@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bexo BD | ড্রপশিপিং সাপ্লায়ার পোর্টাল</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Hind Siliguri for Bangla -->
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Hind Siliguri', sans-serif;
+            background-color: #f8fafc;
+        }
+        .orange-theme {
+            --primary: #FF6B00;
+            --primary-dark: #cc5600;
+            --secondary: #FFFFFF;
+        }
+        .bg-primary { background-color: var(--primary); }
+        .text-primary { color: var(--primary); }
+        .border-primary { border-color: var(--primary); }
+        .hover-bg-primary:hover { background-color: var(--primary-dark); }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #FF6B00; border-radius: 10px; }
+
+        .sidebar-transition { transition: all 0.3s ease; }
+        .glass-header {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Mobile Sidebar Layout */
+        @media (max-width: 1024px) {
+            .sidebar-hidden { transform: translateX(-100%); }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FF6B00',
+                        'primary-dark': '#cc5600',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="orange-theme text-slate-800">
+
+    <!-- LANGUAGE TOGGLE (Floating Top Right) -->
+    <div class="fixed top-4 right-4 z-[100]">
+        <button id="langToggle" onclick="toggleLanguage()" class="bg-white px-4 py-2 rounded-full shadow-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50 transition-all flex items-center gap-2">
+            <i class="fas fa-globe text-primary"></i>
+            <span id="langText">English</span>
+        </button>
+    </div>
+
+    <!-- AUTHENTICATION VIEW -->
+    <div id="authView" class="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+        <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-slate-100 animate-fade-in relative overflow-hidden">
+            <!-- Branding -->
+            <div class="text-center mb-10">
+                <div class="w-20 h-20 bg-primary text-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3">
+                    <i class="fas fa-box-open text-3xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold tracking-tighter text-slate-900 mb-1">BEXO <span class="text-primary italic">BD</span></h1>
+                <p id="authSubtitle" class="text-slate-500 font-medium">সাপ্লায়ার ও রিসেলার পোর্টাল</p>
+            </div>
+
+            <!-- Login/Register Tabs -->
+            <div class="flex p-1 bg-slate-100 rounded-2xl mb-8">
+                <button onclick="showAuthMode('login')" id="loginTab" class="flex-1 py-3 text-sm font-bold rounded-xl transition-all bg-white shadow-sm text-slate-900">লগইন</button>
+                <button onclick="showAuthMode('register')" id="registerTab" class="flex-1 py-3 text-sm font-bold rounded-xl transition-all text-slate-500 hover:text-slate-700">রেজিস্ট্রেশন</button>
+            </div>
+
+            <!-- Form Container -->
+            <form id="authForm" onsubmit="handleAuth(event)" class="space-y-5">
+                <!-- Registration Fields (Hidden by default) -->
+                <div id="registerFields" class="hidden space-y-5">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold uppercase text-slate-400 tracking-widest pl-1" data-bn="নাম" data-en="Name">নাম</label>
+                        <input type="text" id="regName" placeholder="আপনার সম্পূর্ণ নাম" class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-100 transition-all font-medium">
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold uppercase text-slate-400 tracking-widest pl-1" data-bn="মোবাইল নম্বর" data-en="Mobile Number">মোবাইল নম্বর</label>
+                    <div class="relative">
+                        <i class="fas fa-phone absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                        <input type="text" id="mobileInput" placeholder="017xxxxxxxx" class="w-full pl-14 pr-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-100 transition-all font-bold tracking-wider" required>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold uppercase text-slate-400 tracking-widest pl-1" data-bn="পাসওয়ার্ড" data-en="Password">পাসওয়ার্ড</label>
+                    <div class="relative">
+                        <i class="fas fa-lock absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                        <input type="password" id="passwordInput" placeholder="••••••••" class="w-full pl-14 pr-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-100 transition-all font-bold" required>
+                    </div>
+                </div>
+
+                <!-- Confirm Password (Registration Only) -->
+                <div id="confirmPassField" class="hidden space-y-1">
+                    <label class="text-xs font-bold uppercase text-slate-400 tracking-widest pl-1" data-bn="পাসওয়ার্ড নিশ্চিত করুন" data-en="Confirm Password">পাসওয়ার্ড নিশ্চিত করুন</label>
+                    <div class="relative">
+                        <i class="fas fa-shield-check absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                        <input type="password" id="confirmPassInput" placeholder="••••••••" class="w-full pl-14 pr-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-100 transition-all font-bold">
+                    </div>
+                </div>
+
+                <div id="authError" class="hidden text-red-500 text-xs font-bold bg-red-50 p-4 rounded-xl border border-red-100 flex items-center gap-2">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span id="errorMsg">ভুল মোবাইল নম্বর বা পাসওয়ার্ড!</span>
+                </div>
+
+                <button type="submit" id="submitBtn" class="w-full py-5 bg-primary hover:bg-primary-dark text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-xl shadow-orange-100 transition-all transform active:scale-[0.98] flex items-center justify-center gap-3">
+                    <span id="submitBtnText">লগইন করুন</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD VIEW (Hidden) -->
+    <div id="dashboardView" class="hidden min-h-screen flex">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-[280px] bg-white border-r border-slate-100 z-50 sidebar-transition translate-x-0 lg:translate-x-0 sidebar-hidden flex flex-col">
+            <div class="p-8 pb-10">
+                <h2 class="text-2xl font-black tracking-tighter text-slate-900 mb-1">BEXO <span class="text-primary italic">BD</span></h2>
+                <div class="h-1.5 w-12 bg-primary rounded-full"></div>
+            </div>
+
+            <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
+                <button onclick="switchView('profile')" class="sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:bg-orange-50 hover:text-primary transition-all font-bold group">
+                    <i class="fas fa-user-circle w-6"></i>
+                    <span data-bn="প্রোফাইল" data-en="Profile">প্রোফাইল</span>
+                </button>
+                <button onclick="switchView('overview')" class="sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl bg-orange-50 text-primary font-black group shadow-sm shadow-orange-100/50">
+                    <i class="fas fa-th-large w-6"></i>
+                    <span data-bn="ড্যাশবোর্ড" data-en="Dashboard">ড্যাশবোর্ড</span>
+                </button>
+                <button onclick="switchView('products')" class="sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:bg-orange-50 hover:text-primary transition-all font-bold group">
+                    <i class="fas fa-boxes-stacked w-6"></i>
+                    <span data-bn="সকল প্রোডাক্ট" data-en="All Products">সকল প্রোডাক্ট</span>
+                </button>
+                <button onclick="switchView('orders')" class="sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:bg-orange-50 hover:text-primary transition-all font-bold group">
+                    <i class="fas fa-file-invoice w-6"></i>
+                    <span data-bn="অর্ডার লিস্ট" data-en="Order List">অর্ডার লিস্ট</span>
+                </button>
+                <button onclick="switchView('cart')" class="sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:bg-orange-50 hover:text-primary transition-all font-bold group">
+                    <i class="fas fa-shopping-cart w-6"></i>
+                    <span data-bn="কার্ট" data-en="Cart">কার্ট</span>
+                </button>
+                <div class="px-6 py-4">
+                    <hr class="border-slate-100">
+                </div>
+                <button onclick="switchView('sales')" class="sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:bg-orange-50 hover:text-primary transition-all font-bold group">
+                    <i class="fas fa-chart-line w-6"></i>
+                    <span data-bn="সেলস ও প্রফিট" data-en="Sales & Profit">সেলস ও প্রফিট</span>
+                </button>
+                <button onclick="switchView('statement')" class="sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:bg-orange-50 hover:text-primary transition-all font-bold group">
+                    <i class="fas fa-wallet w-6"></i>
+                    <span data-bn="ব্যালেন্স স্টেটমেন্ট" data-en="Balance Statement">ব্যালেন্স স্টেটমেন্ট</span>
+                </button>
+                <button onclick="switchView('support')" class="sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:bg-orange-50 hover:text-primary transition-all font-bold group">
+                    <i class="fas fa-headset w-6"></i>
+                    <span data-bn="সাপোর্ট টিকিট" data-en="Support Ticket">সাপোর্ট টিকিট</span>
+                </button>
+            </nav>
+
+            <div class="p-6 mt-auto">
+                <button onclick="handleLogout()" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-800 transition-colors flex items-center justify-center gap-3">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span data-bn="লগ-আউট" data-en="Logout">লগ-আউট</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Wrapper -->
+        <main class="flex-1 lg:ml-[280px] bg-slate-50 min-h-screen">
+            <!-- Header -->
+            <header class="h-[80px] glass-header border-b border-slate-100 px-8 flex items-center justify-between sticky top-0 z-40">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleSidebar()" class="lg:hidden p-2 text-slate-500 hover:text-primary">
+                        <i class="fas fa-bars-staggered text-xl"></i>
+                    </button>
+                    <h3 id="currentSectionTitle" class="text-lg font-black tracking-tight text-slate-800 lg:block hidden">ড্যাশবোর্ড ওভারভিউ</h3>
+                </div>
+
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-3 bg-white border border-slate-200 px-5 py-2.5 rounded-2xl shadow-sm">
+                        <div class="w-8 h-8 rounded-full bg-orange-100 text-primary flex items-center justify-center font-black">৳</div>
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-black uppercase text-slate-400 leading-none mb-1">ব্যালেন্স</span>
+                            <span class="font-black text-slate-900 leading-none">৫০০.০০</span>
+                        </div>
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-primary border-2 border-white shadow-sm overflow-hidden">
+                        <img src="https://ui-avatars.com/api/?name=User&background=FF6B00&color=fff" alt="User">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div id="content" class="p-8 max-w-7xl mx-auto space-y-10">
+                <!-- Overview Section -->
+                <section id="overviewSection" class="animate-fade-in space-y-10">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl hover:shadow-orange-100 hover:-translate-y-1">
+                            <i class="fas fa-shopping-bag text-primary text-2xl mb-6"></i>
+                            <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">মোট অর্ডার</p>
+                            <h4 class="text-3xl font-black">১২৮</h4>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl hover:shadow-orange-100 hover:-translate-y-1">
+                            <i class="fas fa-clock text-blue-500 text-2xl mb-6"></i>
+                            <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">পেন্ডিং অর্ডার</p>
+                            <h4 class="text-3xl font-black">১২</h4>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl hover:shadow-orange-100 hover:-translate-y-1">
+                            <i class="fas fa-hand-holding-dollar text-emerald-500 text-2xl mb-6"></i>
+                            <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">মোট প্রফিট</p>
+                            <h4 class="text-3xl font-black">৳ ৪,৫০০</h4>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl hover:shadow-orange-100 hover:-translate-y-1">
+                            <i class="fas fa-wallet text-orange-500 text-2xl mb-6"></i>
+                            <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">ওয়ালেট ব্যালেন্স</p>
+                            <h4 class="text-3xl font-black">৳ ৫০০</h4>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 rounded-[3rem] p-12 text-white relative overflow-hidden">
+                        <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
+                            <div class="space-y-4">
+                                <h2 class="text-4xl font-black tracking-tighter leading-tight">আপনার ব্যবসা <br>আকাশছোঁয়া করতে Bexo BD সাথে থাকুন।</h2>
+                                <p class="text-slate-400 max-w-md font-medium">নিজে প্রোডাক্ট ইনভেন্টরি রাখা ছাড়াই শুরু করুন আপনার ই-কমার্স জার্নি। আজই প্রোডাক্ট চুজ করে অর্ডার করুন।</p>
+                                <button onclick="switchView('products')" class="px-8 py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-600 transition-colors">প্রোডাক্ট দেখুন</button>
+                            </div>
+                            <div class="w-full max-w-sm">
+                                <img src="https://picsum.photos/seed/dropship/600/400" class="rounded-3xl shadow-2xl rotate-2" alt="Hero">
+                            </div>
+                        </div>
+                        <div class="absolute -bottom-20 -right-20 w-80 h-80 bg-primary opacity-20 rounded-full blur-[100px]"></div>
+                    </div>
+                </section>
+
+                <!-- Products Section -->
+                <section id="productsSection" class="hidden animate-fade-in space-y-8">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <h2 class="text-3xl font-black tracking-tight cursor-default">সকল প্রোডাক্ট</h2>
+                        <div class="relative w-full max-w-md">
+                            <i class="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                            <input type="text" placeholder="প্রোডাক্ট খুঁজুন..." class="w-full pl-14 pr-6 py-4 bg-white border border-slate-100 rounded-[2rem] shadow-sm focus:outline-none focus:ring-4 focus:ring-orange-100 transition-all font-bold">
+                        </div>
+                    </div>
+
+                    <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                        <!-- Product Item (Dynamic) -->
+                    </div>
+                </section>
+
+                <!-- Order List Section -->
+                <section id="ordersSection" class="hidden animate-fade-in space-y-8">
+                    <h2 class="text-3xl font-black tracking-tight">অর্ডার হিস্টোরি</h2>
+                    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-400 border-b border-slate-100">
+                                    <th class="px-8 py-6 text-[10px] font-black uppercase tracking-widest">অর্ডার আইডি</th>
+                                    <th class="px-8 py-6 text-[10px] font-black uppercase tracking-widest">কাস্টমার</th>
+                                    <th class="px-8 py-6 text-[10px] font-black uppercase tracking-widest">প্রোডাক্ট</th>
+                                    <th class="px-8 py-6 text-[10px] font-black uppercase tracking-widest">মোট দাম</th>
+                                    <th class="px-8 py-6 text-[10px] font-black uppercase tracking-widest">স্ট্যাটাস</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orderListTable" class="divide-y divide-slate-50 italic">
+                                <!-- Order Items (Dynamic) -->
+                            </tbody>
+                        </table>
+                        <div id="noOrders" class="p-12 text-center text-slate-300 font-bold italic">এখনো কোনো অর্ডার নেই।</div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- ORDER FORM MODAL -->
+    <div id="orderModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onclick="closeOrderModal()"></div>
+        <div class="relative bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-fade-in max-h-[90vh] flex flex-col">
+            <div class="p-8 border-b border-slate-50 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-orange-100 text-primary rounded-2xl flex items-center justify-center">
+                        <i class="fas fa-shopping-cart text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-black text-slate-800 tracking-tight">অর্ডার সম্পন্ন করুন</h3>
+                        <p id="modalProductName" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">প্রোডাক্ট নাম</p>
+                    </div>
+                </div>
+                <button onclick="closeOrderModal()" class="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-10 space-y-8 overflow-y-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">কাস্টমারের নাম</label>
+                        <input type="text" id="custName" placeholder="নাম লিখুন" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:bg-white focus:ring-4 focus:ring-orange-100 transition-all font-bold">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ফোন নম্বর</label>
+                        <input type="text" id="custPhone" placeholder="01xxxxxxxxx" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:bg-white focus:ring-4 focus:ring-orange-100 transition-all font-bold">
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">পূর্ণ ঠিকানা</label>
+                    <textarea id="custAddress" rows="2" placeholder="বিস্তারিত ঠিকানা দিন" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:bg-white focus:ring-4 focus:ring-orange-100 transition-all font-bold resize-none"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    <div class="space-y-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">বিক্রয় মূল্য (টাকা)</label>
+                            <input type="number" id="sellingPrice" oninput="calculateProfit()" placeholder="0" class="w-full px-6 py-4 bg-white border-2 border-primary rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-100 transition-all font-black text-2xl text-primary">
+                        </div>
+                        <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center group">
+                            <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">আপনার প্রফিট</p>
+                                <h5 id="profitDisplay" class="text-2xl font-black text-emerald-600">৳ ০</h5>
+                            </div>
+                            <i class="fas fa-coins text-emerald-400 text-xl group-hover:scale-110 transition-transform"></i>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ডেলিভারি জোন</label>
+                            <div class="grid grid-cols-1 gap-3">
+                                <label class="flex items-center justify-between p-4 px-6 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer hover:border-orange-200 transition-all has-[:checked]:border-primary has-[:checked]:bg-orange-50 group">
+                                    <div class="flex items-center gap-3">
+                                        <input type="radio" name="delivery" value="60" checked onchange="calculateProfit()" class="accent-primary w-4 h-4">
+                                        <span class="font-bold text-sm text-slate-600 group-has-[:checked]:text-primary">ঢাকার ভেতরে</span>
+                                    </div>
+                                    <span class="font-black text-sm text-slate-400 group-has-[:checked]:text-primary">৳ ৬০</span>
+                                </label>
+                                <label class="flex items-center justify-between p-4 px-6 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer hover:border-orange-200 transition-all has-[:checked]:border-primary has-[:checked]:bg-orange-50 group">
+                                    <div class="flex items-center gap-3">
+                                        <input type="radio" name="delivery" value="120" onchange="calculateProfit()" class="accent-primary w-4 h-4">
+                                        <span class="font-bold text-sm text-slate-600 group-has-[:checked]:text-primary">ঢাকার বাইরে</span>
+                                    </div>
+                                    <span class="font-black text-sm text-slate-400 group-has-[:checked]:text-primary">৳ ১২০</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-8 border-t border-slate-50 bg-slate-50 flex items-center justify-between flex-shrink-0">
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">মোট প্রদেয়</p>
+                    <h5 id="totalPayableDisplay" class="text-3xl font-black text-slate-900">৳ ০</h5>
+                </div>
+                <button onclick="confirmOrder()" class="px-10 py-5 bg-primary hover:bg-primary-dark text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-orange-100 transition-all transform active:scale-95">
+                    অর্ডার নিশ্চিত করুন
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // State Management
+        let currentLang = 'bn';
+        let currentAuthMode = 'login';
+        let currentView = 'overview';
+        let selectedProduct = null;
+        let orders = [];
+
+        // Mock Products
+        const initialProducts = [
+            { id: 1, name: 'সফট সিল্ক শাড়ি - ব্লু', price: 1250, img: 'https://picsum.photos/seed/saree/500/500' },
+            { id: 2, name: 'কিউ১০ প্রিমিয়াম স্মার্টওয়াচ', price: 2450, img: 'https://picsum.photos/seed/watch/500/500' },
+            { id: 3, name: 'কমপ্লিট স্কিনকেয়ার কিট', price: 850, img: 'https://picsum.photos/seed/cream/500/500' },
+            { id: 4, name: 'ওয়্যারলেস গেমিং মাউস', price: 620, img: 'https://picsum.photos/seed/mouse/500/500' },
+            { id: 5, name: 'পোর্টেবল ব্লুটুথ স্পিকার', price: 1800, img: 'https://picsum.photos/seed/speaker/500/500' },
+            { id: 6, name: 'ইলেকট্রিক কফি মেকার', price: 3500, img: 'https://picsum.photos/seed/coffee/500/500' },
+            { id: 7, name: 'মেনস পোলো টি-শার্ট', price: 450, img: 'https://picsum.photos/seed/polo/500/500' },
+            { id: 8, name: 'নয়েজ ক্যানসেলিং ইয়ারফোন', price: 1100, img: 'https://picsum.photos/seed/airpods/500/500' }
+        ];
+
+        // Language Localization
+        const i18n = {
+            en: {
+                subtitle: 'Supplier & Reseller Portal',
+                login: 'Login',
+                register: 'Registration',
+                mobile: 'Mobile Number',
+                password: 'Password',
+                confirmPass: 'Confirm Password',
+                loginBtn: 'Sign In',
+                regBtn: 'Join Now',
+                error: 'Invalid Mobile or Password!',
+                overview: 'Dashboard Overview',
+                profile: 'Profile',
+                dashboard: 'Dashboard',
+                products: 'All Products',
+                orderList: 'Order List',
+                cart: 'Cart',
+                sales: 'Sales & Profit',
+                balance: 'Balance Statement',
+                support: 'Support Ticket',
+                logout: 'Logout',
+                stats_orders: 'Total Orders',
+                stats_pending: 'Pending Orders',
+                stats_profit: 'Total Profit',
+                stats_balance: 'Wallet Balance'
+            },
+            bn: {
+                subtitle: 'সাপ্লায়ার ও রিসেলার পোর্টাল',
+                login: 'লগইন',
+                register: 'রেজিস্ট্রেশন',
+                mobile: 'মোবাইল নম্বর',
+                password: 'পাসওয়ার্ড',
+                confirmPass: 'পাসওয়ার্ড নিশ্চিত করুন',
+                loginBtn: 'লগইন করুন',
+                regBtn: 'রেজিস্ট্রেশন করুন',
+                error: 'ভুল মোবাইল নম্বর বা পাসওয়ার্ড!',
+                overview: 'ড্যাশবোর্ড ওভারভিউ',
+                profile: 'প্রোফাইল',
+                dashboard: 'ড্যাশবোর্ড',
+                products: 'সকল প্রোডাক্ট',
+                orderList: 'অর্ডার লিস্ট',
+                cart: 'কার্ট',
+                sales: 'সেলস ও প্রফিট',
+                balance: 'ব্যালেন্স স্টেটমেন্ট',
+                support: 'সাপোর্ট টিকিট',
+                logout: 'লগ-আউট',
+                stats_orders: 'মোট অর্ডার',
+                stats_pending: 'পেন্ডিং অর্ডার',
+                stats_profit: 'মোট প্রফিট',
+                stats_balance: 'ওয়ালেট ব্যালেন্স'
+            }
+        };
+
+        // --- Auth Logic ---
+        function showAuthMode(mode) {
+            currentAuthMode = mode;
+            const loginTab = document.getElementById('loginTab');
+            const registerTab = document.getElementById('registerTab');
+            const registerFields = document.getElementById('registerFields');
+            const confirmPassField = document.getElementById('confirmPassField');
+            const submitBtnText = document.getElementById('submitBtnText');
+
+            if (mode === 'login') {
+                loginTab.className = "flex-1 py-3 text-sm font-bold rounded-xl transition-all bg-white shadow-sm text-slate-900";
+                registerTab.className = "flex-1 py-3 text-sm font-bold rounded-xl transition-all text-slate-500 hover:text-slate-700";
+                registerFields.classList.add('hidden');
+                confirmPassField.classList.add('hidden');
+                submitBtnText.innerText = currentLang === 'bn' ? i18n.bn.loginBtn : i18n.en.loginBtn;
+            } else {
+                registerTab.className = "flex-1 py-3 text-sm font-bold rounded-xl transition-all bg-white shadow-sm text-slate-900";
+                loginTab.className = "flex-1 py-3 text-sm font-bold rounded-xl transition-all text-slate-500 hover:text-slate-700";
+                registerFields.classList.remove('hidden');
+                confirmPassField.classList.remove('hidden');
+                submitBtnText.innerText = currentLang === 'bn' ? i18n.bn.regBtn : i18n.en.regBtn;
+            }
+        }
+
+        function handleAuth(e) {
+            e.preventDefault();
+            const mobile = document.getElementById('mobileInput').value;
+            const pass = document.getElementById('passwordInput').value;
+            const errorDiv = document.getElementById('authError');
+
+            if (currentAuthMode === 'login') {
+                if (mobile === '017' && pass === '123') {
+                    document.getElementById('authView').classList.add('hidden');
+                    document.getElementById('dashboardView').classList.remove('hidden');
+                    renderProducts();
+                } else {
+                    errorDiv.classList.remove('hidden');
+                }
+            } else {
+                alert(currentLang === 'bn' ? 'রেজিস্ট্রেশন এখন বন্ধ আছে। লগইন করুন (০১৭ / ১২৩)' : 'Registration is closed. Use mock login (017 / 123).');
+            }
+        }
+
+        function handleLogout() {
+            document.getElementById('dashboardView').classList.add('hidden');
+            document.getElementById('authView').classList.remove('hidden');
+            document.getElementById('mobileInput').value = '';
+            document.getElementById('passwordInput').value = '';
+        }
+
+        // --- View Logic ---
+        function switchView(view) {
+            currentView = view;
+            const sections = ['overviewSection', 'productsSection', 'ordersSection'];
+            sections.forEach(s => document.getElementById(s).classList.add('hidden'));
+
+            if (view === 'overview') {
+                document.getElementById('overviewSection').classList.remove('hidden');
+                document.getElementById('currentSectionTitle').innerText = currentLang === 'bn' ? i18n.bn.overview : i18n.en.overview;
+            } else if (view === 'products') {
+                document.getElementById('productsSection').classList.remove('hidden');
+                document.getElementById('currentSectionTitle').innerText = currentLang === 'bn' ? i18n.bn.products : i18n.en.products;
+            } else if (view === 'orders') {
+                document.getElementById('ordersSection').classList.remove('hidden');
+                document.getElementById('currentSectionTitle').innerText = currentLang === 'bn' ? i18n.bn.orderList : i18n.en.orderList;
+                renderOrders();
+            } else {
+                alert('এই ফিচারটি খুব দ্রুত আসছে!');
+            }
+
+            // Update sidebar buttons
+            const buttons = document.querySelectorAll('.sidebar-btn');
+            buttons.forEach(btn => {
+                const label = btn.querySelector('span').innerText;
+                const targetLabel = i18n[currentLang][view];
+                if (label === targetLabel) {
+                    btn.className = "sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl bg-orange-50 text-primary font-black group shadow-sm shadow-orange-100/50";
+                } else {
+                    btn.className = "sidebar-btn w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:bg-orange-50 hover:text-primary transition-all font-bold group";
+                }
+            });
+
+            if (window.innerWidth < 1024) toggleSidebar();
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('sidebar-hidden');
+        }
+
+        // --- Product Logic ---
+        function renderProducts() {
+            const grid = document.getElementById('productGrid');
+            grid.innerHTML = '';
+            initialProducts.forEach(p => {
+                const card = `
+                    <div class="bg-white p-4 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-2xl hover:shadow-orange-100 group">
+                        <div class="relative h-64 overflow-hidden rounded-[2rem] mb-6 bg-slate-50">
+                            <img src="${p.img}" alt="${p.name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                            <div class="absolute top-4 right-4 bg-white/80 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black text-primary uppercase tracking-widest shadow-sm">নতুন</div>
+                        </div>
+                        <div class="px-2 space-y-4">
+                            <h5 class="text-sm font-black text-slate-700 leading-tight uppercase tracking-tight">${p.name}</h5>
+                            <div class="flex items-center justify-between">
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">বেস প্রাইস</span>
+                                    <span class="text-xl font-black text-slate-900 italic font-mono">৳${p.price}</span>
+                                </div>
+                                <button onclick="openOrderModal(${p.id})" class="p-4 bg-primary text-white rounded-2xl hover:bg-primary-dark transition-all shadow-lg shadow-orange-100 transform active:scale-90">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += card;
+            });
+        }
+
+        // --- Order Logic ---
+        function openOrderModal(id) {
+            selectedProduct = initialProducts.find(p => p.id === id);
+            document.getElementById('modalProductName').innerText = selectedProduct.name;
+            document.getElementById('sellingPrice').value = selectedProduct.price + 200; // default margin
+            document.getElementById('orderModal').classList.remove('hidden');
+            calculateProfit();
+        }
+
+        function closeOrderModal() {
+            document.getElementById('orderModal').classList.add('hidden');
+            selectedProduct = null;
+            // Clear inputs
+            document.getElementById('custName').value = '';
+            document.getElementById('custPhone').value = '';
+            document.getElementById('custAddress').value = '';
+        }
+
+        function calculateProfit() {
+            if (!selectedProduct) return;
+            const selling = Number(document.getElementById('sellingPrice').value) || 0;
+            const deliveryCharge = Number(document.querySelector('input[name="delivery"]:checked').value);
+            
+            const profit = selling - selectedProduct.price;
+            const total = selling + deliveryCharge;
+
+            document.getElementById('profitDisplay').innerText = `৳ ${profit}`;
+            document.getElementById('totalPayableDisplay').innerText = `৳ ${total}`;
+        }
+
+        function confirmOrder() {
+            const name = document.getElementById('custName').value;
+            const phone = document.getElementById('custPhone').value;
+            const address = document.getElementById('custAddress').value;
+            const selling = Number(document.getElementById('sellingPrice').value);
+            const delivery = Number(document.querySelector('input[name="delivery"]:checked').value);
+
+            if (!name || !phone || !address || !selling) {
+                alert(currentLang === 'bn' ? 'দয়া করে সব তথ্য পূরণ করুন!' : 'Please fill all details!');
+                return;
+            }
+
+            const newOrder = {
+                id: 'ORD-' + Math.floor(Math.random() * 90000 + 10000),
+                customer: name,
+                product: selectedProduct.name,
+                total: selling + delivery,
+                status: 'পেন্ডিং'
+            };
+
+            orders.unshift(newOrder);
+            closeOrderModal();
+            alert(currentLang === 'bn' ? 'অর্ডার সফলভাবে প্লেস হয়েছে!' : 'Order placed successfully!');
+            switchView('orders');
+        }
+
+        function renderOrders() {
+            const table = document.getElementById('orderListTable');
+            const noOrders = document.getElementById('noOrders');
+            table.innerHTML = '';
+            
+            if (orders.length === 0) {
+                noOrders.classList.remove('hidden');
+                return;
+            }
+            noOrders.classList.add('hidden');
+
+            orders.forEach(o => {
+                const tr = `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-8 py-6 font-mono text-xs font-bold text-slate-400">${o.id}</td>
+                        <td class="px-8 py-6 text-sm font-bold text-slate-800">${o.customer}</td>
+                        <td class="px-8 py-6 text-sm font-medium text-slate-500">${o.product}</td>
+                        <td class="px-8 py-6 text-sm font-black text-slate-800 italic">৳ ${o.total}</td>
+                        <td class="px-8 py-6">
+                            <span class="bg-orange-50 text-orange-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-orange-100">${o.status}</span>
+                        </td>
+                    </tr>
+                `;
+                table.innerHTML += tr;
+            });
+        }
+
+        // --- Language Toggle Logic ---
+        function toggleLanguage() {
+            currentLang = currentLang === 'bn' ? 'en' : 'bn';
+            const dict = i18n[currentLang];
+
+            // Update Toggle Button
+            document.getElementById('langText').innerText = currentLang === 'bn' ? 'English' : 'Bengali';
+            
+            // Update Auth UI
+            document.getElementById('authSubtitle').innerText = dict.subtitle;
+            document.getElementById('loginTab').innerText = dict.login;
+            document.getElementById('registerTab').innerText = dict.register;
+            document.getElementById('errorMsg').innerText = dict.error;
+            
+            // Update labels with data-en/data-bn
+            document.querySelectorAll('[data-bn]').forEach(el => {
+                el.innerText = el.getAttribute(`data-${currentLang}`);
+            });
+
+            // Update dynamic placeholders (manual)
+            document.getElementById('mobileInput').placeholder = currentLang === 'bn' ? '017xxxxxxxx' : '017xxxxxxxx';
+            document.getElementById('submitBtnText').innerText = currentAuthMode === 'login' ? dict.loginBtn : dict.regBtn;
+            
+            // Update Section Titles
+            if (currentView === 'overview') document.getElementById('currentSectionTitle').innerText = dict.overview;
+            if (currentView === 'products') document.getElementById('currentSectionTitle').innerText = dict.products;
+            if (currentView === 'orders') document.getElementById('currentSectionTitle').innerText = dict.orderList;
+
+            // Update Stat Cards (if overview)
+            const statsLabels = document.querySelectorAll('#overviewSection p');
+            if (statsLabels.length > 0) {
+              statsLabels[0].innerText = dict.stats_orders;
+              statsLabels[1].innerText = dict.stats_pending;
+              statsLabels[2].innerText = dict.stats_profit;
+              statsLabels[3].innerText = dict.stats_balance;
+            }
+        }
+    </script>
+</body>
+</html>

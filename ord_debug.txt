@@ -1,0 +1,29 @@
+    </section>
+
+    <!-- === ADMIN PASSWORD MODAL === -->
+    <div id="adminPasswordModal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/90 backdrop-blur-md" onclick="closeAdminLoginModal()"></div>
+--
+    </div>
+
+    <!-- === SECTION 3: ORDER / CART MODAL === -->
+    <div id="orderModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <!-- Backdrop -->
+--
+            }
+
+            const orderId = 'ORD-' + Date.now();
+            const order = {
+                id: orderId,
+--
+            
+            const stats = [
+                { title: 'TOTAL ORDER:', icon: 'fas fa-box', color: 'text-pink-500', bg: 'bg-pink-50', q: totalQty, p: totalProfit, label: 'PROFIT:' },
+                { title: 'PENDING:', icon: 'fas fa-list-ul', color: 'text-blue-400', bg: 'bg-blue-50', q: appOrders.filter(o => o.status === 'Pending').length, p: 0, label: 'PROFIT:' },
+                { title: 'PROCESSING:', icon: 'fas fa-truck', color: 'text-orange-400', bg: 'bg-orange-50', q: appOrders.filter(o => o.status === 'Processing').length, p: 0, label: 'PROFIT:' },
+--
+                            <!-- Page Label (Image 3) -->
+                            <div class="text-center mb-8">
+                                <h2 class="text-emerald-700 font-bold text-xs uppercase tracking-widest">ACTIVE ORDERS</h2>
+                            </div>
+

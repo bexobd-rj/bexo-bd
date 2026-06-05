@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Allow public read/write to all bexo collections for the custom user/admin panels
+    match /bexo_posts/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_users/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_orders/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_recharge_requests/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_balance_requests/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_withdrawals/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_settings/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_premium_requests/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_bill_requests/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_categories/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_transactions/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_accounts/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_support_tickets/{id} {
+      allow read, write: if true;
+    }
+    match /bexo_customer_reports/{id} {
+      allow read, write: if true;
+    }
+
+    // Default deny for unhandled collections
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

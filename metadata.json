@@ -1,0 +1,6 @@
+{
+  "name": "Bexo BD - Dropshipping & Reselling Supplier Portal",
+  "description": "A modern dropshipping and reselling supplier portal for Bexo BD featuring dashboard, product listing, and order management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
