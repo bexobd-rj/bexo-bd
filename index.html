@@ -2766,6 +2766,34 @@
 
               window.firebaseErrors = [];
               
+              const OperationType = {
+                  CREATE: 'create',
+                  UPDATE: 'update',
+                  DELETE: 'delete',
+                  LIST: 'list',
+                  GET: 'get',
+                  WRITE: 'write',
+              };
+
+              function handleFirestoreError(error, operationType, path) {
+                  const msg = error instanceof Error ? error.message : String(error);
+                  const errInfo = {
+                      error: msg,
+                      operationType: operationType,
+                      path: path,
+                      authInfo: {
+                          userId: null,
+                          email: null,
+                          emailVerified: false,
+                          isAnonymous: false,
+                          tenantId: null,
+                          providerInfo: []
+                      }
+                  };
+                  console.error('Firestore Error: ', JSON.stringify(errInfo));
+                  throw new Error(JSON.stringify(errInfo));
+              }
+
               function logFirebaseError(context, err) {
                   const msg = err && err.message ? err.message : String(err);
                   console.error(`[Firebase ${context} Error]`, err);
@@ -2965,6 +2993,7 @@
                       console.error("Firebase posts snapshot subscription error:", err);
                       logFirebaseError("bexo_posts onSnapshot", err);
                       updateFirebaseConnectionBadges(false, "Posts Sync Error: " + err.message);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_posts");
                   });
 
                   // Realtime users list sync with fallback merging to prevent race condition data loss on offline/slow registrations
@@ -3032,6 +3061,7 @@
                       console.error("Firebase users snapshot subscription error:", err);
                       logFirebaseError("bexo_users onSnapshot", err);
                       updateFirebaseConnectionBadges(false, "Users Sync Error: " + err.message);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_users");
                   });
 
                   // Realtime orders sync
@@ -3056,6 +3086,7 @@
                       console.error("Firebase orders subscription error:", err);
                       logFirebaseError("bexo_orders onSnapshot", err);
                       updateFirebaseConnectionBadges(false, "Orders Sync Error: " + err.message);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_orders");
                   });
 
                   // Realtime settings sync
@@ -3075,6 +3106,7 @@
                       console.error("Firebase settings subscription error:", err);
                       logFirebaseError("bexo_settings onSnapshot", err);
                       updateFirebaseConnectionBadges(false, "Settings Sync Error: " + err.message);
+                      handleFirestoreError(err, OperationType.GET, "bexo_settings/global");
                   });
 
                   // Realtime premium requests sync
@@ -3095,7 +3127,10 @@
                                   .catch(err => console.error("Auto-seed premium error:", err));
                           });
                       }
-                  }, err => console.error("Firebase premium subscription error:", err));
+                  }, err => {
+                      console.error("Firebase premium subscription error:", err);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_premium_requests");
+                  });
 
                   // Realtime recharge requests sync
                   window.db.collection('bexo_recharge_requests').onSnapshot(snap => {
@@ -3115,7 +3150,10 @@
                                   .catch(err => console.error("Auto-seed recharge error:", err));
                           });
                       }
-                  }, err => console.error("Firebase recharge subscription error:", err));
+                  }, err => {
+                      console.error("Firebase recharge subscription error:", err);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_recharge_requests");
+                  });
 
                   // Realtime balance requests sync
                   window.db.collection('bexo_balance_requests').onSnapshot(snap => {
@@ -3135,7 +3173,10 @@
                                   .catch(err => console.error("Auto-seed balance error:", err));
                           });
                       }
-                  }, err => console.error("Firebase balance subscription error:", err));
+                  }, err => {
+                      console.error("Firebase balance subscription error:", err);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_balance_requests");
+                  });
 
                   // Realtime bill requests sync
                   window.db.collection('bexo_bill_requests').onSnapshot(snap => {
@@ -3155,7 +3196,10 @@
                                   .catch(err => console.error("Auto-seed bills error:", err));
                           });
                       }
-                  }, err => console.error("Firebase bill subscription error:", err));
+                  }, err => {
+                      console.error("Firebase bill subscription error:", err);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_bill_requests");
+                  });
 
                   // Realtime customer reports sync
                   window.db.collection('bexo_customer_reports').doc('global').onSnapshot(doc => {
@@ -3170,7 +3214,10 @@
                           window.db.collection('bexo_customer_reports').doc('global').set(sanitizeForFirestore(appCustomerReports))
                               .catch(err => console.error(err));
                       }
-                  }, err => console.error("Firebase reports subscription error:", err));
+                  }, err => {
+                      console.error("Firebase reports subscription error:", err);
+                      handleFirestoreError(err, OperationType.GET, "bexo_customer_reports/global");
+                  });
 
                   // Realtime categories sync
                   window.db.collection('bexo_categories').onSnapshot(snap => {
@@ -3190,7 +3237,10 @@
                                   .catch(err => console.error("Auto-seed categories error:", err));
                           });
                       }
-                  }, err => console.error("Firebase categories subscription error:", err));
+                  }, err => {
+                      console.error("Firebase categories subscription error:", err);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_categories");
+                  });
 
                   // Realtime transactions sync
                   window.db.collection('bexo_transactions').onSnapshot(snap => {
@@ -3210,7 +3260,10 @@
                                   .catch(err => console.error("Firebase sync transaction error:", err));
                           });
                       }
-                  }, err => console.error("Firebase transactions subscription error:", err));
+                  }, err => {
+                      console.error("Firebase transactions subscription error:", err);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_transactions");
+                  });
 
                   // Realtime accounts sync
                   window.db.collection('bexo_accounts').onSnapshot(snap => {
@@ -3230,7 +3283,10 @@
                                   .catch(err => console.error("Firebase sync accounts error:", err));
                           });
                       }
-                  }, err => console.error("Firebase accounts subscription error:", err));
+                  }, err => {
+                      console.error("Firebase accounts subscription error:", err);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_accounts");
+                  });
 
                   // Realtime withdrawals sync
                   window.db.collection('bexo_withdrawals').onSnapshot(snap => {
@@ -3250,7 +3306,10 @@
                                   .catch(err => console.error("Firebase sync withdrawal error:", err));
                           });
                       }
-                  }, err => console.error("Firebase withdrawals subscription error:", err));
+                  }, err => {
+                      console.error("Firebase withdrawals subscription error:", err);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_withdrawals");
+                  });
 
                   // Realtime support tickets sync
                   window.db.collection('bexo_support_tickets').onSnapshot(snap => {
@@ -3270,7 +3329,10 @@
                                   .catch(err => console.error("Firebase sync support tickets error:", err));
                           });
                       }
-                  }, err => console.error("Firebase support tick subscription error:", err));
+                  }, err => {
+                      console.error("Firebase support tick subscription error:", err);
+                      handleFirestoreError(err, OperationType.LIST, "bexo_support_tickets");
+                  });
               }
 
               function triggerViewRendering(type) {
