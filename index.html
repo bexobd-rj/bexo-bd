@@ -19,23 +19,53 @@
     <!-- Html2Canvas for Invoice Download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
-    <!-- Firebase SDK Compat via Cloudflare CDNJS (Highly reliable on mobile and broadband) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-app-compat.min.js" onerror="loadFirebaseGstaticFallback()"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-firestore-compat.min.js" onerror="loadFirestoreGstaticFallback()"></script>
-    
+    <!-- Firebase SDK Compat with Sequential, Fail-Safe Loader -->
     <script>
-      function loadFirebaseGstaticFallback() {
-        console.warn("Cloudflare Firebase App failed to load. Trying gstatic fallback...");
-        const s = document.createElement('script');
-        s.src = "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js";
-        document.head.appendChild(s);
-      }
-      function loadFirestoreGstaticFallback() {
-        console.warn("Cloudflare Firebase Firestore failed to load. Trying gstatic fallback...");
-        const s = document.createElement('script');
-        s.src = "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js";
-        document.head.appendChild(s);
-      }
+      (function() {
+        const urlAppGstatic = "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js";
+        const urlAppCloudflare = "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-app-compat.min.js";
+        const urlFirestoreGstatic = "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js";
+        const urlFirestoreCloudflare = "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-firestore-compat.min.js";
+
+        function injectScript(primarySrc, fallbackSrc, callback) {
+          const script = document.createElement('script');
+          script.src = primarySrc;
+          script.crossOrigin = "anonymous";
+          
+          script.onload = function() {
+            console.log("[Firebase Sequence Loader] Loaded successfully: " + primarySrc);
+            if (callback) callback();
+          };
+          
+          script.onerror = function() {
+            console.warn("[Firebase Sequence Loader] Failed to load primary: " + primarySrc + ". Trying fallback...");
+            const fallbackScript = document.createElement('script');
+            fallbackScript.src = fallbackSrc;
+            fallbackScript.crossOrigin = "anonymous";
+            fallbackScript.onload = function() {
+              console.log("[Firebase Sequence Loader] Fallback loaded successfully: " + fallbackSrc);
+              if (callback) callback();
+            };
+            fallbackScript.onerror = function() {
+              console.error("[Firebase Sequence Loader] CRITICAL: Fallback also failed: " + fallbackSrc);
+              if (callback) callback();
+            };
+            document.head.appendChild(fallbackScript);
+          };
+          
+          document.head.appendChild(script);
+        }
+
+        // Start sequential script loading
+        injectScript(urlAppGstatic, urlAppCloudflare, function() {
+          injectScript(urlFirestoreGstatic, urlFirestoreCloudflare, function() {
+            console.log("[Firebase Sequence Loader] All Firebase SDK scripts loaded synchronously in correct order!");
+            if (typeof window.initializeFirebaseIfReady === 'function') {
+              window.initializeFirebaseIfReady();
+            }
+          });
+        });
+      })();
     </script>
 
     <!-- Visual Search Utility -->
@@ -2775,23 +2805,23 @@
                           
                           // Try initializing Firestore using different syntaxes for compatibility with custom database ID
                           try {
-                              // Prioritize correct named database syntax in Compat SDK (on the app instance, v9/v10 Compat)
-                              window.db = firebase.app().firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                              console.log("[Firebase Applet] Init successful with firebase.app().firestore(databaseId)!");
+                              // Prioritize correct named database syntax (firebase.firestore(app, databaseId))
+                              window.db = firebase.firestore(app, "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
+                              console.log("[Firebase Applet] Init successful with firebase.firestore(app, databaseId)!");
                           } catch (dbErr1) {
-                              logFirebaseError("Init Option 1 (app().firestore)", dbErr1);
+                              logFirebaseError("Init Option 1 (firestore(app, dbId))", dbErr1);
                               try {
-                                  // Directly call firebase.firestore(databaseId) as compat alternative without passing app object
-                                  window.db = firebase.firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                                  console.log("[Firebase Applet] Init successful with firebase.firestore(databaseId)!");
+                                  // Compat alternative on the app instance
+                                  window.db = firebase.app().firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
+                                  console.log("[Firebase Applet] Init successful with firebase.app().firestore(databaseId)!");
                               } catch (dbErr2) {
-                                  logFirebaseError("Init Option 2 (firestore(dbId))", dbErr2);
+                                  logFirebaseError("Init Option 2 (app().firestore)", dbErr2);
                                   try {
-                                      // Fallback using global firebase.firestore(app, databaseId)
-                                      window.db = firebase.firestore(app, "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                                      console.log("[Firebase Applet] Init successful with firebase.firestore(app, databaseId)!");
+                                      // Directly call firebase.firestore(databaseId) as alternative without passing app object
+                                      window.db = firebase.firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
+                                      console.log("[Firebase Applet] Init successful with firebase.firestore(databaseId)!");
                                   } catch (dbErr3) {
-                                      logFirebaseError("Init Option 3 (firestore(app, dbId))", dbErr3);
+                                      logFirebaseError("Init Option 3 (firestore(dbId))", dbErr3);
                                       try {
                                           window.db = firebase.firestore();
                                           logFirebaseError("Init Option 4 Fallback Warning", new Error("Connecting to default Firestore database. Security rules might reject requests."));
