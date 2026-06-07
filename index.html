@@ -2801,7 +2801,7 @@
                   `).join('');
               }
 
-              function initializeFirebaseIfReady() {
+              async function initializeFirebaseIfReady() {
                   if (window.db) {
                       updateFirebaseConnectionBadges(true);
                       return true;
@@ -2811,69 +2811,122 @@
                   updateFirebaseConnectionBadges(false);
                   
                   try {
-                      if (typeof firebase !== 'undefined' && typeof firebase.firestore === 'function') {
-                          let app;
-                          if (firebase.apps && firebase.apps.length > 0) {
-                              app = firebase.app();
-                          } else {
-                              app = firebase.initializeApp(firebaseConfig);
-                          }
-                          
-                          // Try initializing Firestore using different syntaxes for compatibility with custom database ID
-                          try {
-                              // Prioritize correct named database syntax in Compat SDK (on the app instance, v9/v10 Compat)
-                              window.db = firebase.app().firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                              console.log("[Firebase Applet] Init successful with firebase.app().firestore(databaseId)!");
-                          } catch (dbErr1) {
-                              logFirebaseError("Init Option 1 (app().firestore)", dbErr1);
-                              try {
-                                  // Compat alternative directly on firebase
-                                  window.db = firebase.firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                                  console.log("[Firebase Applet] Init successful with firebase.firestore(databaseId)!");
-                              } catch (dbErr2) {
-                                  logFirebaseError("Init Option 2 (firestore(dbId))", dbErr2);
-                                  try {
-                                      // Alternative passing app object
-                                      window.db = firebase.firestore(app, "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                                      console.log("[Firebase Applet] Init successful with firebase.firestore(app, databaseId)!");
-                                  } catch (dbErr3) {
-                                      logFirebaseError("Init Option 3 (firestore(app, dbId))", dbErr3);
-                                      try {
-                                          window.db = firebase.firestore();
-                                          logFirebaseError("Init Option 4 Fallback Warning", new Error("Connecting to default Firestore database. Security rules might reject requests."));
-                                          console.log("[Firebase Applet] Fallen back to default Firebase database successfully!");
-                                      } catch (dbErr4) {
-                                          logFirebaseError("Init Option 4 Failed", dbErr4);
-                                          throw dbErr4;
-                                      }
+                      console.log("[Firebase Applet] Starting dynamic import loader for modern modular SDK...");
+                      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+                      const { 
+                          getFirestore, 
+                          collection, 
+                          doc, 
+                          setDoc, 
+                          deleteDoc, 
+                          getDocs, 
+                          onSnapshot 
+                      } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+
+                      let app = initializeApp(firebaseConfig);
+                      const rawDb = getFirestore(app, "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
+                      console.log("[Firebase Applet] Connected directly to custom named database via modular SDK!");
+
+                      // Expose fully compliant compat wrapper on window.db
+                      window.db = {
+                          collection: (collectionName) => {
+                              return {
+                                  doc: (docId) => {
+                                      const docRef = doc(rawDb, collectionName, String(docId));
+                                      return {
+                                          set: (data) => setDoc(docRef, data),
+                                          delete: () => deleteDoc(docRef),
+                                          onSnapshot: (onNext, onError) => {
+                                              return onSnapshot(docRef, (snapshot) => {
+                                                  onNext({
+                                                      exists: snapshot.exists(),
+                                                      data: () => snapshot.data(),
+                                                      id: snapshot.id
+                                                  });
+                                              }, onError || (err => console.error("Doc onSnapshot error:", err)));
+                                          }
+                                      };
+                                  },
+                                  onSnapshot: (onNext, onError) => {
+                                      const colRef = collection(rawDb, collectionName);
+                                      return onSnapshot(colRef, (querySnapshot) => {
+                                          const docs = [];
+                                          querySnapshot.forEach((docSnap) => {
+                                              docs.push({
+                                                  exists: docSnap.exists(),
+                                                  data: () => docSnap.data(),
+                                                  id: docSnap.id
+                                              });
+                                          });
+                                          onNext({
+                                              forEach: (callback) => docs.forEach(callback),
+                                              docs: docs
+                                          });
+                                      }, onError || (err => console.error("Col onSnapshot error:", err)));
+                                  },
+                                  get: async () => {
+                                      const colRef = collection(rawDb, collectionName);
+                                      const querySnapshot = await getDocs(colRef);
+                                      const docs = [];
+                                      querySnapshot.forEach((docSnap) => {
+                                          docs.push({
+                                              exists: docSnap.exists(),
+                                              data: () => docSnap.data(),
+                                              id: docSnap.id
+                                          });
+                                      });
+                                      return {
+                                          forEach: (callback) => docs.forEach(callback),
+                                          docs: docs
+                                      };
                                   }
-                              }
+                              };
                           }
-                          
-                          updateFirebaseConnectionBadges(true);
-                          setupFirebaseRealtimeListeners();
-                          processPendingSyncs();
-                          
-                          // Force sync currently logged-in active profile to Database too
-                          if (userProfile && userProfile.phone && userProfile.password) {
-                              updateAppUsersList(userProfile);
-                          }
-                          isFirebaseInitInProgress = false;
-                          return true;
-                      } else {
-                          isFirebaseInitInProgress = false;
-                          firebaseInitAttempts++;
-                          if (firebaseInitAttempts < 30) {
-                              setTimeout(initializeFirebaseIfReady, 1000);
-                          } else {
-                              console.warn("Firebase SDK not loaded on window after 30 attempts.");
-                              updateFirebaseConnectionBadges(false);
-                          }
+                      };
+
+                      updateFirebaseConnectionBadges(true);
+                      setupFirebaseRealtimeListeners();
+                      processPendingSyncs();
+                      
+                      // Force sync currently logged-in active profile to Database too
+                      if (userProfile && userProfile.phone && userProfile.password) {
+                          updateAppUsersList(userProfile);
                       }
+                      isFirebaseInitInProgress = false;
+                      return true;
                   } catch (e) {
-                      console.error("Firebase init failed in index.html:", e);
+                      console.error("Firebase modular SDK init failed inside index.html:", e);
+                      logFirebaseError("Modular SDK Init Failed", e);
                       isFirebaseInitInProgress = false;
                       updateFirebaseConnectionBadges(false);
+                      
+                      // Fallback to compat SDK
+                      try {
+                          if (typeof firebase !== 'undefined' && typeof firebase.firestore === 'function') {
+                              let app;
+                              if (firebase.apps && firebase.apps.length > 0) {
+                                  app = firebase.app();
+                              } else {
+                                  app = firebase.initializeApp(firebaseConfig);
+                              }
+                              window.db = firebase.firestore();
+                              console.warn("[Firebase Applet] Fallen back to Compatibility/Default firestore.");
+                              updateFirebaseConnectionBadges(true);
+                              setupFirebaseRealtimeListeners();
+                              processPendingSyncs();
+                              isFirebaseInitInProgress = false;
+                              return true;
+                          }
+                      } catch (compatErr) {
+                          console.error("Compat fallback also failed:", compatErr);
+                      }
+                      
+                      firebaseInitAttempts++;
+                      if (firebaseInitAttempts < 30) {
+                          setTimeout(initializeFirebaseIfReady, 1000);
+                      } else {
+                          console.warn("Firebase SDK initialization totally exhausted.");
+                      }
                   }
                   return false;
               }
