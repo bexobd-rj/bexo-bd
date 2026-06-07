@@ -1479,6 +1479,15 @@
             <i class="fas fa-cogs w-5 text-lg"></i>
             <span class="ml-3">অ্যাপ সেটিংস</span>
           </div>
+
+          <div
+            onclick="switchAdminSubView('diagnostics')"
+            class="admin-nav-item flex items-center px-6 py-4 cursor-pointer text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl mx-4 font-bold text-sm"
+            data-view="diagnostics"
+          >
+            <i class="fas fa-stethoscope w-5 text-lg"></i>
+            <span class="ml-3">সিস্টেম ডায়াগনস্টিকস</span>
+          </div>
         </nav>
 
         <div class="p-6 border-t border-white/5 space-y-4">
@@ -2687,6 +2696,7 @@
                   appId: "1:122942813238:web:80790eae2ed43eba58d497",
                   apiKey: "AIzaSyAOntVjvoUS2pqoDHjFPmCROwfOTIYPhto",
                   authDomain: "gen-lang-client-0517262341.firebaseapp.com",
+                  firestoreDatabaseId: "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878",
                   storageBucket: "gen-lang-client-0517262341.firebasestorage.app",
                   messagingSenderId: "122942813238"
               };
@@ -2732,17 +2742,23 @@
                   }
               }
 
-              function updateFirebaseConnectionBadges(isLive) {
+              function updateFirebaseConnectionBadges(isLive, errMsg = null) {
                   const badgeIds = ['firebaseConnectionStatusBadge', 'adminFirebaseConnectionStatusBadge'];
                   badgeIds.forEach(id => {
                       const el = document.getElementById(id);
                       if (el) {
-                          if (isLive) {
+                          if (isLive && !errMsg) {
                               el.innerHTML = '<span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Cloud Live';
-                              el.className = "flex items-center gap-1 text-[8px] font-bold text-emerald-500 tracking-wider uppercase mt-1";
+                              el.className = "flex items-center gap-1 text-[8px] font-bold text-emerald-500 tracking-wider uppercase mt-1 cursor-pointer";
+                              el.title = "ক্লাউড ডাটাবেজ সফলভাবে সংযুক্ত আছে";
+                          } else if (errMsg) {
+                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span> Sync Error';
+                              el.className = "flex items-center gap-1 text-[8px] font-bold text-amber-500 tracking-wider uppercase mt-1 cursor-pointer";
+                              el.title = "সিঙ্ক ত্রুটি: " + errMsg;
                           } else {
-                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Offline';
-                              el.className = "flex items-center gap-1 text-[8px] font-bold text-rose-500 tracking-wider uppercase mt-1";
+                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Connection Offline';
+                              el.className = "flex items-center gap-1 text-[8px] font-bold text-rose-500 tracking-wider uppercase mt-1 cursor-pointer";
+                              el.title = "ইন্টারনেট বা ক্লাউড সংযোগ বিচ্ছিন্ন";
                           }
                       }
                   });
@@ -2892,7 +2908,11 @@
                                   .catch(err => console.error("Auto-seed product error:", err));
                           });
                       }
-                  }, err => console.error("Firebase posts snapshot subscription error:", err));
+                  }, err => {
+                      console.error("Firebase posts snapshot subscription error:", err);
+                      logFirebaseError("bexo_posts onSnapshot", err);
+                      updateFirebaseConnectionBadges(false, "Posts Sync Error: " + err.message);
+                  });
 
                   // Realtime users list sync with fallback merging to prevent race condition data loss on offline/slow registrations
                   window.db.collection('bexo_users').onSnapshot(snap => {
@@ -2955,7 +2975,11 @@
                                   .catch(err => console.error("Auto-seed user error:", err));
                           });
                       }
-                  }, err => console.error("Firebase users snapshot subscription error:", err));
+                  }, err => {
+                      console.error("Firebase users snapshot subscription error:", err);
+                      logFirebaseError("bexo_users onSnapshot", err);
+                      updateFirebaseConnectionBadges(false, "Users Sync Error: " + err.message);
+                  });
 
                   // Realtime orders sync
                   window.db.collection('bexo_orders').onSnapshot(snap => {
@@ -2975,7 +2999,11 @@
                                   .catch(err => console.error("Auto-seed orders error:", err));
                           });
                       }
-                  }, err => console.error("Firebase orders subscription error:", err));
+                  }, err => {
+                      console.error("Firebase orders subscription error:", err);
+                      logFirebaseError("bexo_orders onSnapshot", err);
+                      updateFirebaseConnectionBadges(false, "Orders Sync Error: " + err.message);
+                  });
 
                   // Realtime settings sync
                   window.db.collection('bexo_settings').doc('global').onSnapshot(doc => {
@@ -2990,7 +3018,11 @@
                           window.db.collection('bexo_settings').doc('global').set(sanitizeForFirestore(appSettings))
                               .catch(err => console.error("Auto-seed settings error:", err));
                       }
-                  }, err => console.error("Firebase settings subscription error:", err));
+                  }, err => {
+                      console.error("Firebase settings subscription error:", err);
+                      logFirebaseError("bexo_settings onSnapshot", err);
+                      updateFirebaseConnectionBadges(false, "Settings Sync Error: " + err.message);
+                  });
 
                   // Realtime premium requests sync
                   window.db.collection('bexo_premium_requests').onSnapshot(snap => {
@@ -4333,7 +4365,8 @@
                           'balances': 'ব্যালেন্স রিকোয়েস্ট',
                           'tickets': 'সাপোর্ট টিকিট',
                           'notice-slider': 'নোটিশ ও হোম স্লাইডার',
-                          'settings': 'অ্যাপ সেটিংস'
+                          'settings': 'অ্যাপ সেটিংস',
+                          'diagnostics': 'সিস্টেম ডায়াগনস্টিকস'
                       };
                       const titleEl = document.getElementById('adminCurrentViewTitle');
                       if (titleEl) titleEl.innerText = titleMap[viewId] === undefined ? 'অ্যাপ সেটিংস' : (titleMap[viewId] || 'অ্যাডমিন ভিউ');
@@ -4349,7 +4382,7 @@
                       container.innerHTML = '<div class="flex items-center justify-center h-64"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div></div>';
 
                       setTimeout(() => {
-                          if (viewId === 'dashboard' || viewId === 'users') {
+                          if (viewId === 'dashboard' || viewId === 'users' || viewId === 'diagnostics') {
                               syncUsersFromDatabaseSilently();
                           }
                           switch(viewId) {
@@ -4367,6 +4400,7 @@
                               case 'payment-delivery': renderAdminPaymentDelivery(); break;
                               case 'notice-slider': renderAdminNoticeSlider(); break;
                               case 'settings': renderAdminAppSettings(); break;
+                              case 'diagnostics': renderAdminDiagnostics(); break;
                               default: container.innerHTML = `<h2 class="text-2xl font-bold p-8">View for ${viewId} coming soon...</h2>`;
                           }
                           // Analytics or Stats Update if needed
@@ -9824,6 +9858,301 @@
                            </div>
                        </div>
                    `;
+               }
+
+               function renderAdminDiagnostics() {
+                   const container = document.getElementById('adminViewContainer');
+                   const pendingSyncs = JSON.parse(localStorage.getItem('bexo_pending_user_syncs') || '[]');
+                   
+                   container.innerHTML = `
+                       <div class="p-8 space-y-6 animate-fade-in text-slate-700">
+                           <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                               <div>
+                                   <h2 class="text-xl font-black flex items-center gap-2 text-slate-800">
+                                       <i class="fas fa-stethoscope text-orange-600"></i> সিস্টেম ডায়াগনস্টিকস ও ক্লাউড সিঙ্ক
+                                   </h2>
+                                   <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">ক্লাউড কানেকশন, লাইভ সিঙ্ক ও ডিডিকেটেড রিমোট কন্ট্রোল</p>
+                               </div>
+                               <div class="flex flex-wrap gap-2">
+                                   <button onclick="triggerDiagnosticsRefresh()" class="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer">
+                                       <i class="fas fa-sync-alt"></i> রিফ্রেশ ডাটা
+                                   </button>
+                               </div>
+                           </div>
+
+                           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                               <!-- Connection Card -->
+                               <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
+                                   <div class="flex items-center justify-between">
+                                       <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">কানেকশন স্ট্যাটাস</span>
+                                       <i class="fas fa-wifi text-slate-300 text-lg"></i>
+                                   </div>
+                                   <div>
+                                       ${window.db ? `
+                                           <div class="flex items-center gap-2 text-emerald-600">
+                                               <span class="w-3 h-3 bg-emerald-500 rounded-full animate-ping"></span>
+                                               <span class="text-lg font-black tracking-tight">Cloud Live</span>
+                                           </div>
+                                           <p class="text-[10px] text-slate-400 font-bold mt-1 uppercase">ফায়ারস্টোর ডাটাবেজ সংযুক্ত আছে</p>
+                                       ` : `
+                                           <div class="flex items-center gap-2 text-rose-500">
+                                               <span class="w-3 h-3 bg-rose-500 rounded-full animate-pulse"></span>
+                                               <span class="text-lg font-black tracking-tight">Offline / Sync Error</span>
+                                           </div>
+                                           <p class="text-[10px] text-slate-400 font-bold mt-1 uppercase">ডাটাবেজ সংযোগ বা ক্রেনডেনশিয়াল ইস্যু</p>
+                                       `}
+                                   </div>
+                               </div>
+
+                               <!-- Database Config Card -->
+                               <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
+                                   <div class="flex items-center justify-between">
+                                       <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">ফায়ারস্টোর ডাটাবেজ আইডি</span>
+                                       <i class="fas fa-database text-slate-300 text-lg"></i>
+                                   </div>
+                                   <div>
+                                       <p class="text-xs font-bold font-mono tracking-tighter text-slate-800 select-all break-all bg-slate-50 p-2.5 rounded-xl border border-slate-100">ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878</p>
+                                       <p class="text-[10px] text-slate-400 font-bold mt-1 uppercase">ঐচ্ছিক কাস্টম ডাটাবেজ রেফারেন্স</p>
+                                   </div>
+                               </div>
+
+                               <!-- Synchronization Statistics Card -->
+                               <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
+                                   <div class="flex items-center justify-between">
+                                       <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">সিঙ্ক পরিসংখ্যান</span>
+                                       <i class="fas fa-history text-slate-300 text-lg"></i>
+                                   </div>
+                                   <div class="grid grid-cols-2 gap-4">
+                                       <div>
+                                           <p class="text-3xl font-black text-slate-800 leading-none">${appUsers.length}</p>
+                                           <p class="text-[9px] text-slate-400 font-bold mt-1.5 uppercase">লোকাল ইউজার</p>
+                                       </div>
+                                       <div>
+                                           <p class="text-3xl font-black ${pendingSyncs.length > 0 ? 'text-amber-500' : 'text-emerald-500'} leading-none">${pendingSyncs.length}</p>
+                                           <p class="text-[9px] text-slate-400 font-bold mt-1.5 uppercase">অপেক্ষারত সিঙ্ক</p>
+                                       </div>
+                                   </div>
+                               </div>
+                           </div>
+
+                           <!-- System Diagnostic Operations -->
+                           <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+                               <div>
+                                   <h3 class="text-lg font-black text-slate-800 flex items-center gap-2">
+                                       <i class="fas fa-tools text-orange-600"></i> এডভান্সড ট্রাবলশুটিং প্যানেল
+                                   </h3>
+                                   <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">মোবাইল থেকে তৈরি হওয়া ইউজার অ্যাকাউন্টগুলো ল্যাপটপ অ্যাডমিন প্যানেলে রিয়েল-টাইমে মিলাতে নিচের একশনগুলো চালান</p>
+                               </div>
+
+                               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                   <!-- Action 1: Force Full Re-Sync -->
+                                   <div class="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-3">
+                                       <div class="flex items-center gap-3">
+                                           <span class="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white font-black text-xs">১</span>
+                                           <h4 class="text-sm font-black text-slate-800">ডিরেক্ট ডাটা সিঙ্ক</h4>
+                                       </div>
+                                       <p class="text-xs text-slate-400 font-semibold leading-relaxed">ক্লাউড ডাটাবেজ থেকে সকল ইউজার জোরপূর্বক টেনে এনে মেলানো হবে।</p>
+                                       <button onclick="forceDatabaseDirectSyncDetailed()" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer">
+                                           <i class="fas fa-sync-alt"></i> ডিরেক্ট সিঙ্ক চালান
+                                       </button>
+                                   </div>
+
+                                   <!-- Action 2: Upload local-only -->
+                                   <div class="p-6 bg-orange-50/50 rounded-3xl border border-orange-100/50 space-y-3">
+                                       <div class="flex items-center gap-3">
+                                           <span class="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center text-white font-black text-xs">২</span>
+                                           <h4 class="text-sm font-black text-orange-950">লোকাল ইউজার আপলোড</h4>
+                                       </div>
+                                       <p class="text-xs text-slate-400 font-semibold leading-relaxed">Currently currently currently বর্তমানে এই ব্রাউজারে থাকা লোকাল ইউজারদেরকে ক্লাউডে ফোর্স পুশ করা হবে।</p>
+                                       <button onclick="forceUploadLocalUsersDetailed()" class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer">
+                                           <i class="fas fa-cloud-upload-alt"></i> ক্লাউডে আপলোড করুন
+                                       </button>
+                                   </div>
+
+                                   <!-- Action 3: Reset and clean start -->
+                                   <div class="p-6 bg-rose-50/40 rounded-3xl border border-rose-100/30 space-y-3">
+                                       <div class="flex items-center gap-3">
+                                           <span class="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-white font-black text-xs font-mono">৩</span>
+                                           <h4 class="text-sm font-black text-rose-950">কিল ক্যাশ ও ডিপ ক্লিন সিঙ্ক</h4>
+                                       </div>
+                                       <p class="text-xs text-slate-400 font-semibold leading-relaxed">লোকাল মেমরি সম্পূর্ণ মুছে দিয়ে ফায়ারস্টোর ক্লাউড থেকে একদম তাজা ডাটা লোড করবে।</p>
+                                       <button onclick="clearCacheAndFullRecoverySyncDetailed()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer">
+                                           <i class="fas fa-trash-restore"></i> ফুল ক্যাশ রিকভারি সিঙ্ক
+                                       </button>
+                                   </div>
+                               </div>
+                           </div>
+
+                           <!-- Connection Logs Debug Panel -->
+                           <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+                               <div class="flex items-center justify-between">
+                                   <div>
+                                       <h3 class="text-lg font-black text-slate-800 flex items-center gap-2">
+                                           <i class="fas fa-clipboard-list text-slate-600"></i> কানেক্টিভিটি ডিবাগিং লগ (Diagnostics)
+                                       </h3>
+                                       <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">ফায়ারবেস ক্লাউড কানেক্টিভিটির রিয়েল-টাইম কনসোল এরর এবং ওয়ার্নিং ডাটা</p>
+                                   </div>
+                                   <button onclick="clearDiagnosticLogsData()" class="px-4 py-2 border border-rose-100 hover:bg-rose-50 text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer">
+                                       লগ ক্লিয়ার করুন
+                                   </button>
+                               </div>
+
+                               <div class="bg-slate-900 text-slate-300 font-mono text-xs p-5 rounded-2xl border border-slate-800 space-y-2 overflow-x-auto max-h-72">
+                                   ${renderDiagnosticLogs()}
+                               </div>
+                           </div>
+                       </div>
+                   `;
+               }
+
+               function renderDiagnosticLogs() {
+                   if (!window.firebaseErrors || window.firebaseErrors.length === 0) {
+                       return '<div class="text-slate-500 py-4 font-bold text-center italic">কোন এরর লগ পাওয়া যায়নি। কানেকশন সম্পূর্ণ স্বাভাবিক আছে!</div>';
+                   }
+                   return window.firebaseErrors.map(err => {
+                       return `
+                           <div class="border-b border-slate-800/80 pb-2 mb-2 last:border-0 last:pb-0 last:mb-0">
+                               <div class="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                                   <span>${err.context || 'GENERAL'}</span>
+                                   <span>${err.time || ''}</span>
+                               </div>
+                               <p class="text-rose-400 break-words leading-relaxed">${err.message || String(err)}</p>
+                           </div>
+                       `;
+                   }).join('');
+               }
+
+               async function forceDatabaseDirectSyncDetailed() {
+                   showToast("ডাটাবেজ ডিরেক্ট সিঙ্ক শুরু হয়েছে...", "info");
+                   if (!window.db) {
+                       showToast("ডাটাবেজ লাইভ নেই! পুনরায় সংযোগের চেষ্টা চলছে...", "warning");
+                       initializeFirebaseIfReady();
+                       if (!window.db) {
+                           showToast("ডাটাবেজ সংযোগ ব্যর্থ হয়েছে! এরর লগটি চেক করুন।", "error");
+                           return;
+                       }
+                   }
+                   try {
+                       const snap = await window.db.collection('bexo_users').get();
+                       const firebaseUsers = [];
+                       snap.forEach(doc => {
+                           const data = doc.data();
+                           if (data) firebaseUsers.push(data);
+                       });
+                       
+                       let addedCount = 0;
+                       let updatedCount = 0;
+                       
+                       if (firebaseUsers.length > 0) {
+                           firebaseUsers.forEach(fUser => {
+                               if (!fUser || !fUser.phone || !fUser.password) return;
+                               const idx = appUsers.findIndex(u => u.profileId === fUser.profileId || u.phone === fUser.phone);
+                               if (idx > -1) {
+                                   appUsers[idx] = { ...appUsers[idx], ...fUser };
+                                   updatedCount++;
+                               } else {
+                                   appUsers.push(fUser);
+                                   addedCount++;
+                               }
+                           });
+                           appUsers = appUsers.filter(u => u && u.phone && u.password);
+                           localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                           showToast(`ডিরেক্ট সিঙ্ক সফল! নতুন ইউজার যোগ: ${addedCount}টি, আপডেট: ${updatedCount}টি।`, "success");
+                       } else {
+                           showToast("ক্লাউড ডাটাবেজ সম্পূর্ণ ফাঁকা!", "warning");
+                       }
+                       renderAdminDiagnostics();
+                   } catch (err) {
+                       console.error("Direct sync failed:", err);
+                       showToast("ডাটাবেজ সিঙ্ক ব্যর্থ: " + err.message, "error");
+                       logFirebaseError("Manual Direct Sync Action", err);
+                       renderAdminDiagnostics();
+                   }
+               }
+
+               async function forceUploadLocalUsersDetailed() {
+                   if (!window.db) {
+                       showToast("ডাটাবেজ কানেকশন অফলাইন!", "error");
+                       return;
+                   }
+                   showToast("লোকাল ডাটা আপলোড শুরু হয়েছে...", "info");
+                   try {
+                       let uploadCount = 0;
+                       for (const u of appUsers) {
+                           if (u && u.profileId && u.phone && u.password) {
+                               await window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u));
+                               uploadCount++;
+                           }
+                       }
+                       showToast(`সফলভাবে ${uploadCount}টি ইউজার ডাটাবেজে ফোর্স আপডেট করা হয়েছে!`, "success");
+                       renderAdminDiagnostics();
+                   } catch(err) {
+                       console.error("Force local upload error:", err);
+                       showToast("ফোর্স আপলোড ব্যর্থ: " + err.message, "error");
+                       logFirebaseError("Manual Local Upload Action", err);
+                       renderAdminDiagnostics();
+                   }
+               }
+
+               async function clearCacheAndFullRecoverySyncDetailed() {
+                   if (!confirm("আপনি কি নিশ্চিতভাবে লোকাল ক্যাশ ও মেমরি ট্রাশ সম্পূর্ণ ডিলিট করে ক্লাউড থেকে ফ্রেশ ডাটা নামাতে চান?")) {
+                       return;
+                   }
+                   showToast("লোকাল ক্যঁশ ডিলিট করা হচ্ছে...", "info");
+                   try {
+                       appUsers = [];
+                       localStorage.setItem('bexo_users', JSON.stringify([]));
+                       
+                       if (!window.db) {
+                           initializeFirebaseIfReady();
+                       }
+                       
+                       if (window.db) {
+                           const snap = await window.db.collection('bexo_users').get();
+                           const firebaseUsers = [];
+                           snap.forEach(doc => {
+                               const data = doc.data();
+                               if (data) firebaseUsers.push(data);
+                           });
+                           
+                           firebaseUsers.forEach(f => {
+                               if (f && f.phone && f.password) {
+                                   appUsers.push(f);
+                               }
+                           });
+                           appUsers = appUsers.filter(u => u && u.phone && u.password);
+                           
+                           // Preserve current user login details if needed
+                           if (userProfile && userProfile.phone) {
+                               const hasMyProfile = appUsers.some(u => u.profileId === userProfile.profileId || u.phone === userProfile.phone);
+                               if (!hasMyProfile) {
+                                   appUsers.push({ ...userProfile });
+                               }
+                           }
+                           
+                           localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                           showToast("ক্লিন রিকভারি সিঙ্ক সফলভাবে শেষ হয়েছে!", "success");
+                       } else {
+                           showToast("ক্লাউড সংযোগ সক্রিয় না থাকায় রিকভারি সম্ভব হয়নি!", "error");
+                       }
+                       renderAdminDiagnostics();
+                   } catch(err) {
+                       showToast("রিকভারি সিঙ্ক ব্যর্থ: " + err.message, "error");
+                       logFirebaseError("Cache Clean Sync Action", err);
+                       renderAdminDiagnostics();
+                   }
+               }
+
+               function clearDiagnosticLogsData() {
+                   window.firebaseErrors = [];
+                   renderAdminDiagnostics();
+                   showToast("সব ডায়াগনস্টিক লগ মুছে দেওয়া হয়েছে।", "success");
+               }
+
+               function triggerDiagnosticsRefresh() {
+                   syncGlobalStateWithLocalStorage();
+                   renderAdminDiagnostics();
+                   showToast("ডায়াগনস্টিক তথ্য রিফ্রেশ হয়েছে।", "success");
                }
 
                function renderAdminAppSettings() {
