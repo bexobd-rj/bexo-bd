@@ -2805,23 +2805,23 @@
                           
                           // Try initializing Firestore using different syntaxes for compatibility with custom database ID
                           try {
-                              // Prioritize correct named database syntax (firebase.firestore(app, databaseId))
-                              window.db = firebase.firestore(app, "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                              console.log("[Firebase Applet] Init successful with firebase.firestore(app, databaseId)!");
+                              // Prioritize correct named database syntax in Compat SDK (on the app instance, v9/v10 Compat)
+                              window.db = firebase.app().firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
+                              console.log("[Firebase Applet] Init successful with firebase.app().firestore(databaseId)!");
                           } catch (dbErr1) {
-                              logFirebaseError("Init Option 1 (firestore(app, dbId))", dbErr1);
+                              logFirebaseError("Init Option 1 (app().firestore)", dbErr1);
                               try {
-                                  // Compat alternative on the app instance
-                                  window.db = firebase.app().firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                                  console.log("[Firebase Applet] Init successful with firebase.app().firestore(databaseId)!");
+                                  // Compat alternative directly on firebase
+                                  window.db = firebase.firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
+                                  console.log("[Firebase Applet] Init successful with firebase.firestore(databaseId)!");
                               } catch (dbErr2) {
-                                  logFirebaseError("Init Option 2 (app().firestore)", dbErr2);
+                                  logFirebaseError("Init Option 2 (firestore(dbId))", dbErr2);
                                   try {
-                                      // Directly call firebase.firestore(databaseId) as alternative without passing app object
-                                      window.db = firebase.firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                                      console.log("[Firebase Applet] Init successful with firebase.firestore(databaseId)!");
+                                      // Alternative passing app object
+                                      window.db = firebase.firestore(app, "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
+                                      console.log("[Firebase Applet] Init successful with firebase.firestore(app, databaseId)!");
                                   } catch (dbErr3) {
-                                      logFirebaseError("Init Option 3 (firestore(dbId))", dbErr3);
+                                      logFirebaseError("Init Option 3 (firestore(app, dbId))", dbErr3);
                                       try {
                                           window.db = firebase.firestore();
                                           logFirebaseError("Init Option 4 Fallback Warning", new Error("Connecting to default Firestore database. Security rules might reject requests."));
