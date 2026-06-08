@@ -6148,83 +6148,13 @@
                               <div class="w-20 h-20 bg-slate-100 text-slate-300 rounded-full flex items-center justify-center mx-auto text-3xl mb-4">
                                   <i class="fas fa-box-open"></i>
                               </div>
-                              <p class="text-slate-400 font-bold">এই ক্যাটাগরিতে কোনো পোস্ট পাওয়া যায়নি</p>
+                              <p class="text-slate-400 font-bold">এই ক্যাটাগরিতে কোনো প্রোডাক্ট পাওয়া যায়নি!</p>
                           </div>
                       `;
                       return;
                   }
 
-                  feed.className = "space-y-6 max-w-2xl mx-auto";
-                  feed.innerHTML = filtered.map(p => {
-                      if (!p) return '';
-                      const isFav = (p.images || []).some((_, i) => (userProfile.favorites || []).includes(`${p.id}-${i}`));
-                      const authorName = "বেক্সো অফিসিয়াল";
-                      return `
-                      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-fade-in hover:shadow-md transition-all">
-                          <!-- Header -->
-                          <div class="p-4 flex items-center justify-between">
-                              <div class="flex items-center gap-3">
-                                  <div class="w-11 h-11 bg-orange-600 rounded-full flex items-center justify-center text-white text-[10px] font-black shadow-lg shadow-orange-100">
-                                      BX
-                                  </div>
-                                  <div>
-                                      <h4 class="font-bold text-slate-800 text-sm flex items-center gap-1">${authorName} <i class="fas fa-check-circle text-emerald-500 text-[10px]"></i></h4>
-                                      <p class="text-[10px] text-slate-400 font-bold tracking-tight"><i class="far fa-clock mr-1"></i> ${p.time} <i class="fas fa-users ml-1"></i></p>
-                                  </div>
-                              </div>
-                              <button onclick="toggleFavorite('${p.id}', null)" class="w-10 h-10 rounded-xl transition-all flex items-center justify-center ${isFav ? 'bg-rose-50 text-rose-500 border border-rose-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-slate-100'} hover:border-rose-200">
-                                  <i class="${isFav ? 'fas animate-bounce-short' : 'far'} fa-heart"></i>
-                              </button>
-                          </div>
-
-                          <!-- Meta Tags (Price/Verified/Rating) -->
-                          <div class="px-4 flex items-center gap-2 mb-3">
-                              <div class="bg-[#f0f4f8] text-slate-800 px-3 py-2 rounded-lg text-[11px] font-bold flex-1 text-center border border-slate-100">প্রাইস: ${p.price}</div>
-                              <div class="bg-[#f0f4f8] text-emerald-600 px-3 py-2 rounded-lg text-[11px] font-bold flex-1 text-center border border-slate-100">ভেরিফাইড</div>
-                              <div class="bg-[#f0f4f8] text-orange-400 px-3 py-2 rounded-lg text-[11px] font-bold flex-1 text-center border border-slate-100">
-                                  ${Array(5).fill(0).map((_, i) => `<i class="${i < p.rating ? 'fas' : 'far'} fa-star"></i>`).join('')}
-                              </div>
-                          </div>
-
-                          <!-- Content -->
-                          <div class="px-4 py-2 space-y-2">
-                              <div class="flex items-center justify-between">
-                                  <h3 class="font-bold text-slate-800 text-[14px] leading-tight">${p.title}</h3>
-                                  <span class="text-[9px] font-black text-slate-300 uppercase tracking-widest">${p.sku || ''}</span>
-                              </div>
-                              <div class="flex items-center gap-2">
-                                  <button onclick="renderPostDetail('${p.id}', 0)" class="bg-[#79c68a] hover:bg-emerald-700 text-white px-2 py-1 rounded-[4px] text-[8px] font-black tracking-widest flex items-center gap-1 transition-all uppercase"><i class="fas fa-caret-right"></i> READ MORE</button>
-                                  <button onclick="downloadAllImages('${p.id}')" class="bg-[#79c68a] hover:bg-emerald-700 text-white px-2 py-1 rounded-[4px] text-[8px] font-black tracking-widest flex items-center gap-1 transition-all uppercase"><i class="fas fa-image"></i> IMAGE</button>
-                              </div>
-                          </div>
-
-                          <!-- Images Collage (3 top, 3 bottom = 6 Images) -->
-                          <div class="px-4 pb-4 cursor-pointer" onclick="renderPostDetail('${p.id}', 0)">
-                              <div class="grid grid-cols-3 gap-1 rounded-lg overflow-hidden">
-                                  <div class="aspect-square bg-slate-100 overflow-hidden">
-                                      <img src="${(p.images && p.images[0]) || 'https://picsum.photos/seed/placeholder/400/400'}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
-                                  </div>
-                                  <div class="aspect-square bg-slate-100 overflow-hidden">
-                                      <img src="${(p.images && (p.images[1] || p.images[0])) || 'https://picsum.photos/seed/placeholder/400/400'}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
-                                  </div>
-                                  <div class="aspect-square bg-slate-100 overflow-hidden">
-                                      <img src="${(p.images && (p.images[2] || p.images[0])) || 'https://picsum.photos/seed/placeholder/400/400'}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
-                                  </div>
-                                  <div class="aspect-square bg-slate-100 overflow-hidden">
-                                      <img src="${(p.images && (p.images[3] || p.images[0])) || 'https://picsum.photos/seed/placeholder/400/400'}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
-                                  </div>
-                                  <div class="aspect-square bg-slate-100 overflow-hidden">
-                                      <img src="${(p.images && (p.images[4] || p.images[0])) || 'https://picsum.photos/seed/placeholder/400/400'}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
-                                  </div>
-                                  <div class="aspect-square bg-slate-100 overflow-hidden relative">
-                                      <img src="${(p.images && (p.images[5] || p.images[0])) || 'https://picsum.photos/seed/placeholder/400/400'}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
-                                      ${p.imageCount > 6 ? `<div class="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-bold text-lg">+${p.imageCount - 5}</div>` : ''}
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
-                  `;
-                  }).join('');
+                  feed.innerHTML = filtered.map(p => renderPostCard(p, 0)).join('');
               }
 
               function renderPostCard(p, imgIdx = 0, isStockOutPage = false) {
@@ -6233,7 +6163,8 @@
                   const productStockOut = p.isStockOut || (p.stockCount !== undefined && p.stockCount <= 0);
 
                   return `
-                  <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden p-3 group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col">
+                  <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden p-3 group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col font-bold">
+                      <div class="relative w-full aspect-square rounded-lg overflow-hidden mb-3 bg-white cursor-pointer" onclick="renderPostDetail('ake', 0)" style="display:none"></div>
                       <div class="relative w-full aspect-square rounded-lg overflow-hidden mb-3 bg-white cursor-pointer" onclick="renderPostDetail('${p.id}', ${imgIdx})">
                           <img src="${mainImg}" alt="${p.title}" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700">
                           ${(isStockOutPage || productStockOut) ? '<div class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center"><span class="text-[9px] font-black text-white uppercase tracking-widest border-2 border-white/60 px-4 py-1.5 rounded-full">স্টক আউট</span></div>' : ''}
@@ -6257,7 +6188,7 @@
                   `;
               }
 
-              function addToOrderList(postId, imgIdx) {
+                            function addToOrderList(postId, imgIdx) {
                   const p = appPosts.find(x => String(x.id) === String(postId));
                   if (!p) return;
 
@@ -6354,38 +6285,37 @@
                                                    <span class="text-pink-600 font-black text-lg">৳${p.price}</span>
                                                    ${p.discountAmount && parseInt(p.discountAmount) > 0 ? `<span class="text-[10px] text-slate-400 line-through">৳${parseInt(p.price) + parseInt(p.discountAmount)}</span>` : ''}
                                                </div>
-                                           </div>
-                                           <div class="bg-slate-50 px-6 py-2 rounded-lg border border-slate-100">
-                                               <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 text-center">স্টক: <span class="${p.isStockOut || (p.stockCount !== undefined && p.stockCount <= 0) ? 'text-rose-500' : 'text-emerald-500'} ml-1">${p.isStockOut || (p.stockCount !== undefined && p.stockCount <= 0) ? 'শেষ' : (p.stockCount !== undefined ? p.stockCount + ' পিস' : 'আছে')}</span></p>
-                                           </div>
-                                           <div class="flex items-center gap-0.5 text-orange-400 text-[10px] ml-auto">
-                                               ${p.discountAmount && parseInt(p.discountAmount) > 0 ? `<span class="bg-emerald-500 text-white px-2 py-0.5 rounded text-[9px] font-bold">-${Math.round((parseInt(p.discountAmount)/(parseInt(p.price)+parseInt(p.discountAmount)))*100)}% ছাড়</span>` : ''}
-                                           </div>
-                                       </div>
+                </div>
+                                            <div class="bg-slate-50 px-6 py-2 rounded-lg border border-slate-100 pb-2">
+                                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 text-center font-bold">স্টক: <span class="${p.isStockOut || (p.stockCount !== undefined && p.stockCount <= 0) ? 'text-rose-500 font-bold' : 'text-emerald-500 font-bold'} ml-1">${p.isStockOut || (p.stockCount !== undefined && p.stockCount <= 0) ? 'শেষ' : (p.stockCount !== undefined ? p.stockCount + ' পিস' : 'আছে')}</span></p>
+                                            </div>
+                                            <div class="flex items-center gap-0.5 text-orange-400 text-[10px] ml-auto">
+                                                ${p.discountAmount && parseInt(p.discountAmount) > 0 ? `<span class="bg-emerald-500 text-white px-2 py-0.5 rounded text-[9px] font-bold">-${Math.round((parseInt(p.discountAmount)/(parseInt(p.price)+parseInt(p.discountAmount)))*100)}% ছাড়</span>` : ''}
+                                            </div>
+                                        </div>
 
-                                       <!-- Metadata -->
-                                       <div class="space-y-6">
-                                           <div>
-                                               <p class="text-xs font-bold text-slate-500">প্রোডাক্টটির সাজেস্টেড বিক্রয় মূল্য সর্বোচ্চ <span class="text-pink-600 font-black">৳${p.maxSellingPrice || Math.floor(parseInt(p.price) * 1.5)}</span>।</p>
-                                           </div>
-                                           <div>
-                                               <p class="text-[11px] font-black text-slate-800 uppercase tracking-widest">SKU: ${p.sku || 'N/A'}</p>
-                                           </div>
+                                        <!-- Metadata -->
+                                        <div class="space-y-6">
+                                            <div>
+                                                <p class="text-xs font-bold text-slate-500">প্রোডাক্টটির সাজেস্টেড বিক্রয় মূল্য সর্বোচ্চ <span class="text-pink-600 font-black">৳${p.maxSellingPrice || Math.floor(parseInt(p.price) * 1.5)}</span>।</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-[11px] font-black text-slate-800 uppercase tracking-widest">SKU: ${p.sku || 'N/A'}</p>
+                                            </div>
 
-                                           <!-- Dynamic variants selector -->
-                                           <div class="space-y-4">
-                                               ${(() => {
-                                                   const variants = [];
-                                                   // Add saved dynamic variants
-                                                   if (p.variants && p.variants.length > 0) {
-                                                       variants.push(...p.variants);
-                                                   } else {
-                                                       // Fallback to legacy size or default size
-                                                       const sizeOptions = p.availableSizes && p.availableSizes.length > 0 ? p.availableSizes : ['M', 'L', 'XL'];
-                                                       variants.push({ name: 'সাইজ', options: sizeOptions });
-                                                   }
-
-                                                   // Automatically add "কালার" option if specified in info but not in variants
+                                            <!-- Dynamic variants selector -->
+                                            <div class="space-y-4">
+                                                ${(() => {
+                                                    const variants = [];
+                                                    // Add saved dynamic variants
+                                                    if (p.variants && p.variants.length > 0) {
+                                                        variants.push(...p.variants);
+                                                    } else {
+                                                        // Fallback to legacy size or default size
+                                                        const sizeOptions = p.availableSizes && p.availableSizes.length > 0 ? p.availableSizes : ['M', 'L', 'XL'];
+                                                        variants.push({ name: 'সাইজ', options: sizeOptions });
+                                                    }
+// Automatically add "কালার" option if specified in info but not in variants
                                                    if (p.color && p.color !== 'N/A' && !variants.find(v => v.name === 'কালার' || v.name.toLowerCase() === 'color')) {
                                                        variants.push({ name: 'কালার', options: [p.color] });
                                                    }
@@ -6576,155 +6506,24 @@
                   `;
               }
 
-              function renderCheckoutTerms() {
-                  const main = document.getElementById('mainContent');
-                  main.innerHTML = `
-                      <div class="p-4 lg:p-10 animate-fade-in bg-[#f0f4f9] min-h-screen">
-                          <div class="max-w-2xl mx-auto">
-                              <div class="bg-white p-8 md:p-12 rounded-[3rem] border border-white shadow-2xl space-y-8">
-                                  <div class="text-center space-y-2">
-                                      <span class="bg-orange-50 text-orange-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border border-orange-100">শর্তাবলী</span>
-                                      <h2 class="text-2xl font-black text-slate-800 tracking-tight pt-2">অর্ডার করার নিয়ম ও শর্তসমূহ</h2>
-                                      <p class="text-xs font-bold text-slate-400">অর্ডার প্লেস করার আগে দয়া করে নিচের শর্তগুলো মনোযোগ দিয়ে পড়ুন</p>
-                                  </div>
-
-                                  <div class="space-y-6 select-none">
-                                      <div class="flex gap-4 group">
-                                          <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 font-black text-sm border-2 border-white shadow-sm">১</div>
-                                          <p class="text-slate-600 text-[13px] font-bold leading-relaxed pt-1">অর্ডার করার পূর্বে কাস্টমারের ঠিকানা এবং মোবাইল নম্বর শতভাগ সঠিক কিনা তা নিশ্চিত করুন।</p>
-                                      </div>
-                                      <div class="flex gap-4 group">
-                                          <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 font-black text-sm border-2 border-white shadow-sm">২</div>
-                                          <p class="text-slate-600 text-[13px] font-bold leading-relaxed pt-1">কোন ফেক বা ডুপ্লিকেট অর্ডার সাবমিট করা যাবে না। ফেক অর্ডারের জন্য জরিমানা প্রযোজ্য হতে পারে।</p>
-                                      </div>
-                                      <div class="flex gap-4 group">
-                                          <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 font-black text-sm border-2 border-white shadow-sm">৩</div>
-                                          <p class="text-slate-600 text-[13px] font-bold leading-relaxed pt-1">ডেলিভারি ম্যান দাঁড়ানো অবস্থায় কাস্টমার প্রোডাক্ট চেক করতে পারবে। কোনো সমস্যা পেলে রিটার্ন করতে পারবে।</p>
-                                      </div>
-                                      <div class="flex gap-4 group">
-                                          <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 font-black text-sm border-2 border-white shadow-sm">৪</div>
-                                          <p class="text-slate-600 text-[13px] font-bold leading-relaxed pt-1">নিচের উল্লেখিত ক্যাটাগরির প্রোডাক্টের জন্য অবশ্যই কাস্টমারের নিকট থেকে ডেলিভারি চার্জ অগ্রিম নিতে হবে এবং আমাদের পেমেন্ট করে অর্ডার প্লেস করতে হবে। চেষ্টা করবেন যেন রিটার্ন না আসে।</p>
-                                      </div>
-                                  </div>
-
-                                  <div class="pt-10 border-t border-slate-50 space-y-8">
-                                      <p class="text-center text-xs font-black text-emerald-600 uppercase tracking-[0.2em]">উপরোক্ত শর্তসমূহে রাজি থাকলে অর্ডার কনফার্ম করুন</p>
-                                      <div class="flex justify-center">
-                                          <button onclick="renderCheckoutMobileVerify()" class="bg-emerald-500 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 flex items-center gap-3 hover:bg-emerald-600 transition-all active:scale-95">
-                                              <i class="fas fa-check-circle"></i> হ্যাঁ, রাজি আছি
-                                          </button>
-                                      </div>
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
-                  `;
-              }
-
-              function renderCheckoutMobileVerify() {
-                  const main = document.getElementById('mainContent');
-                  main.innerHTML = `
-                      <div class="p-4 lg:p-10 animate-fade-in bg-[#f0f4f9] min-h-screen">
-                          <div class="max-w-lg mx-auto">
-                              <div class="bg-white p-10 rounded-[3rem] border border-white shadow-2xl space-y-10">
-                                  <div class="text-center space-y-2">
-                                      <h2 class="text-2xl font-black text-pink-600 tracking-tight">কাস্টমার রিপোর্ট</h2>
-                                      <p class="text-[11px] font-bold text-slate-400 leading-relaxed max-w-sm mx-auto">কাস্টমারটি অনলাইন থেকে কি পরিমাণ অর্ডার ডেলিভারি নিয়েছে এবং রিটার্ন করেছে সেই রিপোর্ট চেক করুন। কাস্টমার রিপোর্ট বিবেচনা করে দেখুন এই কাস্টমারকে প্রোডাক্ট পাঠালে রিটার্ন হওয়ার সম্ভাবনা কতটুকু এবং ডেলিভারি চার্জ অগ্রিম না নিয়ে প্রোডাক্ট পাঠানো যাবে কি না? বিষয়টি বিবেচনা করে অর্ডার প্লেস করুন।</p>
-                                  </div>
-
-                                  <div class="space-y-6">
-                                      <div class="space-y-3">
-                                          <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">কাস্টমারের মোবাইল নং (১১ সংখ্যা)</label>
-                                          <input type="tel" id="checkoutMobile" value="" placeholder="যেমন: 017XXXXXXXX" maxlength="11" class="w-full px-8 py-5 bg-slate-50/50 border-2 border-slate-100 rounded-3xl outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-50 font-black text-slate-800 text-lg transition-all">
-                                      </div>
-
-                                      <button onclick="checkCustomerReport()" class="w-full bg-orange-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-orange-100 hover:bg-slate-900 transition-all transform active:scale-95">
-                                          কাস্টমারের রিপোর্ট চেক করুন
-                                      </button>
-                                  </div>
-
-                                  <div id="customerReportResult" class="space-y-6 animate-fade-in">
-                                      <!-- result here -->
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
-                  `;
-              }
-
-              function checkCustomerReport() {
-                  const mobile = document.getElementById('checkoutMobile').value;
-                  if(!mobile || mobile.length < 11) {
-                      showToast("সঠিক মোবাইল নম্বর দিন!");
-                      return;
-                  }
-
-                  const btn = event.currentTarget;
-                  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> চেক করা হচ্ছে...';
-
-                  setTimeout(() => {
-                      btn.innerHTML = 'কাস্টমারের রিপোর্ট চেক করুন';
-                      const report = appCustomerReports[mobile] || { delivered: 0, returned: 0 };
-
-                      const resultDiv = document.getElementById('customerReportResult');
-                      resultDiv.innerHTML = `
-                          <div class="grid grid-cols-1 gap-4">
-                              <div class="flex items-center justify-between p-4 bg-emerald-50 rounded-2xl border border-emerald-100/50">
-                                  <span class="text-[11px] font-bold text-slate-600">সর্বমোট ডেলিভারি নিয়েছেঃ</span>
-                                  <span class="bg-emerald-500 text-white px-3 py-1 rounded-lg text-xs font-black">${report.delivered} টি অর্ডার।</span>
-                              </div>
-                              <div class="flex items-center justify-between p-4 bg-orange-50 rounded-2xl border border-orange-100/50">
-                                  <span class="text-[11px] font-bold text-slate-600">সর্বমোট রিটার্ন করেছেঃ</span>
-                                  <span class="bg-orange-500 text-white px-3 py-1 rounded-lg text-xs font-black">${report.returned} টি অর্ডার।</span>
-                              </div>
-                          </div>
-
-                          <button onclick="renderCheckoutOrderForm()" class="w-full bg-orange-600 text-white py-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-orange-100 flex items-center justify-center gap-3 hover:bg-slate-900 transition-all transform active:scale-95">
-                              অর্ডার করুন <i class="fas fa-chevron-right text-[10px]"></i>
-                          </button>
+                            function updateCheckoutReportBadge(mobile) {
+                  const report = appCustomerReports[mobile] || { delivered: 0, returned: 0 };
+                  const badgeContainer = document.getElementById('checkoutReportBadge');
+                  if (badgeContainer) {
+                      badgeContainer.innerHTML = `
+                          <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">কাস্টমার রিপোর্টঃ</span>
+                          <span class="bg-emerald-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">ডেলিভারিঃ ${report.delivered}</span>
+                          <span class="bg-orange-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">রিটার্নিংঃ ${report.returned}</span>
                       `;
-                      showToast("রিপোর্ট লোড হয়েছে!");
-                  }, 1000);
-              }
-
-              function isDistrictDhaka(districtStr) {
-                  if (!districtStr) return false;
-                  const clean = districtStr.trim().toLowerCase();
-                  return clean === 'dhaka' || clean === 'ঢাকা' || clean.includes('dhaka') || clean.includes('ঢাকা');
-              }
-
-              function onDistrictInputCheckout() {
-                  const districtVal = document.getElementById('shippingDistrict')?.value || '';
-                  const isDhaka = isDistrictDhaka(districtVal);
-                  const charge = isDhaka ? 80 : 130;
-
-                  const courierChargeInput = document.getElementById('courierCharge');
-                  if (courierChargeInput) {
-                      courierChargeInput.value = charge;
-                  }
-
-                  const displayChargeEl = document.getElementById('checkoutDeliveryChargeDisplay');
-                  if (displayChargeEl) {
-                      displayChargeEl.innerText = `৳${charge}`;
-                  }
-                  const labelEl = document.getElementById('checkoutDeliveryChargeLabel');
-                  if (labelEl) {
-                      labelEl.innerText = isDhaka ? 'ঢাকার ভিতরে (স্বয়ংক্রিয়)' : 'ঢাকার বাইরে (স্বয়ংক্রিয়)';
-                  }
-
-                  // Update grand total in checkout summary
-                  const totalAmount = userProfile.cart.reduce((acc, item) => acc + (item.sellingPrice * item.qty), 0);
-                  const grandTotalEl = document.getElementById('checkoutGrandTotalDisplay');
-                  if (grandTotalEl) {
-                      grandTotalEl.innerText = `৳${totalAmount + charge}`;
                   }
               }
 
-              
-function renderCheckoutOrderForm() {
+              function renderCheckoutOrderForm(presetMobile = '') {
                   const main = document.getElementById('mainContent');
                   const cartItems = userProfile.cart || [];
                   const totalAmount = cartItems.reduce((acc, item) => acc + (item.sellingPrice * item.qty), 0);
+                  const finalMobile = presetMobile || '';
+                  const report = finalMobile ? (appCustomerReports[finalMobile] || { delivered: 0, returned: 0 }) : { delivered: 0, returned: 0 };
 
                   main.innerHTML = `
                       <div class="p-4 lg:p-10 animate-fade-in bg-[#f0f4f9] min-h-screen">
@@ -6771,23 +6570,23 @@ function renderCheckoutOrderForm() {
                                       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                           <div class="space-y-2">
                                               <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">কাস্টমারের মোবাইল নং (১১ সংখ্যা)*</label>
-                                              <input type="tel" id="shippingMobile" value="01770370567" maxlength="11" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-orange-50 font-bold text-slate-800 transition-all">
+                                              <input type="tel" id="shippingMobile" value="${finalMobile}" oninput="updateCheckoutReportBadge(this.value)" maxlength="11" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-orange-50 font-bold text-slate-800 transition-all">
                                               <p class="text-[9px] font-medium text-pink-500 ml-1">কাস্টমারের বিকল্প ফোন নম্বর থাকলে ডেলিভারি এড্রেস বক্সে লিখে দিবেন।</p>
                                           </div>
                                           <div class="space-y-4 pt-1">
-                                              <div class="flex items-center gap-2">
+                                              <div id="checkoutReportBadge" class="flex items-center gap-2">
                                                   <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">কাস্টমার রিপোর্টঃ</span>
-                                                  <span class="bg-emerald-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">ডেলিভারিঃ ২</span>
-                                                  <span class="bg-orange-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">রিটার্নিংঃ ০</span>
+                                                  <span class="bg-emerald-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">ডেলিভারিঃ ${report.delivered}</span>
+                                                  <span class="bg-orange-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">রিটার্নিংঃ ${report.returned}</span>
                                               </div>
                                           </div>
                                           <div class="space-y-2 md:col-span-2">
                                               <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">কাস্টমারের নাম*</label>
-                                              <input type="text" id="shippingName" placeholder="Sayed Golam Sorowa" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-orange-50 font-bold text-slate-800 transition-all">
+                                              <input type="text" id="shippingName" placeholder="যেমন: মোঃ কামাল হোসেন" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-orange-50 font-bold text-slate-800 transition-all">
                                           </div>
                                           <div class="space-y-2">
                                               <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">কাস্টমারের জেলা*</label>
-                                              <input type="text" id="shippingDistrict" placeholder="যেমন: ঢাকা" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-orange-50 font-bold text-slate-800 transition-all">
+                                              <input type="text" id="shippingDistrict" oninput="onDistrictInputCheckout()" placeholder="যেমন: ঢাকা" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-orange-50 font-bold text-slate-800 transition-all">
                                           </div>
                                           <div class="space-y-2">
                                               <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">কাস্টমারের থানা/এরিয়া*</label>
@@ -6842,14 +6641,81 @@ function renderCheckoutOrderForm() {
                                       <button onclick="showOrderConfirmationModal()" class="w-full bg-orange-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-orange-100 hover:bg-slate-900 transition-all transform active:scale-95 flex items-center justify-center gap-3">
                                           অর্ডার কনফার্ম করুন
                                       </button>
+                                   </button>
                                   </div>
                               </div>
                           </div>
                       </div>
                   `;
-              }
+               }
 
-              function updateDeliveryChargeValue() {
+               function checkCustomerReport(event) {
+                   const mobile = document.getElementById('shippingMobile')?.value || document.getElementById('checkoutMobile')?.value || '';
+                   if(!mobile || mobile.length < 11) {
+                       showToast("সঠিক মোবাইল নম্বর দিন!");
+                       return;
+                   }
+
+                   const btn = event.currentTarget;
+                   btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> চেক করা হচ্ছে...';
+
+                   setTimeout(() => {
+                       btn.innerHTML = 'কাস্টমারের রিপোর্ট চেক করুন';
+                       const report = appCustomerReports[mobile] || { delivered: 0, returned: 0 };
+
+                       const resultDiv = document.getElementById('customerReportResult');
+                       if (resultDiv) {
+                           resultDiv.innerHTML = `
+                               <div class="grid grid-cols-1 gap-4">
+                                   <div class="flex items-center justify-between p-4 bg-emerald-50 rounded-2xl border border-emerald-100/50">
+                                       <span class="text-[11px] font-bold text-slate-600">সর্বমোট ডেলিভারি নিয়েছেঃ</span>
+                                       <span class="bg-emerald-500 text-white px-3 py-1 rounded-lg text-xs font-black">${report.delivered} টি অর্ডার।</span>
+                                   </div>
+                                   <div class="flex items-center justify-between p-4 bg-orange-50 rounded-2xl border border-orange-100/50">
+                                       <span class="text-[11px] font-bold text-slate-600">সর্বমোট রিটার্ন করেছেঃ</span>
+                                       <span class="bg-orange-500 text-white px-3 py-1 rounded-lg text-xs font-black">${report.returned} টি অর্ডার।</span>
+                                   </div>
+                               </div>
+                           `;
+                       }
+                       showToast("রিপোর্ট লোড হয়েছে!");
+                   }, 1000);
+               }
+
+               function isDistrictDhaka(districtStr) {
+                   if (!districtStr) return false;
+                   const clean = districtStr.trim().toLowerCase();
+                   return clean === 'dhaka' || clean === 'ঢাকা' || clean.includes('dhaka') || clean.includes('ঢাকা');
+               }
+
+               function onDistrictInputCheckout() {
+                   const districtVal = document.getElementById('shippingDistrict')?.value || '';
+                   const isDhaka = isDistrictDhaka(districtVal);
+                   const charge = isDhaka ? 80 : 130;
+
+                   const courierChargeInput = document.getElementById('courierCharge');
+                   if (courierChargeInput) {
+                       courierChargeInput.value = charge;
+                   }
+
+                   const displayChargeEl = document.getElementById('checkoutDeliveryChargeDisplay');
+                   if (displayChargeEl) {
+                       displayChargeEl.innerText = `৳${charge}`;
+                   }
+                   const labelEl = document.getElementById('checkoutDeliveryChargeLabel');
+                   if (labelEl) {
+                       labelEl.innerText = isDhaka ? 'ঢাকার ভিতরে (স্বয়ংক্রিয়)' : 'ঢাকার বাইরে (স্বয়ংক্রিয়)';
+                   }
+
+                   // Update grand total in checkout summary
+                   const totalAmount = userProfile.cart.reduce((acc, item) => acc + (item.sellingPrice * item.qty), 0);
+                   const grandTotalEl = document.getElementById('checkoutGrandTotalDisplay');
+                   if (grandTotalEl) {
+                       grandTotalEl.innerText = `৳${totalAmount + charge}`;
+                   }
+               }
+
+               function updateDeliveryChargeValue() {
                   const zone = document.querySelector('input[name="deliveryZone"]:checked').value;
                   const charge = zone === 'inside' ? appSettings.dhakaCharge : appSettings.outsideDhakaCharge;
                   document.getElementById('courierCharge').value = charge;
