@@ -26,6 +26,38 @@ try {
     } catch (err) {
       console.error(`\n--- SYNTAX ERROR IN SCRIPT BLOCK #${scriptCount} ---`);
       console.error(err.stack || err.message);
+      
+      // RUN BRACE/BRACKET/PARENTHESIS ANALYSIS
+      console.log('\n--- BRACE BALANCE ANALYSIS ---');
+      let stack = [];
+      let lineNum = lineNumber;
+      for (let i = 0; i < scriptContent.length; i++) {
+        const char = scriptContent[i];
+        if (char === '\n') lineNum++;
+        if (char === '{' || char === '[' || char === '(') {
+          stack.push({ char, line: lineNum, index: i });
+        } else if (char === '}' || char === ']' || char === ')') {
+          if (stack.length === 0) {
+            console.log(`Unmatched closing char '${char}' at line ${lineNum}`);
+          } else {
+            const top = stack.pop();
+            if (
+              (char === '}' && top.char !== '{') ||
+              (char === ']' && top.char !== '[') ||
+              (char === ')' && top.char !== '(')
+            ) {
+              console.log(`Mismatch: opened '${top.char}' at line ${top.line} but closed '${char}' at line ${lineNum}`);
+            }
+          }
+        }
+      }
+      console.log(`Remaining unclosed items count: ${stack.length}`);
+      if (stack.length > 0) {
+        console.log('Unclosed items stack (first 20):');
+        console.log(stack.slice(0, 20));
+        console.log('Unclosed items stack (last 20):');
+        console.log(stack.slice(-20));
+      }
       console.error(`---------------------------------------------\n`);
       process.exit(1);
     }

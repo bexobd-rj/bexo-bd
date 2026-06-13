@@ -48,6 +48,7 @@ import {
 import { cn } from './lib/utils';
 import { Product, Order, UserProfile, Transaction } from './types';
 import { AdminUsersList } from './components/AdminUsersList';
+import { AdminTransferPanel } from './components/AdminTransferPanel';
 
 // --- Types & Constants ---
 type View = 'dashboard' | 'profile' | 'products' | 'orders' | 'admin-orders' | 'admin-payouts' | 'admin-products' | 'admin-users' | 'admin-panel' | 'cart' | 'sales' | 'balance' | 'support';
@@ -60,12 +61,12 @@ interface AdminWorkspaceProps {
 }
 
 function AdminWorkspace({ allUsers, transactions, products, orders }: AdminWorkspaceProps) {
-  const [currentTab, setCurrentTab] = useState<'users' | 'products' | 'orders' | 'payouts'>('users');
+  const [currentTab, setCurrentTab] = useState<'users' | 'products' | 'orders' | 'payouts' | 'transfer'>('users');
 
   return (
     <div className="space-y-6">
       {/* Premium Segmented Controls at Top */}
-      <div className="flex flex-wrap gap-2 bg-slate-100 p-2 rounded-2xl max-w-2xl shadow-sm border border-slate-200/50">
+      <div className="flex flex-wrap gap-2 bg-slate-100 p-2 rounded-2xl max-w-4xl shadow-sm border border-slate-200/50">
         <button 
           onClick={() => setCurrentTab('users')}
           className={`flex-1 min-w-[120px] px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
@@ -100,6 +101,17 @@ function AdminWorkspace({ allUsers, transactions, products, orders }: AdminWorks
           <span>Orders ({orders.length})</span>
         </button>
         <button 
+          onClick={() => setCurrentTab('transfer')}
+          className={`flex-1 min-w-[120px] px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+            currentTab === 'transfer' 
+              ? "bg-white text-slate-900 shadow-md scale-[1.02] border border-slate-100" 
+              : "text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Banknote size={15} className="text-orange-600" />
+          <span>পেমেন্ট ট্রান্সফার ({orders.filter(o => o.status === 'Delivered').length})</span>
+        </button>
+        <button 
           onClick={() => setCurrentTab('payouts')}
           className={`flex-1 min-w-[120px] px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
             currentTab === 'payouts' 
@@ -117,6 +129,7 @@ function AdminWorkspace({ allUsers, transactions, products, orders }: AdminWorks
         {currentTab === 'users' && <AdminUsersList allUsers={allUsers} transactions={transactions} />}
         {currentTab === 'products' && <AdminProductList products={products} />}
         {currentTab === 'orders' && <AdminOrderList orders={orders} />}
+        {currentTab === 'transfer' && <AdminTransferPanel orders={orders} />}
         {currentTab === 'payouts' && <AdminPayoutList transactions={transactions} />}
       </div>
     </div>
@@ -531,6 +544,7 @@ export default function App() {
             onClose={() => setIsCheckoutOpen(false)} 
             userId={user.uid}
             profile={profile}
+            orders={orders}
           />
         )}
       </AnimatePresence>
@@ -803,19 +817,25 @@ function ProductGrid({ products, onAdd }: { products: Product[], onAdd: (p: Prod
   );
 }
 
-function CheckoutModal({ product, onClose, userId, profile }: { product: Product, onClose: () => void, userId: string, profile: UserProfile | null }) {
+function CheckoutModal({ product, onClose, userId, profile, orders }: { product: Product, onClose: () => void, userId: string, profile: UserProfile | null, orders: Order[] }) {
+  const userOrdersCount = useMemo(() => {
+    return orders.filter(o => o.userId === userId).length;
+  }, [orders, userId]);
+
   const [formData, setFormData] = useState({
     customerName: '',
     customerPhone: '',
     customerAddress: '',
     size: '',
     sellingPrice: '' as string | number,
-    deliveryZone: 'inside' as 'inside' | 'outside'
+    deliveryZone: 'inside' as 'inside' | 'outside' | 'inside_free' | 'outside_free'
   });
   const [isLoading, setIsLoading] = useState(false);
   const [recordCheck, setRecordCheck] = useState<'idle' | 'checking' | 'safe' | 'warning'>('idle');
 
-  const deliveryCharge = DELIVERY_CHARGES[formData.deliveryZone];
+  const deliveryCharge = (formData.deliveryZone === 'inside_free' || formData.deliveryZone === 'outside_free')
+    ? 0
+    : DELIVERY_CHARGES[formData.deliveryZone === 'outside' ? 'outside' : 'inside'];
   const total = (Number(formData.sellingPrice) || 0) + deliveryCharge;
   const profit = (Number(formData.sellingPrice) || 0) - product.basePrice;
 
@@ -840,7 +860,7 @@ function CheckoutModal({ product, onClose, userId, profile }: { product: Product
         customerName: formData.customerName,
         customerPhone: formData.customerPhone,
         customerAddress: formData.customerAddress,
-        deliveryZone: formData.deliveryZone,
+        deliveryZone: (formData.deliveryZone === 'inside_free' || formData.deliveryZone === 'inside') ? 'inside' : 'outside',
         deliveryCharge,
         basePrice: product.basePrice,
         sellingPrice: Number(formData.sellingPrice),
@@ -1008,6 +1028,12 @@ function CheckoutModal({ product, onClose, userId, profile }: { product: Product
               >
                 <option value="inside">Inside Dhaka (৳ 60)</option>
                 <option value="outside">Outside Dhaka (৳ 120)</option>
+                {userOrdersCount >= 2 && (
+                  <>
+                    <option value="inside_free">Inside Dhaka (Free - ৳ 0)</option>
+                    <option value="outside_free">Outside Dhaka (Free - ৳ 0)</option>
+                  </>
+                )}
               </select>
             </div>
 

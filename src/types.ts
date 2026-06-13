@@ -40,6 +40,7 @@ export interface UserProfile {
   role: 'admin' | 'user' | 'supplier';
   shopName?: string;
   phone?: string;
+  website?: string;
 }
 
 export interface Transaction {
