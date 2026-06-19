@@ -49,6 +49,7 @@ import { cn } from './lib/utils';
 import { Product, Order, UserProfile, Transaction } from './types';
 import { AdminUsersList } from './components/AdminUsersList';
 import { AdminTransferPanel } from './components/AdminTransferPanel';
+import { InvoiceViewer } from './components/InvoiceViewer';
 
 // --- Types & Constants ---
 type View = 'dashboard' | 'profile' | 'products' | 'orders' | 'admin-orders' | 'admin-payouts' | 'admin-products' | 'admin-users' | 'admin-panel' | 'cart' | 'sales' | 'balance' | 'support';
@@ -495,7 +496,7 @@ export default function App() {
                   }} 
                 />
               )}
-              {activeView === 'orders' && <OrderList orders={orders} />}
+              {activeView === 'orders' && <OrderList orders={orders} profile={profile} user={user} />}
               {activeView === 'admin-panel' && (
                 profile?.role === 'admin' ? (
                   <AdminWorkspace 
@@ -1078,7 +1079,7 @@ function CheckoutModal({ product, onClose, userId, profile, orders }: { product:
   );
 }
 
-function OrderList({ orders }: { orders: Order[] }) {
+function OrderList({ orders, profile, user }: { orders: Order[], profile: UserProfile | null, user: any }) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const stats = useMemo(() => {
@@ -1207,6 +1208,8 @@ function OrderList({ orders }: { orders: Order[] }) {
           <ResellerOrderDetailsModal 
             order={selectedOrder} 
             onClose={() => setSelectedOrder(null)} 
+            profile={profile}
+            user={user}
           />
         )}
       </AnimatePresence>
@@ -1214,7 +1217,7 @@ function OrderList({ orders }: { orders: Order[] }) {
   );
 }
 
-function ResellerOrderDetailsModal({ order, onClose }: { order: Order, onClose: () => void }) {
+function ResellerOrderDetailsModal({ order, onClose, profile, user }: { order: Order, onClose: () => void, profile?: UserProfile | null, user?: any }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <motion.div 
@@ -1228,101 +1231,115 @@ function ResellerOrderDetailsModal({ order, onClose }: { order: Order, onClose: 
         initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
-        className="relative bg-white w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-[2.5rem] shadow-2xl flex flex-col"
+        className="relative bg-white w-full max-w-7xl h-[92vh] overflow-hidden rounded-[2.5rem] shadow-2xl flex flex-col"
       >
-        <div className="p-8 border-b border-border flex items-center justify-between bg-white shrink-0">
+        <div className="p-6 md:p-8 border-b border-border flex items-center justify-between bg-white shrink-0">
           <div className="space-y-1">
-            <h3 className="text-2xl font-black tracking-tight text-text-main flex items-center gap-3">
-              Order Tracking
-              <span className="text-sm bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-bold border border-border uppercase">#{order.id.slice(-6)}</span>
+            <h3 className="text-xl md:text-2xl font-black tracking-tight text-text-main flex items-center gap-3">
+              Order Details & Invoice
+              <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-bold border border-border uppercase font-mono">#{order.id.slice(-8).toUpperCase()}</span>
             </h3>
             <p className="text-xs text-text-muted font-medium">Status: {order.status}</p>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-slate-50 rounded-[1.25rem] transition-colors border border-border shadow-sm">
+          <button onClick={onClose} className="p-3 hover:bg-slate-50 rounded-[1.25rem] transition-colors border border-border shadow-sm cursor-pointer">
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 lg:p-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div className="space-y-10">
-              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 space-y-4">
-                <h4 className="micro-label">Customer Info</h4>
-                <p className="font-bold">{order.customerName}</p>
-                <p className="text-sm">{order.customerAddress}</p>
-              </div>
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50/50">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Left Main Pane: Invoice matching mockup screenshot */}
+            <div className="lg:col-span-8 bg-white rounded-3xl shadow-sm">
+              <InvoiceViewer order={order} profile={profile} currentUser={user} />
+            </div>
 
-              <div className="space-y-3">
-                <h4 className="micro-label">Tracking URL</h4>
-                {order.trackingLink ? (
-                  <a 
-                    href={order.trackingLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 p-4 bg-primary/5 text-primary border border-primary/20 rounded-xl font-bold text-sm"
-                  >
-                    <ExternalLink size={16} /> Click here to track parcel
-                  </a>
-                ) : (
-                  <p className="text-sm text-text-muted italic bg-slate-50 p-4 rounded-xl border border-border">Parcel tracking link will be updated soon.</p>
-                )}
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-6 space-y-4">
-                <span className="micro-label text-slate-500">টাকার আর্থিক বিবরণী (Order Economics)</span>
+            {/* Right Side Pane: Parcel tracking and status updates */}
+            <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-0">
+              
+              {/* Order Economics Card */}
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-5">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg shrink-0">
+                    <TrendingUp size={16} />
+                  </span>
+                  <span className="text-xs uppercase font-black text-slate-500 tracking-wider">টাকার আর্থিক বিবরণী (Order Economics)</span>
+                </div>
                 
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm text-center">
-                    <span className="text-[9px] uppercase font-black text-slate-400 block tracking-normal mb-1">কিনছেন (Buy)</span>
-                    <span className="text-sm font-black text-slate-800">৳{order.basePrice?.toLocaleString()}</span>
+                  <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-normal mb-1">কিনছেন (Buy)</span>
+                    <span className="text-sm font-black text-slate-800 font-mono">৳{order.basePrice?.toLocaleString()}</span>
                   </div>
                   
-                  <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm text-center">
-                    <span className="text-[9px] uppercase font-black text-indigo-400 block tracking-normal mb-1">বেচছেন (Sell)</span>
-                    <span className="text-sm font-black text-indigo-700">৳{order.sellingPrice?.toLocaleString()}</span>
+                  <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center col-span-1">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-normal mb-1">বেচছেন (Sell)</span>
+                    <span className="text-sm font-black text-slate-800 font-mono">৳{order.sellingPrice?.toLocaleString()}</span>
                   </div>
 
-                  <div className="bg-emerald-500/10 p-3.5 rounded-xl border border-emerald-100/50 shadow-sm text-center">
-                    <span className="text-[9px] uppercase font-black text-emerald-600 block tracking-normal mb-2">লাভ (Pocket)</span>
-                    <span className="text-sm font-black text-emerald-700">৳{order.profit?.toLocaleString()}</span>
+                  <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100/60 text-center">
+                    <span className="text-[9px] uppercase font-bold text-emerald-600 block tracking-normal mb-1">লাভ (Profit)</span>
+                    <span className="text-sm font-black text-emerald-700 font-mono">৳{order.profit?.toLocaleString()}</span>
                   </div>
                 </div>
 
-                <div className="border-t border-slate-250 pt-3 flex items-center justify-between text-xs font-bold text-slate-600">
-                  <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Profit Transfer</span>
+                <div className="border-t border-slate-100 pt-4 flex items-center justify-between text-xs font-bold text-slate-600">
+                  <span className="text-[10px] uppercase font-extrabold tracking-widest text-slate-400">Profit Transfer</span>
                   <span className={cn(
-                    "px-2.5 py-1 rounded font-black text-[10px] uppercase tracking-wide border",
+                    "px-3 py-1 rounded-full font-black text-[10px] uppercase tracking-wide border",
                     order.profitStatus === 'completed' 
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                      : "bg-orange-50 text-orange-700 border-orange-200 animate-pulse"
+                      : "bg-orange-50 text-orange-700 border-orange-200"
                   )}>
                     💰 {order.profitStatus?.replace('_', ' ')}
                   </span>
                 </div>
               </div>
+
+              {/* Parcel Tracking Link Card */}
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-3">
+                <span className="text-xs uppercase font-black text-slate-500 tracking-wider block">Parcel Tracking</span>
+                {order.trackingLink ? (
+                  <a 
+                    href={order.trackingLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-sm transition-all text-center cursor-pointer"
+                  >
+                    <ExternalLink size={14} /> <span>ক্লিক করুন ট্র্যাক করতে</span>
+                  </a>
+                ) : (
+                  <p className="text-xs text-slate-400 font-semibold bg-slate-50 p-4 rounded-2xl border border-slate-200 italic text-center">
+                    পার্সেল ট্র্যাকিং লিংক প্রস্তুত হচ্ছে।
+                  </p>
+                )}
+              </div>
+
+              {/* Delivery Status Timeline Logs Card */}
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-2 text-slate-500">
+                  <Clock size={15} /> Delivery Timeline
+                </h4>
+                <div className="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
+                  {order.statusHistory?.map((log, i) => (
+                    <div key={i} className="relative">
+                      <div className={cn(
+                        "absolute -left-6 top-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center z-10 shadow-sm",
+                        i === order.statusHistory!.length - 1 ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500"
+                      )}>
+                        <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                      </div>
+                      <div>
+                        <p className="font-extrabold text-[12px] text-text-main leading-tight mb-1">{log.status}</p>
+                        <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">{new Date(log.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
 
-            <div className="space-y-6">
-              <h4 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                <Clock size={16} /> Delivery Status Details
-              </h4>
-              <div className="relative pl-8 space-y-8 before:content-[''] before:absolute before:left-3 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
-                {order.statusHistory?.map((log, i) => (
-                  <div key={i} className="relative">
-                    <div className={cn(
-                      "absolute -left-8 top-1.5 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center z-10 shadow-sm",
-                      i === order.statusHistory!.length - 1 ? "bg-primary text-white" : "bg-slate-200 text-slate-500"
-                    )}>
-                      <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                    </div>
-                    <div>
-                      <p className="font-extrabold text-[13px] text-text-main leading-none mb-1">{log.status}</p>
-                      <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">{new Date(log.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </motion.div>
@@ -1520,141 +1537,49 @@ function OrderDetailsModal({
         initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
-        className="relative bg-white w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-[2.5rem] shadow-2xl flex flex-col"
+        className="relative bg-white w-full max-w-7xl h-[92vh] overflow-hidden rounded-[2.5rem] shadow-2xl flex flex-col"
       >
-        <div className="p-8 border-b border-border flex items-center justify-between bg-white shrink-0">
+        <div className="p-6 md:p-8 border-b border-border flex items-center justify-between bg-white shrink-0">
           <div className="space-y-1">
-            <h3 className="text-2xl font-black tracking-tight text-text-main flex items-center gap-3">
-              Order Details
-              <span className="text-sm bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-bold border border-border uppercase">#{order.id.slice(-6)}</span>
+            <h3 className="text-xl md:text-2xl font-black tracking-tight text-text-main flex items-center gap-3">
+              Admin: Invoice & Order Operations
+              <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-bold border border-border uppercase font-mono">#{order.id.slice(-8).toUpperCase()}</span>
             </h3>
             <p className="text-xs text-text-muted font-medium">Placed on {new Date(order.date).toLocaleString()}</p>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-slate-50 rounded-[1.25rem] transition-colors border border-border shadow-sm">
+          <button onClick={onClose} className="p-3 hover:bg-slate-50 rounded-[1.25rem] transition-colors border border-border shadow-sm cursor-pointer">
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 lg:p-12">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50/50">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
-            {/* Left Column: Customer & Reseller Info */}
-            <div className="lg:col-span-2 space-y-10">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div className="flex items-center gap-3 text-primary">
-                    <User size={20} className="stroke-[3]" />
-                    <h4 className="text-sm font-black uppercase tracking-widest">Customer Information</h4>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 space-y-4">
-                    <div>
-                      <span className="micro-label block mb-1">Name</span>
-                      <p className="font-bold text-text-main">{order.customerName}</p>
-                    </div>
-                    <div>
-                      <span className="micro-label block mb-1">Mobile</span>
-                      <p className="font-bold text-text-main tracking-tight">{order.customerPhone}</p>
-                    </div>
-                    <div>
-                      <span className="micro-label block mb-1">Address</span>
-                      <p className="font-medium text-text-muted text-sm leading-relaxed">{order.customerAddress}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="flex items-center gap-3 text-indigo-600">
-                    <ShoppingCart size={20} className="stroke-[3]" />
-                    <h4 className="text-sm font-black uppercase tracking-widest">Reseller / Shop</h4>
-                  </div>
-                  <div className="bg-indigo-50/50 rounded-2xl p-6 border border-indigo-100/50 space-y-4">
-                    <div>
-                      <span className="micro-label block mb-1 text-indigo-400">Shop Name</span>
-                      <p className="font-black text-indigo-900">{order.resellerShopName}</p>
-                    </div>
-                    <div>
-                      <span className="micro-label block mb-1 text-indigo-400">Owner Name</span>
-                      <p className="font-bold text-indigo-900">{order.resellerName}</p>
-                    </div>
-                    <div>
-                      <span className="micro-label block mb-1 text-indigo-400">Reseller Email</span>
-                      <p className="font-medium text-indigo-700 text-xs">{order.resellerEmail}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 text-emerald-600">
-                  <Package size={20} className="stroke-[3]" />
-                  <h4 className="text-sm font-black uppercase tracking-widest">Product & Pricing</h4>
-                </div>
-                <div className="bg-white rounded-2xl border border-border p-6 shadow-sm overflow-hidden">
-                  <div className="flex items-center gap-4 border-b border-border pb-6 mb-6">
-                    <div className="w-16 h-16 bg-slate-50 rounded-xl overflow-hidden border border-border shrink-0">
-                      <img src={`https://picsum.photos/seed/${order.productId}/100/100`} className="w-full h-full object-cover" />
-                    </div>
-                    <div>
-                      <h5 className="font-bold text-text-main">{order.productTitle}</h5>
-                      <p className="text-xs text-text-muted">ID: {order.productId.slice(-8)}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                    <PriceCard label="Base Price" value={order.basePrice} />
-                    <PriceCard label="Selling Price" value={order.sellingPrice} highlight />
-                    <PriceCard label="Delivery" value={order.deliveryCharge} />
-                    <PriceCard label="Reseller Profit" value={order.profit} variant="emerald" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Profit Management Card */}
-              {order.status === 'Delivered' && (
-                <div className={cn(
-                  "p-8 rounded-[2rem] border transition-all flex flex-col md:flex-row items-center justify-between gap-6",
-                  order.profitStatus === 'completed' 
-                    ? "bg-emerald-50 border-emerald-100" 
-                    : "bg-orange-50 border-orange-100"
-                )}>
-                  <div>
-                    <h4 className={cn("text-lg font-black tracking-tight", order.profitStatus === 'completed' ? "text-emerald-900" : "text-orange-900")}>
-                      {order.profitStatus === 'completed' ? 'Profit Successfully Added' : 'Pending Profit Approval'}
-                    </h4>
-                    <p className={cn("text-sm font-medium", order.profitStatus === 'completed' ? "text-emerald-600" : "text-orange-600")}>
-                      ৳{order.profit} profit is ready to be added to {order.resellerShopName}'s account.
-                    </p>
-                  </div>
-                  {order.profitStatus !== 'completed' && (
-                    <button 
-                      onClick={() => onApproveProfit(order)}
-                      className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-200 transition-all active:scale-95"
-                    >
-                      Accept & Add Profit
-                    </button>
-                  )}
-                  {order.profitStatus === 'completed' && (
-                    <div className="flex items-center gap-2 px-6 py-3 bg-white/50 rounded-full border border-emerald-200 text-emerald-700 font-bold text-sm">
-                      <CheckCircle2 size={18} /> Profit Settled
-                    </div>
-                  )}
-                </div>
-              )}
+            {/* Left Column: Full-featured Invoice Sheet matching Mockup */}
+            <div className="lg:col-span-8 bg-white rounded-3xl shadow-sm">
+              <InvoiceViewer order={order} />
             </div>
 
-            {/* Right Column: Order Management & Timeline */}
-            <div className="space-y-10">
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 text-slate-800">
-                  <LayoutDashboard size={20} className="stroke-[3]" />
-                  <h4 className="text-sm font-black uppercase tracking-widest">Order Control</h4>
+            {/* Right Column: Administrative Controls Panel (Preserving all original actions) */}
+            <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-0">
+              
+              {/* Order Operations Panel */}
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-slate-800">
+                  <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg shrink-0">
+                    <LayoutDashboard size={16} />
+                  </span>
+                  <span className="text-xs uppercase font-black text-slate-500 tracking-wider">Administrative Controls</span>
                 </div>
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 space-y-6">
-                  <div className="space-y-2">
-                    <label className="micro-label">Update Status</label>
+
+                {/* Status Switcher Dropdown */}
+                <div className="space-y-2">
+                  <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">Update Order Status</span>
+                  <div className="relative">
                     <select 
                       value={order.status}
                       onChange={(e) => onUpdateStatus(order.id, e.target.value as Order['status'], order.statusHistory || [])}
-                      className="w-full px-4 py-3 bg-white border border-border rounded-xl font-bold text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all appearance-none"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl font-bold text-xs text-slate-700 outline-none focus:ring-4 focus:ring-blue-100 transition-all appearance-none cursor-pointer"
                     >
                       <option value="Pending">🕒 Pending</option>
                       <option value="Processing">⚙️ Processing</option>
@@ -1663,49 +1588,90 @@ function OrderDetailsModal({
                       <option value="Returned">❌ Returned</option>
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="micro-label">Tracking Link</label>
-                    <div className="relative">
-                      <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                      <input 
-                        type="text" 
-                        placeholder="Parcel tracking URL..." 
-                        defaultValue={order.trackingLink}
-                        onBlur={(e) => onUpdateTracking(order.id, e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-white border border-border rounded-xl font-medium text-sm focus:outline-none focus:border-primary"
-                      />
-                    </div>
+                </div>
+
+                {/* Tracking Link Input */}
+                <div className="space-y-2">
+                  <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">Tracking Link</span>
+                  <div className="relative">
+                    <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-450" size={14} />
+                    <input 
+                      type="text" 
+                      placeholder="Parcel tracking URL..." 
+                      defaultValue={order.trackingLink}
+                      onBlur={(e) => onUpdateTracking(order.id, e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-150 rounded-xl font-bold text-xs text-slate-700 outline-none focus:ring-4 focus:ring-blue-100 transition-all font-mono"
+                    />
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-6">
-                 <div className="flex items-center gap-3 text-slate-800">
-                  <Clock size={20} className="stroke-[3]" />
-                  <h4 className="text-sm font-black uppercase tracking-widest">Delivery Status Details</h4>
+              {/* Profit Settlement Panel */}
+              {order.status === 'Delivered' && (
+                <div className={cn(
+                  "border rounded-3xl p-6 shadow-sm space-y-4",
+                  order.profitStatus === 'completed' 
+                    ? "bg-emerald-50 border-emerald-100" 
+                    : "bg-orange-50 border-orange-100"
+                )}>
+                  <div className="space-y-1">
+                    <h4 className={cn("text-xs uppercase font-black tracking-wider", order.profitStatus === 'completed' ? "text-emerald-800" : "text-orange-850")}>
+                      Profit Settlement
+                    </h4>
+                    <p className={cn("text-xs font-semibold leading-relaxed", order.profitStatus === 'completed' ? "text-emerald-700" : "text-orange-700")}>
+                      ৳{order.profit?.toLocaleString()} is eligible to be settled to reseller {order.resellerShopName || order.resellerName}.
+                    </p>
+                  </div>
+                  {order.profitStatus !== 'completed' ? (
+                    <button 
+                      onClick={() => onApproveProfit(order)}
+                      className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-md transition-all active:scale-[0.98] cursor-pointer"
+                    >
+                      Approve & Add Profit
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-center gap-1.5 py-3.5 bg-emerald-100/50 rounded-2xl border border-emerald-200 text-emerald-800 font-extrabold text-xs uppercase tracking-wider">
+                      <CheckCircle2 size={14} className="stroke-[2.5]" /> Profit Settled
+                    </div>
+                  )}
                 </div>
-                <div className="relative pl-8 space-y-8 before:content-[''] before:absolute before:left-3 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
+              )}
+
+              {/* Delivery History Logs Card */}
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-2 text-slate-500">
+                  <Clock size={15} /> Delivery Timeline
+                </h4>
+                <div className="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
                   {order.statusHistory?.map((log, i) => (
                     <div key={i} className="relative">
                       <div className={cn(
-                        "absolute -left-8 top-1.5 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center z-10 shadow-sm",
-                        i === order.statusHistory!.length - 1 ? "bg-primary text-white" : "bg-slate-200 text-slate-500"
+                        "absolute -left-6 top-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center z-10 shadow-sm",
+                        i === order.statusHistory!.length - 1 ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500"
                       )}>
                         <div className="w-1.5 h-1.5 bg-current rounded-full" />
                       </div>
                       <div>
-                        <p className="font-extrabold text-[13px] text-text-main leading-none mb-1">{log.status}</p>
-                        <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-2">{new Date(log.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
-                        {log.note && <p className="text-xs text-text-muted font-medium bg-slate-50 p-2 rounded-lg border border-slate-100">{log.note}</p>}
+                        <p className="font-extrabold text-[12px] text-text-main leading-tight mb-1">{log.status}</p>
+                        <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider mb-1">
+                          {new Date(log.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                        </p>
+                        {log.note && (
+                          <p className="text-[10px] text-slate-500 font-medium bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 mt-1.5">
+                            {log.note}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}
                   {(!order.statusHistory || order.statusHistory.length === 0) && (
-                    <p className="text-xs text-text-muted italic opacity-60">No history available yet.</p>
+                    <p className="text-xs text-text-muted italic opacity-60 text-center py-4">No history logged yet.</p>
                   )}
                 </div>
               </div>
+
             </div>
+
           </div>
         </div>
       </motion.div>

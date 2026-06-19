@@ -8,6 +8,14 @@ export interface Product {
   stock?: number;
 }
 
+export interface OrderItem {
+  productId: string;
+  productTitle: string;
+  size?: string;
+  qty: number;
+  basePrice: number;
+}
+
 export interface Order {
   id: string;
   date: string;
@@ -30,6 +38,7 @@ export interface Order {
   resellerEmail?: string;
   profitStatus: 'not_added' | 'pending_approval' | 'completed';
   statusHistory?: { status: string; date: string; note?: string }[];
+  items?: OrderItem[];
 }
 
 export interface UserProfile {
