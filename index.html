@@ -12429,21 +12429,238 @@
                   `;
               }
 
-              function systemPurgeAllData() {
-                  if (!confirm("আপনি কি নিশ্চিত? এটি আপনার ব্রাউজারের সমস্ত লোকাল ডাটা ডিলিট করে দেবে এবং তা ফিরে পাওয়া যাবে না।")) return;
+              /*
+               * =================================================================================
+               * CRITICAL SAFETY WARNING: DATABASE CLEAN SWEEP & DATA PURGE SCRIPT
+               * =================================================================================
+               * WARNING: RUNNING THIS SCRIPT WILL PERMANENTLY AND IRREVERSIBLY DELETE ALL
+               * DATA RECORDS FROM THE FIREBASE FIRESTORE DATABASE AND BROWSER LOCAL STORAGE.
+               * 
+               * THIS DIRECTLY AFFECTS:
+               * - USER ACCOUNTS (ALL USER LIST DATA)
+               * - ORDERS (ALL ORDER HISTORYS)
+               * - PRODUCTS & POSTS (ALL PRODUCT CATALOG RECORDS)
+               * - FINANCIAL TRANSACTIONS & WITHDRAWAL LOGS
+               * - SUPPORT TICKETS & CHAT/COMMUNICATIONS
+               * - BILLS, RECHARGES, PAYOUTS, & BALANCE REQUESTS
+               * 
+               * !!! ADVICE !!!
+               * IT IS STRONGLY ADVISED TO PERFORM A COMPREHENSIVE FULL FIREBASE FIRESTORE 
+               * DATABASE BACKUP/EXPORT BEFORE INITIATING THIS PURGING ROUTINE. 
+               * ONCE COMPLETED, RECOVERY OF DELETED ROWS/DOCUMENTS IS NOT POSSIBLE.
+               * 
+               * NOTE: THIS SCRIPT CLEARS ONLY THE DATA ROWS (DOCUMENTS) INSIDE THE COLLECTIONS.
+               * THE TABLE STRUCTURES (COLLECTIONS) THEMSELVES ARE PRESERVED FULLY EMPTY,
+               * ENSURING THE WEBSITE REMAINS ENTIRELY COMPLIANT AND OPERATIONAL FOR NEW ENTRY.
+               * =================================================================================
+               */
+              async function systemPurgeAllData() {
+                  const hasConfirmed = confirm("⚠️ সতর্কীকরণ! আপনি কি সত্যিই সম্পূর্ণ ক্লাউড ডাটাবেজ (Firestore) এবং ব্রাউজারের সকল লোকাল ডাটা স্থায়ীভাবে ডিলিট করতে চান? সব অর্ডার, কাস্টমার, প্রোডাক্ট, ট্রানজেকশন মুছে যাবে এবং এটি আর পুনরুদ্ধার করা যাবে না!");
+                  if (!hasConfirmed) return;
                   
-                  const keysToPurge = [
-                      'bexo_users', 'bexo_orders', 'bexo_posts', 'bexo_transactions', 
-                      'bexo_profile', 'bexo_settings', 'bexo_premium_requests', 
-                      'bexo_recharge_requests', 'bexo_balance_requests', 'bexo_bill_requests',
-                      'bexo_pending_profits', 'bexo_customer_reports', 'bexo_categories',
-                      'bexo_accounts', 'bexo_withdrawals', 'bexo_support_tickets'
+                  const doubleConfirmation = prompt("নিরাপত্তার স্বার্থে নিচে বড় হাতের অক্ষরে 'DELETE ALL' লিখে OK চাপুন:");
+                  if (doubleConfirmation !== "DELETE ALL") {
+                      alert("রিসেট প্রক্রিয়া বাতিল করা হয়েছে। সঠিক নিরাপত্তা কী প্রবেশ করান।");
+                      return;
+                  }
+
+                  // Create custom styled overlay on the page to display real-time wiping progress
+                  const overlay = document.createElement('div');
+                  overlay.id = 'databasePurgeScreenOverlay';
+                  overlay.className = 'fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[99999] flex flex-col items-center justify-center text-white p-8 font-sans';
+                  overlay.innerHTML = `
+                      <div class="max-w-xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 text-center">
+                          <div class="flex justify-center">
+                              <span class="w-16 h-16 bg-rose-600/10 rounded-full flex items-center justify-center border border-rose-500/20 text-rose-500 text-3xl animate-pulse">
+                                  <i class="fas fa-radiation"></i>
+                              </span>
+                          </div>
+                          <div>
+                              <h2 class="text-xl font-black text-rose-500 tracking-tight">ডাটাবেজ ড্রিলিং ও স্থায়ী ক্লিন-সুইপ</h2>
+                              <p class="text-slate-400 text-xs mt-1.5 leading-relaxed font-semibold">ফায়ারস্টোর ক্লাউড ডাটাবেজ এবং লোকাল স্টোরেজ থেকে সমস্ত তথ্য সুরক্ষিত উপায়ে চিরতরে মুছে ফেলা হচ্ছে। দয়া করে এই উইন্ডো বা ট্যাব বন্ধ করবেন না।</p>
+                          </div>
+                          
+                          <!-- Progress bar -->
+                          <div class="space-y-2">
+                              <div class="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                  <span>মোট অগ্রগতি</span>
+                                  <span id="purgeOverallPercentage">0%</span>
+                              </div>
+                              <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                                  <div id="purgeProgressBarTrack" class="bg-gradient-to-r from-rose-600 to-orange-500 w-0 h-full transition-all duration-300"></div>
+                              </div>
+                          </div>
+
+                          <!-- Realtime checklist with spinners -->
+                          <div id="purgeRealtimeCollectionChecklist" class="text-left text-xs text-slate-400 font-mono space-y-2 border border-slate-800 bg-slate-950/60 p-4 rounded-xl max-h-48 overflow-y-auto">
+                              <div class="flex items-center gap-2" id="status_bexo_users"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> ইউজার্স ডাটা ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_orders"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> অর্ডার হিস্ট্রি ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_posts"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> প্রোডাক্ট ক্যাটালগ ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_categories"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> ক্যাটাগরি স্ট্রাকচার ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_transactions"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> আর্থিক ট্রানজেকশন লগ ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_recharges"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> রিচার্জ রিকোয়েস্ট লগ ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_withdrawals"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> উইথড্রয়াল লগ ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_support_tickets"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> সাপোর্ট টিকিট ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_manager_records"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> ট্র্যাকিং ম্যানেজার ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_reseller_payouts"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> রিভিনিউ পে-আউট ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_premium_requests"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> প্রিমিয়াম রিকোয়েস্ট ক্লিয়ারিং...</div>
+                              <div class="flex items-center gap-2" id="status_bexo_settings"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> গ্লোবাল সেটিংস ডিফল্ট রিকোভারি...</div>
+                          </div>
+                      </div>
+                  `;
+                  document.body.appendChild(overlay);
+
+                  const collectionsToWipe = [
+                      { key: 'bexo_users', dom: 'status_bexo_users', label: 'আউট অফ ইউজার্স সফল' },
+                      { key: 'bexo_orders', dom: 'status_bexo_orders', label: 'অর্ডার রেকর্ডস সফল' },
+                      { key: 'bexo_posts', dom: 'status_bexo_posts', label: 'প্রোডাক্ট ক্যাটালগ সফল' },
+                      { key: 'bexo_categories', dom: 'status_bexo_categories', label: 'ক্যাটাগরি রি-সেট সফল' },
+                      { key: 'bexo_transactions', dom: 'status_bexo_transactions', label: 'লেনদেন হিস্ট্রি সফল' },
+                      { key: 'bexo_recharge_requests', dom: 'status_bexo_recharges', label: 'রিচার্জ রেকর্ডস সফল' },
+                      { key: 'bexo_balance_requests', dom: 'status_bexo_recharges', label: 'ব্যালেন্স রেকর্ডস সফল' },
+                      { key: 'bexo_bill_requests', dom: 'status_bexo_recharges', label: 'বিল রেকর্ডস সফল' },
+                      { key: 'bexo_withdrawals', dom: 'status_bexo_withdrawals', label: 'উইথড্রয়াল রেকর্ডস সফল' },
+                      { key: 'bexo_support_tickets', dom: 'status_bexo_support_tickets', label: 'সাপোর্ট টিকিট সফল' },
+                      { key: 'bexo_manager_records', dom: 'status_bexo_manager_records', label: 'ম্যানেজার ডেটা সফল' },
+                      { key: 'bexo_reseller_payouts', dom: 'status_bexo_reseller_payouts', label: 'পে-আউট ডেটা সফল' },
+                      { key: 'bexo_premium_requests', dom: 'status_bexo_premium_requests', label: 'প্রিমিয়াম রিকোয়েস্টস সফল' },
+                      { key: 'bexo_customer_reports', dom: 'status_bexo_manager_records', label: 'কাস্টমার রিপোর্টস সফল' },
+                      { key: 'bexo_settings', dom: 'status_bexo_settings', label: 'গ্লোবাল সেটিংস রিকোভারি সফল' }
                   ];
-                  
-                  keysToPurge.forEach(key => localStorage.removeItem(key));
-                  
-                  alert("সফলভাবে রিসেট সম্পন্ন হয়েছে। পেইজটি রিলোড হচ্ছে...");
-                  location.reload();
+
+                  const totalSteps = collectionsToWipe.length;
+                  let completedSteps = 0;
+
+                  function updateProgress() {
+                      completedSteps++;
+                      const percent = Math.min(100, Math.round((completedSteps / totalSteps) * 100));
+                      const progressTrack = document.getElementById('purgeProgressBarTrack');
+                      const percentageEl = document.getElementById('purgeOverallPercentage');
+                      if (progressTrack) progressTrack.style.width = percent + '%';
+                      if (percentageEl) percentageEl.innerText = percent + '%';
+                  }
+
+                  async function wipeCollection(colName) {
+                      if (!window.db) return;
+                      try {
+                          const querySnapshot = await window.db.collection(colName).get();
+                          const batch = window.db.batch ? window.db.batch() : null;
+                          
+                          if (batch) {
+                              let docCount = 0;
+                              querySnapshot.forEach(doc => {
+                                  batch.delete(doc.ref);
+                                  docCount++;
+                              });
+                              if (docCount > 0) {
+                                  await batch.commit();
+                              }
+                          } else {
+                              const promises = [];
+                              querySnapshot.forEach(doc => {
+                                  promises.push(doc.ref.delete());
+                              });
+                              await Promise.all(promises);
+                          }
+                          console.log(`[Firebase Wipe] Wiped all documents inside collection: ${colName}`);
+                      } catch (err) {
+                          console.error(`Error purging collection ${colName}:`, err);
+                      }
+                  }
+
+                  try {
+                      for (const col of collectionsToWipe) {
+                          const el = document.getElementById(col.dom);
+                          
+                          // 1. Wipe remote database
+                          if (window.db) {
+                              if (col.key === 'bexo_settings') {
+                                  // Restore default global settings instead of leaving it completely empty
+                                  const defaults = {
+                                      youtubeLink: '',
+                                      premiumGroupLink: '',
+                                      homeBannerUrl: '',
+                                      bkashLogo: '',
+                                      nagadLogo: '',
+                                      mcashLogo: '',
+                                      bkashNumber: '',
+                                      nagadNumber: '',
+                                      mcashNumber: '',
+                                      showTopSellingHome: false,
+                                      topSellingLimit: 0,
+                                      dhakaCharge: 80,
+                                      outsideDhakaCharge: 130
+                                  };
+                                  await window.db.collection('bexo_settings').doc('global').set(sanitizeForFirestore(defaults));
+                              } else if (col.key === 'bexo_categories') {
+                                  // Wipe but ensure a clean initialized category collection table space
+                                  await wipeCollection('bexo_categories');
+                              } else {
+                                  await wipeCollection(col.key);
+                              }
+                          }
+
+                          // 2. Wipe Local memory
+                          if (col.key === 'bexo_settings') {
+                              localStorage.setItem('bexo_settings', JSON.stringify({
+                                  youtubeLink: '',
+                                  premiumGroupLink: '',
+                                  homeBannerUrl: '',
+                                  bkashLogo: '',
+                                  nagadLogo: '',
+                                  mcashLogo: '',
+                                  bkashNumber: '',
+                                  nagadNumber: '',
+                                  mcashNumber: '',
+                                  showTopSellingHome: false,
+                                  topSellingLimit: 0,
+                                  dhakaCharge: 80,
+                                  outsideDhakaCharge: 130
+                              }));
+                          } else if (col.key === 'bexo_categories') {
+                              localStorage.setItem('bexo_categories', JSON.stringify([]));
+                          } else {
+                              localStorage.removeItem(col.key);
+                          }
+
+                          // Update checklist UI to check icon
+                          if (el) {
+                              el.innerHTML = `<i class="fas fa-check-circle text-emerald-500"></i> ${col.label}...`;
+                              el.className = "flex items-center gap-2 text-emerald-400 font-semibold";
+                          }
+                          
+                          updateProgress();
+                          // Introduce artificial 100ms lag for smoothness
+                          await new Promise(resolve => setTimeout(resolve, 100));
+                      }
+
+                      // Additional LocalStorage keys clearing
+                      const cleanupKeys = [
+                          'bexo_pending_user_syncs', 'bexo_pending_profits', 
+                          'bexo_profile', 'bexo_admin_subview'
+                      ];
+                      cleanupKeys.forEach(k => localStorage.removeItem(k));
+
+                      // UI state to Success
+                      const titleEl = document.querySelector('#databasePurgeScreenOverlay h2');
+                      const descEl = document.querySelector('#databasePurgeScreenOverlay p');
+                      if (titleEl) {
+                          titleEl.innerText = "ডাটাবেজ সম্পূর্ণ ডিলিট করা হয়েছে!";
+                          titleEl.className = "text-xl font-black text-emerald-500 tracking-tight";
+                      }
+                      if (descEl) {
+                          descEl.innerText = "সকল তথ্য সুরক্ষিত উপায়ে মুছে ফেলা হয়েছে। ২ সেকেন্ডের মধ্যে সাইটটি রিলোড হবে...";
+                      }
+
+                      setTimeout(() => {
+                          location.reload();
+                      }, 2000);
+
+                  } catch (err) {
+                      console.error("Purging routine error:", err);
+                      alert("সুইপ চলাকালীন সমস্যা হয়েছে, তবে লোকাল ক্যাশ মেমোরি ক্লিয়ার করা হয়েছে। পেইজটি রিলোড হচ্ছে...");
+                      location.reload();
+                  }
               }
 
               function saveAdminSettings() {
