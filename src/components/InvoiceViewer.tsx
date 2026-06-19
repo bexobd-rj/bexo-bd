@@ -438,26 +438,19 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
           {/* Left Column: Seller Brand Details (40% on desktop) */}
           <div className="md:col-span-5 flex flex-col justify-between z-10 text-left">
             <div>
-              {/* Brand Row with Rounded Logged-in User Profile Photo / Custom Bajar Bari Ai Logo */}
+              {/* Brand Row with Rounded Logged-in User Profile Photo */}
               <div className="flex items-center gap-4 mb-4">
-                {((profile as any)?.avatar || (profile as any)?.photoURL || currentUser?.photoURL) ? (
-                  <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center p-0.5 border border-slate-200 shadow-sm overflow-hidden shrink-0">
-                    <img 
-                      src={userPhoto} 
-                      alt="Seller Profile" 
-                      className="w-full h-full object-cover rounded-[14px]" 
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(order.resellerShopName || 'Bexo')}&background=0E46A3&color=ffffff&size=128&bold=true`;
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="w-14 h-14 rounded-2xl border-2 border-emerald-500 bg-white flex flex-col items-center justify-center p-1.5 shrink-0 select-none shadow-[0_2px_10px_rgba(16,185,129,0.15)] font-sans">
-                    <div className="text-[11px] font-black leading-none text-[#0E46A3] tracking-tight">Bajar</div>
-                    <div className="mt-1 px-1.5 py-0.5 bg-emerald-500 rounded text-[9px] font-black text-white leading-none tracking-tighter">Bari Ai</div>
-                  </div>
-                )}
+                <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center p-0.5 border border-slate-200 shadow-sm overflow-hidden shrink-0">
+                  <img 
+                    src={userPhoto} 
+                    alt="Seller Profile" 
+                    className="w-full h-full object-cover rounded-[14px]" 
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(order.resellerShopName || 'Bexo')}&background=0E46A3&color=ffffff&size=128&bold=true`;
+                    }}
+                  />
+                </div>
                 <div>
                   <h1 className="text-2xl font-black text-[#0D3B66] tracking-tight leading-tight">
                     {order.resellerShopName || (profile as any)?.shopName || 'Not Available'}
@@ -563,12 +556,18 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
               </div>
 
               {/* Status Badge styled exactly like a pill badge inside a container */}
-              <div className="pt-2">
-                <div className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full text-xs font-black font-sans">
+              <div className="pt-2 flex flex-col gap-2.5">
+                <div className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full text-xs font-black font-sans self-start">
                   <CheckCircle2 size={12} className="stroke-[3]" />
                   <span>অর্ডার স্ট্যাটাস:</span>
                   <span className="font-extrabold">{order.status}</span>
                 </div>
+                {order.comment && (
+                  <div className="mt-2 bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900 font-bold whitespace-pre-line text-left">
+                    <span className="text-slate-500 font-extrabold block mb-0.5 text-[9px] uppercase tracking-wider">সেলার কমেন্ট:</span>
+                    <p className="leading-relaxed font-sans">{order.comment}</p>
+                  </div>
+                )}
               </div>
             </div>
 

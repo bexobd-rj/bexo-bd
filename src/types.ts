@@ -39,6 +39,7 @@ export interface Order {
   profitStatus: 'not_added' | 'pending_approval' | 'completed';
   statusHistory?: { status: string; date: string; note?: string }[];
   items?: OrderItem[];
+  comment?: string;
 }
 
 export interface UserProfile {

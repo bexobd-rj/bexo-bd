@@ -113,6 +113,77 @@
           return null;
         }
       };
+
+      window.sortByNewestFirst = function(arr) {
+        if (!Array.isArray(arr)) return [];
+        return arr.slice().sort((a, b) => {
+          // 1. Check timestamp
+          const tA = Number(a.timestamp) || 0;
+          const tB = Number(b.timestamp) || 0;
+          if (tA && tB && tA !== tB) {
+            return tB - tA;
+          }
+
+          // 2. Fallback to parsing dates/times
+          const dateStrA = a.time || a.date || '';
+          const dateStrB = b.time || b.date || '';
+          if (dateStrA && dateStrB && dateStrA !== dateStrB) {
+            let parsedA = Date.parse(dateStrA);
+            let parsedB = Date.parse(dateStrB);
+
+            if (isNaN(parsedA) && typeof dateStrA === 'string') {
+              const match = dateStrA.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+              if (match) {
+                const day = parseInt(match[1]);
+                const month = parseInt(match[2]) - 1;
+                const year = parseInt(match[3]);
+                let hour = 0, min = 0, sec = 0;
+                const timeMatch = dateStrA.match(/(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+                if (timeMatch) {
+                  hour = parseInt(timeMatch[1]);
+                  min = parseInt(timeMatch[2]);
+                  sec = parseInt(timeMatch[3]);
+                }
+                parsedA = new Date(year, month, day, hour, min, sec).getTime();
+              }
+            }
+            if (isNaN(parsedB) && typeof dateStrB === 'string') {
+              const match = dateStrB.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+              if (match) {
+                const day = parseInt(match[1]);
+                const month = parseInt(match[2]) - 1;
+                const year = parseInt(match[3]);
+                let hour = 0, min = 0, sec = 0;
+                const timeMatch = dateStrB.match(/(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+                if (timeMatch) {
+                  hour = parseInt(timeMatch[1]);
+                  min = parseInt(timeMatch[2]);
+                  sec = parseInt(timeMatch[3]);
+                }
+                parsedB = new Date(year, month, day, hour, min, sec).getTime();
+              }
+            }
+
+            if (!isNaN(parsedA) && !isNaN(parsedB) && parsedA !== parsedB) {
+              return parsedB - parsedA;
+            }
+          }
+
+          // 3. Fallback to sorting by string IDs containing numbers
+          const idA = String(a.id || a.orderId || a.orderNo || '');
+          const idB = String(b.id || b.orderId || b.orderNo || '');
+          if (idA && idB) {
+            const numA = parseFloat(idA.replace(/[^\d]/g, ''));
+            const numB = parseFloat(idB.replace(/[^\d]/g, ''));
+            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+              return numB - numA;
+            }
+            return idB.localeCompare(idA);
+          }
+
+          return 0;
+        });
+      };
     </script>
 
     <style>
@@ -1241,6 +1312,14 @@
                       placeholder=" "
                     ></textarea>
                     <label>সম্পূর্ণ ঠিকানা</label>
+                  </div>
+                  <div class="floating-label-group">
+                    <textarea
+                      id="custComment"
+                      rows="2"
+                      placeholder=" "
+                    ></textarea>
+                    <label>কমেন্টস / অতিরিক্ত নির্দেশনা (অপশনাল)</label>
                   </div>
                 </div>
               </div>
@@ -6794,11 +6873,11 @@
                       window.activeFinanceTab = 'withdrawals';
                   }
 
-                  // Standardize lists
-                  const withdrawals = appWithdrawals || [];
-                  const balanceRequests = appBalanceRequests || [];
-                  const rechargeRequests = appRechargeRequests || [];
-                  const billRequests = appBillRequests || [];
+                  // Standardize lists & sort chronologically descending (newest first)
+                  const withdrawals = window.sortByNewestFirst(appWithdrawals || []);
+                  const balanceRequests = window.sortByNewestFirst(appBalanceRequests || []);
+                  const rechargeRequests = window.sortByNewestFirst(appRechargeRequests || []);
+                  const billRequests = window.sortByNewestFirst(appBillRequests || []);
 
                   // Calculate Counts
                   const pendingWithdrawals = withdrawals.filter(w => w.status === 'Pending' || !w.status || w.status === '').length;
@@ -7009,7 +7088,7 @@
                                   </td>
                               </tr>
                               `;
-                          }).reverse().join('');
+                          }).join('');
 
                           mobileHtml = filtered.map(w => {
                               const timeString = w.time || (w.timestamp ? new Date(w.timestamp).toLocaleString('en-GB') : (w.date || 'N/A'));
@@ -7100,7 +7179,7 @@
                                   </div>
                               </div>
                               `;
-                          }).reverse().join('');
+                          }).join('');
                       }
 
                       list.innerHTML = `
@@ -13077,98 +13156,6 @@
                                   }
                               }
                               userDocRef.set(sanitizeForFirestore(userData))
-                                  .then(() => console.log(`[Firebase] Directly updated user ${profileId} bill status in Firestore.`))
-                                  .catch(err => console.error("Error setting user doc in updateBillStatus:", err));
-                          }
-                      }).catch(err => console.error("Error direct getting user doc in updateBillStatus:", err));
-                  }
-
-                  // 2. Local appUsers update for immediate UI refresh
-                  const uIdx = appUsers.findIndex(u => u.profileId === profileId);
-                  if (uIdx > -1) {
-                      const targetUser = appUsers[uIdx];
-                      if (!targetUser.rechargeTransactions) targetUser.rechargeTransactions = [];
-                      const tx = targetUser.rechargeTransactions.find(t => t.id === internalId);
-                      if (tx) {
-                          tx.status = newStatus;
-                          if (trxId) tx.trxId = trxId;
-                          if (adminNote) tx.adminNote = adminNote;
-                          
-                          if (newStatus === 'Rejected') {
-                              targetUser.rechargeBalance = (Number(targetUser.rechargeBalance) || 0) + (Number(tx.amount) || 0);
-                              targetUser.balance = targetUser.rechargeBalance;
-                              
-                              // Log refund/fail to global appTransactions
-                              appTransactions.unshift({
-                                  id: Date.now(),
-                                  date: new Date().toLocaleString(),
-                                  userId: targetUser.id || targetUser.profileId,
-                                  profileId: targetUser.profileId,
-                                  details: `রিফান্ড: বিল পরিশোধ রিকোয়েস্ট বাতিল/ব্যর্থ (৳${tx.amount})`,
-                                  amount: Number(tx.amount),
-                                  balance: targetUser.rechargeBalance
-                              });
-                              saveTransactions();
-                          } else if (newStatus === 'Successful') {
-                              // Log successful bill payment out of wallet path
-                              appTransactions.unshift({
-                                  id: Date.now(),
-                                  date: new Date().toLocaleString(),
-                                  userId: targetUser.id || targetUser.profileId,
-                                  profileId: targetUser.profileId,
-                                  details: `বিল পরিশোধ সফল (ID: ${internalId})`,
-                                  amount: -Number(tx.amount),
-                                  balance: targetUser.rechargeBalance,
-                                  trxId: trxId,
-                                  adminNote: adminNote
-                              });
-                              saveTransactions();
-                          }
-                      }
-                      
-                      if (targetUser.profileId === userProfile.profileId) {
-                          userProfile.rechargeBalance = targetUser.rechargeBalance;
-                          userProfile.balance = targetUser.rechargeBalance;
-                          userProfile.rechargeTransactions = targetUser.rechargeTransactions;
-                          saveProfile();
-                          updateHeaderBalance();
-                      }
-                      saveUsers(profileId, true);
-                  }
-
-                  renderAdminBills();
-                  updateAdminStats();
-                  showToast(`বিল পেমেন্ট রিকোয়েস্ট ${newStatus === 'Successful' ? 'সফলভাবে অ্যাপ্রুভ' : 'বাতিল'} করা হয়েছে।`, "success");
-              }
-
-              function updateRechargeStatus(profileId, internalId, newStatus, trxId = '', adminNote = '') {
-                  const gReq = (appRechargeRequests || []).find(r => r.id === internalId && r.profileId === profileId);
-                  if(gReq) {
-                      gReq.status = newStatus;
-                      if (trxId) gReq.trxId = trxId;
-                      if (adminNote) gReq.adminNote = adminNote;
-                  }
-                  saveRechargeRequests();
-
-                  // 1. Direct Firestore user document update to guarantee reliability
-                  if (window.db && profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
-                      userDocRef.get().then(doc => {
-                          if (doc.exists) {
-                              const userData = doc.data();
-                              if (!userData.rechargeTransactions) userData.rechargeTransactions = [];
-                              const tx = userData.rechargeTransactions.find(t => t.id === internalId);
-                              if (tx) {
-                                  tx.status = newStatus;
-                                  if (trxId) tx.trxId = trxId;
-                                  if (adminNote) tx.adminNote = adminNote;
-                                  
-                                  if (newStatus === 'Rejected') {
-                                      userData.rechargeBalance = (Number(userData.rechargeBalance) || 0) + (Number(tx.amount) || 0);
-                                      userData.balance = userData.rechargeBalance;
-                                  }
-                              }
-                              userDocRef.set(sanitizeForFirestore(userData))
                                   .then(() => console.log(`[Firebase] Directly updated user ${profileId} recharge status in Firestore.`))
                                   .catch(err => console.error("Error setting user doc in updateRechargeStatus:", err));
                           }
@@ -13932,11 +13919,9 @@
                               <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 font-sans">
                                   ${subsHtml}
                                   <!-- Add Sub Button Tile -->
-                                  <div onclick="openAddSubCategoryModal('${cat.id}')" class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center p-2 cursor-pointer hover:bg-orange-50 hover:border-orange-200 transition-all group font-sans">
-                                      <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-300 group-hover:text-orange-500 shadow-sm transition-all font-sans">
-                                          <i class="fas fa-plus"></i>
-                                      </div>
-                                      <p class="mt-2 text-[9px] font-black text-slate-300 group-hover:text-orange-500 uppercase tracking-widest font-sans">নতুন এড করুন</p>
+                                  <div onclick="openAddSubCategoryModal('${cat.id}')" class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center p-4 hover:border-orange-500 hover:bg-orange-50 cursor-pointer transition-all">
+                                      <i class="fas fa-plus text-slate-400 mb-1.5"></i>
+                                      <span class="text-[9px] font-black text-slate-400">অ্যাড সাব-ক্যাটাগরি</span>
                                   </div>
                               </div>
                           </div>
@@ -13944,11 +13929,16 @@
                   }).join('');
 
                   container.innerHTML = `
-                      <div class="p-4 lg:p-8 space-y-8 animate-fade-in bg-[#f8fafc] min-h-screen">
-                          <div class="max-w-7xl mx-auto space-y-8 pb-20">
-                              <div class="flex justify-between items-center bg-white p-6 rounded-[2.5rem] border border-slate-50 shadow-sm font-sans">
-                                  <div>
-                                      <h2 class="text-2xl font-black text-slate-900 tracking-tight font-sans">সকল প্রোডাক্ট ও ক্যাটাগরি</h2>
+                      <div class="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
+                          <!-- Top Header with Actions -->
+                          <div class="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-150 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+                              <div>
+                                  <h2 class="text-xl font-black text-slate-800">সকল প্রোডাক্ট ও ক্যাটাগরি</h2>
+
+
+
+
+                      status: 'Pending',��� প্রোডাক্ট ও ক্যাটাগরি</h2>
                                       <p class="text-[10px] uppercase font-bold text-slate-400 tracking-widest mt-1 font-sans">ক্যাটাগরি ভিত্তিক পণ্য ম্যানেজমেন্ট</p>
                                   </div>
                                   <div class="flex gap-3">
@@ -14622,6 +14612,7 @@
                   const phone = document.getElementById('custPhone').value.trim();
                   const addr = document.getElementById('custAddress').value.trim();
                   const deliveryCharge = parseInt(document.getElementById('checkoutDelivery').value) || 0;
+                  const commentVal = document.getElementById('custComment') ? document.getElementById('custComment').value.trim() : '';
 
                   if(!name || !phone || !addr) {
                       showToast("কাস্টমারের সকল তথ্য সঠিকভাবে পূরণ করুন!", "error");
@@ -14637,7 +14628,9 @@
                       profileId: userProfile.profileId,
                       resellerShopName: userProfile.shopName || 'Bexo BD Official',
                       resellerAddress: userProfile.address || 'Dhaka, Bangladesh',
+                      resellerPhone: userProfile.phone || 'Not Available',
                       date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
+                      comment: commentVal,
                       customerName: name,
                       customerPhone: phone,
                       customerAddress: addr,
@@ -16353,44 +16346,22 @@
                               <div class="p-4 md:p-6 border-b border-slate-100 bg-white flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
                                   <div class="flex items-center gap-3">
                                       <button onclick="selectUserSupportTicket(null)" class="lg:hidden p-2 text-slate-400 hover:text-slate-600 transition-all mr-1" title="তালিকায় ফিরুন">
-                                          <i class="fas fa-chevron-                              <!-- SECTION 2: BUYER INFORMATION DETAILS -->
-                              <div class="p-6 md:p-8 text-left">
-                                <div class="bg-[#F4F8FA] rounded-2xl border border-slate-150 p-6 space-y-4">
-                                  
-                                  <!-- Card Header with User Icon -->
-                                  <div class="flex items-center gap-2.5 text-blue-800 border-b border-blue-100/60 pb-3">
-                                    <div class="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 shrink-0">
-                                      <i class="fas fa-user text-[11px] font-black"></i>
-                                    </div>
-                                    <h2 class="text-base font-black tracking-wide font-sans">ক্রেতার তথ্য</h2>
-                                  </div>
-
-                                  <!-- Buyer Contact Details -->
-                                  <div class="space-y-3">
-                                    <h3 class="text-lg font-black text-slate-900 leading-tight block font-sans">
-                                      ${customerName}
-                                    </h3>
-                                    
-                                    <div class="text-sm font-semibold text-slate-600 space-y-1.5 leading-relaxed font-sans font-sans">
-                                      <p class="block">${fullAddress}</p>
-                                      <div class="flex items-center gap-2.5 text-slate-800 font-bold mt-1 font-sans">
-                                        <i class="fas fa-phone-alt text-blue-600 shrink-0"></i>
-                                        <span class="font-mono tracking-wide">${customerPhone}</span>
+                                          <i class="fas fa-chevron-left"></i>
+                                      </button>
+                                      <div class="w-10 h-10 rounded-full bg-slate-100 text-[#0E46A3] font-black flex items-center justify-center border border-slate-200 text-xs">
+                                          SU
                                       </div>
-                                    </div>
-
-                                    <!-- Status Badge styled exactly like a pill badge inside a container -->
-                                    <div class="pt-2">
-                                      <div class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full text-xs font-black font-sans">
-                                        <i class="fas fa-check-circle text-[11px]"></i>
-                                        <span>অর্ডার স্ট্যাটাস:</span>
-                                        <span class="font-bold">${o.status}</span>
+                                      <div>
+                                          <div class="flex items-center gap-2">
+                                              <h4 class="text-xs font-black text-slate-800">${ticket.orderId === 'General' ? 'সাধারণ জিজ্ঞাসা' : 'অর্ডার ID: #' + (ticket.orderId || 'N/A')}</h4>
+                                              <span class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${chatHeaderStatusClass}">${ticket.status}</span>
+                                          </div>
+                                          <p class="text-[9px] text-slate-400 font-mono font-bold mt-0.5">সহায়তা টিকেট আইডি: #${ticket.id}</p>
                                       </div>
-                                    </div>
                                   </div>
+                              </div>
 
-                                </div>
-                              </div>uto p-4 md:p-6 space-y-1 bg-slate-50/50">
+                              <div class="flex-1 overflow-y-auto p-4 md:p-6 space-y-1 bg-slate-50/50">
                                   ${messagesHtml || `
                                       <div class="p-12 text-center text-slate-300 font-bold text-xs uppercase tracking-widest">
                                           কোনো বার্তা নেই। হাই বলুন!
@@ -16958,13 +16929,13 @@
                   if(!o) return;
 
                   const reseller = appUsers.find(u => 
-                      (o.profileId && u.profileId === o.profileId) || 
-                      (o.resellerPhone && u.phone === o.resellerPhone) ||
-                      (o.userId && u.id === o.userId)
-                  );
+                      (o.profileId && String(u.profileId).trim() === String(o.profileId).trim()) || 
+                      (o.resellerPhone && String(u.phone).trim() === String(o.resellerPhone).trim()) ||
+                      (o.userId && String(u.id).trim() === String(o.userId).trim())
+                  ) || (userProfile && (String(userProfile.profileId).trim() === String(o.profileId).trim() || userProfile.phone === o.resellerPhone || userProfile.id === o.userId) ? userProfile : null);
 
-                  const resellerShopName = reseller ? reseller.shopName : (o.resellerShopName || (isAdminMode ? '' : userProfile.shopName));
-                  const isShopNameMissing = !resellerShopName || resellerShopName.trim() === '' || resellerShopName.trim().toUpperCase() === 'N/A';
+                  const resellerShopName = (reseller && reseller.shopName && reseller.shopName.trim()) || (reseller && reseller.fullName && reseller.fullName.trim()) || o.resellerShopName || (isAdminMode ? 'N/A' : userProfile.shopName) || 'Bexo Shop';
+                  const isShopNameMissing = !resellerShopName || resellerShopName.trim() === '' || resellerShopName.trim().toUpperCase() === 'N/A' || resellerShopName === 'Not Available';
                   const shopAbbr = getAbbr(resellerShopName);
 
                   const main = document.getElementById(isAdminMode ? 'adminViewContainer' : 'mainContent');
@@ -17055,7 +17026,7 @@
                       }
                   };
 
-                  const userPhoto = (reseller && (reseller.avatar || reseller.photoURL)) || `https://ui-avatars.com/api/?name=${encodeURIComponent(o.resellerShopName || (reseller ? reseller.shopName : '') || 'Bxo')}&background=10B981&color=ffffff&size=128&bold=true`;
+                  const userPhoto = (reseller && (reseller.avatar || reseller.photoURL)) || (userProfile && userProfile.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(resellerShopName || 'Bxo')}&background=0E46A3&color=ffffff&size=128&bold=true`;
 
                   // Dynamically prepare items list to support multi-item cart naturally in calculations & renderings
                   const invoiceItems = o.items || [
@@ -17090,13 +17061,12 @@
                       }) + ' টাকা';
                   };
 
-                  const resellerAddress = reseller ? (reseller.address || 'Not Available') : (o.resellerAddress || 'Not Available');
-                  const resellerPhone = reseller ? (reseller.phone || 'Not Available') : (o.resellerPhone || 'Not Available');
-                  const resellerEmail = reseller ? (reseller.email || 'Not Available') : (o.resellerEmail || 'Not Available');
-                  const resellerWebsite = reseller ? (reseller.website || 'www.bexo.com.bd') : (o.resellerWebsite || 'www.bexo.com.bd');
+                  const resellerAddress = (reseller && reseller.address && reseller.address.trim()) || o.resellerAddress || 'Not Available';
+                  const resellerPhone = (reseller && reseller.phone && reseller.phone.trim()) || o.resellerPhone || 'Not Available';
+                  const resellerEmail = (reseller && reseller.email && reseller.email.trim()) || o.resellerEmail || 'Not Available';
+                  const resellerWebsite = (reseller && reseller.website && reseller.website.trim()) || o.resellerWebsite || 'www.bexo.com.bd';
 
-                  const hasCustomLogo = reseller && (reseller.avatar || reseller.photoURL);
-                  const brandLogoHTML = hasCustomLogo || (resellerShopName && resellerShopName !== 'Bajar Bari Ai' && resellerShopName !== 'Bexo Shop' && resellerShopName !== 'Bexo BD Official') ? `
+                  const brandLogoHTML = `
                     <div class="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center p-0.5 border border-slate-200 shadow-sm overflow-hidden shrink-0">
                       <img 
                         src="${userPhoto}" 
@@ -17105,11 +17075,6 @@
                         referrerpolicy="no-referrer"
                         onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(resellerShopName || 'Bxo')}&background=0E46A3&color=ffffff&size=128&bold=true'"
                       />
-                    </div>
-                  ` : `
-                    <div class="w-14 h-14 rounded-2xl border-2 border-emerald-500 bg-white flex flex-col items-center justify-center p-1.5 shrink-0 select-none shadow-[0_2px_10px_rgba(16,185,129,0.15)] font-sans">
-                      <div class="text-[11px] font-black leading-none text-[#0E46A3] font-sans tracking-tight">Bajar</div>
-                      <div class="mt-1 px-1.5 py-0.5 bg-emerald-500 rounded text-[9px] font-black text-white leading-none tracking-tighter col-span-12 font-sans">Bari Ai</div>
                     </div>
                   `;
 
@@ -17388,12 +17353,18 @@
                                     </div>
 
                                     <!-- Status Badge styled exactly like a pill badge inside a container -->
-                                    <div class="pt-2">
-                                      <div class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full text-xs font-black font-sans">
+                                    <div class="pt-2 flex flex-col gap-2.5">
+                                      <div class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full text-xs font-black font-sans self-start">
                                         <i class="fas fa-check-circle text-[11px]"></i>
                                         <span>অর্ডার স্ট্যাটাস:</span>
                                         <span class="font-bold">${o.status}</span>
                                       </div>
+                                      ${o.comment ? `
+                                      <div class="mt-2 bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-905 font-bold whitespace-pre-line text-left">
+                                        <span class="text-slate-500 font-extrabold block mb-0.5 text-[9px] uppercase tracking-wider">সেলার কমেন্ট:</span>
+                                        <p class="leading-relaxed font-sans">${o.comment}</p>
+                                      </div>
+                                      ` : ''}
                                     </div>
                                   </div>
 
