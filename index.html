@@ -8797,13 +8797,64 @@
                   renderCart();
               }
 
-              function downloadImage(url) {
+              async function downloadImage(url) {
                   if (!url) return;
                   
-                  // 1. If it's a base64 / data URL, handle entirely on client-side
+                  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                  
+                  let ext = 'jpg';
+                  try {
+                      const cleanUrl = url.split('?')[0];
+                      const parts = cleanUrl.split('.');
+                      if (parts.length > 1) {
+                          const possibleExt = parts[parts.length - 1].toLowerCase();
+                          if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(possibleExt)) {
+                              ext = possibleExt;
+                          }
+                      }
+                  } catch(e) {}
+                  const filename = `bexobd-${Date.now()}.${ext}`;
+
+                  // If on mobile, try modern Web Share API first which allows saving image directly to photos/gallery natively.
+                  if (isMobile && navigator.share && navigator.canShare) {
+                      try {
+                          showToast("ডাউনলোড প্রস্তুত হচ্ছে...", "success");
+                          
+                          let response;
+                          try {
+                              response = await fetch(url, { mode: 'cors', credentials: 'omit' });
+                          } catch (corsErr) {
+                              const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
+                              response = await fetch(proxyUrl);
+                          }
+                          
+                          if (response && response.ok) {
+                              const blob = await response.blob();
+                              let mime = blob.type || 'image/jpeg';
+                              if (mime.includes('png')) ext = 'png';
+                              else if (mime.includes('webp')) ext = 'webp';
+                              else if (mime.includes('gif')) ext = 'gif';
+                              
+                              const file = new File([blob], `bexobd-${Date.now()}.${ext}`, { type: mime });
+                              if (navigator.canShare({ files: [file] })) {
+                                  await navigator.share({
+                                      files: [file],
+                                      title: 'bexobd-image',
+                                  });
+                                  showToast("ছবি সেভ সম্পন্ন হয়েছে!", "success");
+                                  return;
+                              }
+                          }
+                      } catch (err) {
+                          console.log("Web Share API error or dismissed:", err);
+                      }
+                  }
+
+                  // Default direct download flow
+                  showToast("ডাউনলোড শুরু হচ্ছে...", "success");
+
                   if (url.startsWith('data:')) {
                       try {
-                          showToast("ডাউনলোড শুরু হচ্ছে...", "success");
                           let ext = 'png';
                           const matchMime = url.match(/^data:image\/([a-zA-Z+]+);base64,/);
                           if (matchMime && matchMime[1]) {
@@ -8845,54 +8896,21 @@
                       }
                   }
 
-                  // 2. Otherwise it's an external remote URL
-                  showToast("ডাউনলোড শুরু হচ্ছে...", "success");
-
-                  // Try direct fetch first (works if remote has CORS allowed)
-                  fetch(url, {
-                      mode: 'cors',
-                      credentials: 'omit'
-                  })
-                  .then(response => {
-                      if (!response.ok) throw new Error("CORS or network error");
-                      return response.blob();
-                  })
-                  .then(blob => {
-                      let ext = 'jpg';
-                      try {
-                          const cleanUrl = url.split('?')[0];
-                          const parts = cleanUrl.split('.');
-                          if (parts.length > 1) {
-                              const possibleExt = parts[parts.length - 1].toLowerCase();
-                              if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(possibleExt)) {
-                                  ext = possibleExt;
-                              }
-                          }
-                      } catch(e) {}
-
-                      const blobUrl = URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = blobUrl;
-                      link.download = `bexobd-${Date.now()}.${ext}`;
-                      document.body.appendChild(link);
-                      link.click();
+                  // Remote URL direct browser-initiated download via backend proxy with Content-Disposition attachment header
+                  try {
+                      const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
+                      // Setting window.location.href on the proxy download forces the browser to trigger a full file download prompt 
+                      // and prevents mobile app webviews from swallowing the simulated programmatic click event.
+                      window.location.href = proxyUrl;
+                      
                       setTimeout(() => {
-                          document.body.removeChild(link);
-                          URL.revokeObjectURL(blobUrl);
                           showToast("ডাউনলোড সম্পন্ন হয়েছে!", "success");
                       }, 1000);
-                  })
-                  .catch(err => {
-                      console.log("Client-side direct fetch failed, routing to proxy download:", err);
+                  } catch (err) {
+                      console.error("Direct redirect download fallback failed:", err);
                       const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
-                      const link = document.createElement('a');
-                      link.href = proxyUrl;
-                      document.body.appendChild(link);
-                      link.click();
-                      setTimeout(() => {
-                          document.body.removeChild(link);
-                      }, 1500);
-                  });
+                      window.open(proxyUrl, '_blank');
+                  }
               }
 
               function downloadAllImages(postId) {
