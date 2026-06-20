@@ -8799,118 +8799,18 @@
 
               function downloadImage(url) {
                   if (!url) return;
-                  
-                  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                  
-                  // Helper function to trigger actual programmatic download of a blob
-                  function triggerDownload(blob, filename) {
-                      const blobUrl = URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = blobUrl;
-                      link.download = filename;
-                      document.body.appendChild(link);
-                      link.click();
-                      setTimeout(() => {
-                          document.body.removeChild(link);
-                          URL.revokeObjectURL(blobUrl);
-                      }, 1500);
-                  }
-
-                  // Determine file name & extension
-                  let ext = 'jpg';
-                  try {
-                      const cleanUrl = url.split('?')[0];
-                      const parts = cleanUrl.split('.');
-                      if (parts.length > 1) {
-                          const possibleExt = parts[parts.length - 1].toLowerCase();
-                          if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(possibleExt)) {
-                              ext = possibleExt;
-                          }
-                      }
-                  } catch(e) {}
-                  const filename = `bexobd-${Date.now()}.${ext}`;
-
-                  // Fallback function: opens the instructional mobile modal
-                  function showMobileDownloadModal() {
-                      const modalId = 'mobDownModal-' + Date.now();
-                      const modalHTML = `
-                          <div id="${modalId}" class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-sm animate-fade-in">
-                              <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative animate-scale-in text-center space-y-4">
-                                  <button onclick="document.getElementById('${modalId}').remove()" class="absolute top-4 right-4 w-8 h-8 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-all z-10">
-                                      <i class="fas fa-times"></i>
-                                  </button>
-                                  
-                                  <div class="space-y-1">
-                                      <span class="inline-flex items-center justify-center w-12 h-12 bg-orange-50 text-orange-500 rounded-full mb-2 animate-bounce">
-                                          <i class="fas fa-mobile-alt text-xl"></i>
-                                      </span>
-                                      <h3 class="text-base font-black text-slate-800">মোবাইল ডাউনলোড গাইড</h3>
-                                      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">নিচের ছবিটিতে চেপে ধরে সেভ করুন</p>
-                                  </div>
-
-                                  <div class="relative bg-slate-50 p-2 rounded-2xl border border-slate-100 flex justify-center items-center">
-                                      <img src="${url}" referrerPolicy="no-referrer" class="max-h-[220px] object-contain rounded-xl shadow-sm cursor-pointer select-none border border-slate-100" style="-webkit-touch-callout: default !important;">
-                                  </div>
-
-                                  <div class="bg-orange-50/50 p-3 rounded-xl border border-orange-100 text-left">
-                                      <p class="text-[11px] text-orange-800 font-medium leading-relaxed flex gap-2">
-                                          <i class="fas fa-info-circle mt-0.5 text-xs text-orange-500 shrink-0"></i>
-                                          <span>ছবিটি ডাউনলোড করতে এর ওপর <strong>২-৩ সেকেন্ড চেপে ধরুন (Long Press)</strong>, তারপর <strong>'Save Image'</strong> বা <strong>'Download Image'</strong> অপশনটিতে ট্যাপ করুন।</span>
-                                      </p>
-                                  </div>
-
-                                  <div class="flex gap-2">
-                                      <button onclick="document.getElementById('${modalId}').remove()" class="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200 transition-all">
-                                          বন্ধ করুন
-                                      </button>
-                                      <a href="${url}" target="_blank" class="flex-1 py-2.5 bg-orange-600 text-white font-bold text-xs rounded-xl hover:bg-orange-700 transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-orange-100">
-                                          <i class="fas fa-external-link-alt"></i> নতুন ট্যাবে খুলুন
-                                      </a>
-                                  </div>
-                              </div>
-                          </div>
-                      `;
-                      document.body.insertAdjacentHTML('beforeend', modalHTML);
-                  }
-
-                  // If on mobile/webview, we automatically show the instructional popup 
-                  // as in-app WebViews (Facebook, WhatsApp, Messenger) often block programmatic downloads.
-                  if (isMobile) {
-                      showMobileDownloadModal();
-                  }
-
-                  // Attempt direct background fetch download for all environments
                   showToast("ডাউনলোড শুরু হচ্ছে...", "success");
-                  fetch(url, {
-                      mode: 'cors',
-                      credentials: 'omit'
-                  })
-                  .then(r => {
-                      if (!r.ok) throw new Error("CORS or fetch error");
-                      return r.blob();
-                  })
-                  .then(blob => {
-                      triggerDownload(blob, filename);
-                      if (!isMobile) {
-                          showToast("ছবি ডাউনলোড সম্পন্ন হয়েছে!", "success");
-                      }
-                  })
-                  .catch(err => {
-                      console.log("Direct blob download failed, trying standard fallback link:", err);
-                      // Fallback when fetch fails (e.g., CORS mismatch)
-                      if (!isMobile) {
-                          // On desktop, try direct anchor download fallback, which might open in new window
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.target = '_blank';
-                          link.download = filename;
-                          document.body.appendChild(link);
-                          link.click();
-                          setTimeout(() => document.body.removeChild(link), 1500);
-                      } else {
-                          // Already showing modal on mobile
-                      }
-                  });
+
+                  // Trigger direct download using the backend proxy endpoint configured with attachment headers
+                  const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
+                  const link = document.createElement('a');
+                  link.href = proxyUrl;
+                  document.body.appendChild(link);
+                  link.click();
+                  
+                  setTimeout(() => {
+                      document.body.removeChild(link);
+                  }, 1500);
               }
 
               function downloadAllImages(postId) {

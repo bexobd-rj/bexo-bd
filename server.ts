@@ -59,6 +59,56 @@ async function startServer() {
     }
   });
 
+  // API Route for Proxy Download to bypass CORS and force direct download
+  app.get("/api/proxy-download", async (req, res) => {
+    try {
+      const imageUrl = req.query.url as string;
+      if (!imageUrl) {
+        return res.status(400).send("No image URL provided");
+      }
+
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        return res.status(500).send("Failed to fetch image");
+      }
+
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      
+      // Determine file extension based on contentType or original URL
+      let ext = "jpg";
+      if (contentType.includes("png")) {
+        ext = "png";
+      } else if (contentType.includes("webp")) {
+        ext = "webp";
+      } else if (contentType.includes("gif")) {
+        ext = "gif";
+      } else if (contentType.includes("jpeg")) {
+        ext = "jpeg";
+      } else {
+        try {
+          const cleanUrl = imageUrl.split('?')[0];
+          const parts = cleanUrl.split('.');
+          if (parts.length > 1) {
+            const possibleExt = parts[parts.length - 1].toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(possibleExt)) {
+              ext = possibleExt;
+            }
+          }
+        } catch(e) {}
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="bexobd-${Date.now()}.${ext}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Proxy Download Error:", error);
+      res.status(500).send("Error reading image content");
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
