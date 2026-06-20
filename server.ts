@@ -62,9 +62,47 @@ async function startServer() {
   // API Route for Proxy Download to bypass CORS and force direct download
   app.get("/api/proxy-download", async (req, res) => {
     try {
-      const imageUrl = req.query.url as string;
+      let imageUrl = req.query.url as string;
       if (!imageUrl) {
         return res.status(400).send("No image URL provided");
+      }
+
+      // Reconstruct original URL if it was split by '&' inside WebViews or query parser
+      // e.g., if Firestore storage URL had '&alt=media&token=...' which becomes separate query params
+      const rawUrl = req.originalUrl;
+      const urlIndex = rawUrl.indexOf("url=");
+      if (urlIndex !== -1) {
+        const afterUrl = rawUrl.substring(urlIndex + 4);
+        imageUrl = decodeURIComponent(afterUrl);
+      }
+
+      // Security Check: Prevent SSRF (Server-Side Request Forgery)
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(imageUrl);
+      } catch (e) {
+        return res.status(400).send("Invalid URL format");
+      }
+
+      const isHttp = parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+      if (!isHttp) {
+        return res.status(400).send("Only http or https URLs are permitted");
+      }
+
+      const hostname = parsedUrl.hostname.toLowerCase();
+      
+      // Blacklist local and private network ranges to block internal scanning (GCP Metadata / Localhost)
+      const isInternal = 
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "0.0.0.0" ||
+        hostname === "169.254.169.254" || // GCP Metadata Server
+        hostname.startsWith("10.") ||
+        hostname.startsWith("192.168.") ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname); // 172.16.0.0/12
+
+      if (isInternal) {
+        return res.status(403).send("Access to internal or private URLs is forbidden");
       }
 
       const response = await fetch(imageUrl);
