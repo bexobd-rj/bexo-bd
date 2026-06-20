@@ -8799,18 +8799,100 @@
 
               function downloadImage(url) {
                   if (!url) return;
+                  
+                  // 1. If it's a base64 / data URL, handle entirely on client-side
+                  if (url.startsWith('data:')) {
+                      try {
+                          showToast("ডাউনলোড শুরু হচ্ছে...", "success");
+                          let ext = 'png';
+                          const matchMime = url.match(/^data:image\/([a-zA-Z+]+);base64,/);
+                          if (matchMime && matchMime[1]) {
+                              ext = matchMime[1];
+                          }
+                          
+                          const parts = url.split(',');
+                          const byteString = atob(parts[1]);
+                          const mimeString = parts[0].split(':')[1].split(';')[0];
+                          const ab = new ArrayBuffer(byteString.length);
+                          const ia = new Uint8Array(ab);
+                          for (let i = 0; i < byteString.length; i++) {
+                              ia[i] = byteString.charCodeAt(i);
+                          }
+                          const blob = new Blob([ab], { type: mimeString });
+                          
+                          const blobUrl = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = blobUrl;
+                          link.download = `bexobd-${Date.now()}.${ext}`;
+                          document.body.appendChild(link);
+                          link.click();
+                          
+                          setTimeout(() => {
+                              document.body.removeChild(link);
+                              URL.revokeObjectURL(blobUrl);
+                              showToast("ডাউনলোড সম্পন্ন হয়েছে!", "success");
+                          }, 1000);
+                          return;
+                      } catch (error) {
+                          console.error("Base64 direct download failed:", error);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `bexobd-${Date.now()}.png`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          return;
+                      }
+                  }
+
+                  // 2. Otherwise it's an external remote URL
                   showToast("ডাউনলোড শুরু হচ্ছে...", "success");
 
-                  // Trigger direct download using the backend proxy endpoint configured with attachment headers
-                  const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
-                  const link = document.createElement('a');
-                  link.href = proxyUrl;
-                  document.body.appendChild(link);
-                  link.click();
-                  
-                  setTimeout(() => {
-                      document.body.removeChild(link);
-                  }, 1500);
+                  // Try direct fetch first (works if remote has CORS allowed)
+                  fetch(url, {
+                      mode: 'cors',
+                      credentials: 'omit'
+                  })
+                  .then(response => {
+                      if (!response.ok) throw new Error("CORS or network error");
+                      return response.blob();
+                  })
+                  .then(blob => {
+                      let ext = 'jpg';
+                      try {
+                          const cleanUrl = url.split('?')[0];
+                          const parts = cleanUrl.split('.');
+                          if (parts.length > 1) {
+                              const possibleExt = parts[parts.length - 1].toLowerCase();
+                              if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(possibleExt)) {
+                                  ext = possibleExt;
+                              }
+                          }
+                      } catch(e) {}
+
+                      const blobUrl = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = blobUrl;
+                      link.download = `bexobd-${Date.now()}.${ext}`;
+                      document.body.appendChild(link);
+                      link.click();
+                      setTimeout(() => {
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(blobUrl);
+                          showToast("ডাউনলোড সম্পন্ন হয়েছে!", "success");
+                      }, 1000);
+                  })
+                  .catch(err => {
+                      console.log("Client-side direct fetch failed, routing to proxy download:", err);
+                      const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
+                      const link = document.createElement('a');
+                      link.href = proxyUrl;
+                      document.body.appendChild(link);
+                      link.click();
+                      setTimeout(() => {
+                          document.body.removeChild(link);
+                      }, 1500);
+                  });
               }
 
               function downloadAllImages(postId) {
