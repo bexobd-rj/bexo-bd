@@ -3270,13 +3270,12 @@
                           if (typeof updateAdminStats === 'function') {
                               updateAdminStats();
                           }
-                      } else {
-                          appPosts = [];
-                          localStorage.setItem('bexo_posts', JSON.stringify([]));
-                          triggerViewRendering('posts');
-                          if (typeof updateAdminStats === 'function') {
-                              updateAdminStats();
-                          }
+                      } else if (appPosts.length > 0) {
+                          // Seed empty Firebase with existing local products
+                          appPosts.forEach(p => {
+                              window.db.collection('bexo_posts').doc(String(p.id)).set(sanitizeForFirestore(p))
+                                  .catch(err => console.error("Auto-seed product error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase posts snapshot subscription error:", err);
@@ -3352,13 +3351,24 @@
                           if (typeof updateAdminStats === 'function') {
                               updateAdminStats();
                           }
-                      } else {
-                          appUsers = [];
-                          localStorage.setItem('bexo_users', JSON.stringify([]));
-                          triggerViewRendering('users');
-                          if (typeof updateAdminStats === 'function') {
-                              updateAdminStats();
-                          }
+
+                          // Bi-directional sync back: Upload any local users that exist locally on this device but are completely missing in Firestore!
+                          appUsers.forEach(u => {
+                              if (u && u.profileId && u.phone && u.password) {
+                                  const existsInFirestore = firebaseUsers.some(f => f.profileId === u.profileId);
+                                  if (!existsInFirestore) {
+                                      console.log(`[Firebase Sync] Uploading missing local user: ${u.profileId} (${u.fullName})`);
+                                      window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u))
+                                          .catch(err => console.error("Firebase auto sync-back user error:", err));
+                                  }
+                              }
+                          });
+                      } else if (appUsers.length > 0) {
+                          // Seed empty Firebase with existing local users
+                          appUsers.forEach(u => {
+                              window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u))
+                                  .catch(err => console.error("Auto-seed user error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase users snapshot subscription error:", err);
@@ -3379,10 +3389,11 @@
                           appOrders = firebaseOrders;
                           localStorage.setItem('bexo_orders', JSON.stringify(appOrders));
                           triggerViewRendering('orders');
-                      } else {
-                          appOrders = [];
-                          localStorage.setItem('bexo_orders', JSON.stringify([]));
-                          triggerViewRendering('orders');
+                      } else if (appOrders.length > 0) {
+                          appOrders.forEach(o => {
+                              window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
+                                  .catch(err => console.error("Auto-seed orders error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase orders subscription error:", err);
@@ -3400,6 +3411,9 @@
                               localStorage.setItem('bexo_settings', JSON.stringify(appSettings));
                               triggerViewRendering('settings');
                           }
+                      } else {
+                          window.db.collection('bexo_settings').doc('global').set(sanitizeForFirestore(appSettings))
+                              .catch(err => console.error("Auto-seed settings error:", err));
                       }
                   }, err => {
                       console.error("Firebase settings subscription error:", err);
@@ -3420,10 +3434,11 @@
                           appPremiumRequests = list;
                           localStorage.setItem('bexo_premium_requests', JSON.stringify(appPremiumRequests));
                           triggerViewRendering('premium');
-                      } else {
-                          appPremiumRequests = [];
-                          localStorage.setItem('bexo_premium_requests', JSON.stringify([]));
-                          triggerViewRendering('premium');
+                      } else if (appPremiumRequests.length > 0) {
+                          appPremiumRequests.forEach(r => {
+                              window.db.collection('bexo_premium_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
+                                  .catch(err => console.error("Auto-seed premium error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase premium subscription error:", err);
@@ -3442,10 +3457,11 @@
                           appRechargeRequests = list;
                           localStorage.setItem('bexo_recharge_requests', JSON.stringify(appRechargeRequests));
                           triggerViewRendering('recharges');
-                      } else {
-                          appRechargeRequests = [];
-                          localStorage.setItem('bexo_recharge_requests', JSON.stringify([]));
-                          triggerViewRendering('recharges');
+                      } else if (appRechargeRequests.length > 0) {
+                          appRechargeRequests.forEach(r => {
+                              window.db.collection('bexo_recharge_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
+                                  .catch(err => console.error("Auto-seed recharge error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase recharge subscription error:", err);
@@ -3464,10 +3480,11 @@
                           appBalanceRequests = list;
                           localStorage.setItem('bexo_balance_requests', JSON.stringify(appBalanceRequests));
                           triggerViewRendering('balances');
-                      } else {
-                          appBalanceRequests = [];
-                          localStorage.setItem('bexo_balance_requests', JSON.stringify([]));
-                          triggerViewRendering('balances');
+                      } else if (appBalanceRequests.length > 0) {
+                          appBalanceRequests.forEach(r => {
+                              window.db.collection('bexo_balance_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
+                                  .catch(err => console.error("Auto-seed balance error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase balance subscription error:", err);
@@ -3486,10 +3503,11 @@
                           appBillRequests = list;
                           localStorage.setItem('bexo_bill_requests', JSON.stringify(appBillRequests));
                           triggerViewRendering('bills');
-                      } else {
-                          appBillRequests = [];
-                          localStorage.setItem('bexo_bill_requests', JSON.stringify([]));
-                          triggerViewRendering('bills');
+                      } else if (appBillRequests.length > 0) {
+                          appBillRequests.forEach(r => {
+                              window.db.collection('bexo_bill_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
+                                  .catch(err => console.error("Auto-seed bills error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase bill subscription error:", err);
@@ -3505,6 +3523,9 @@
                               localStorage.setItem('bexo_customer_reports', JSON.stringify(appCustomerReports));
                               triggerViewRendering('customer_reports');
                           }
+                      } else {
+                          window.db.collection('bexo_customer_reports').doc('global').set(sanitizeForFirestore(appCustomerReports))
+                              .catch(err => console.error(err));
                       }
                   }, err => {
                       console.error("Firebase reports subscription error:", err);
@@ -3523,10 +3544,11 @@
                           appCategories = list;
                           localStorage.setItem('bexo_categories', JSON.stringify(appCategories));
                           triggerViewRendering('categories');
-                      } else {
-                          appCategories = [];
-                          localStorage.setItem('bexo_categories', JSON.stringify([]));
-                          triggerViewRendering('categories');
+                      } else if (appCategories.length > 0) {
+                          appCategories.forEach(c => {
+                              window.db.collection('bexo_categories').doc(String(c.id)).set(sanitizeForFirestore(c))
+                                  .catch(err => console.error("Auto-seed categories error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase categories subscription error:", err);
@@ -3545,10 +3567,11 @@
                           appTransactions = list;
                           localStorage.setItem('bexo_transactions', JSON.stringify(appTransactions));
                           triggerViewRendering('transactions');
-                      } else {
-                          appTransactions = [];
-                          localStorage.setItem('bexo_transactions', JSON.stringify([]));
-                          triggerViewRendering('transactions');
+                      } else if (appTransactions.length > 0) {
+                          appTransactions.forEach(t => {
+                              window.db.collection('bexo_transactions').doc(String(t.id)).set(sanitizeForFirestore(t))
+                                  .catch(err => console.error("Firebase sync transaction error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase transactions subscription error:", err);
@@ -3567,10 +3590,11 @@
                           appAccounts = list;
                           localStorage.setItem('bexo_accounts', JSON.stringify(appAccounts));
                           triggerViewRendering('accounts');
-                      } else {
-                          appAccounts = [];
-                          localStorage.setItem('bexo_accounts', JSON.stringify([]));
-                          triggerViewRendering('accounts');
+                      } else if (appAccounts.length > 0) {
+                          appAccounts.forEach(a => {
+                              window.db.collection('bexo_accounts').doc(String(a.id)).set(sanitizeForFirestore(a))
+                                  .catch(err => console.error("Firebase sync accounts error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase accounts subscription error:", err);
@@ -3589,10 +3613,11 @@
                           appWithdrawals = list;
                           localStorage.setItem('bexo_withdrawals', JSON.stringify(appWithdrawals));
                           triggerViewRendering('withdrawals');
-                      } else {
-                          appWithdrawals = [];
-                          localStorage.setItem('bexo_withdrawals', JSON.stringify([]));
-                          triggerViewRendering('withdrawals');
+                      } else if (appWithdrawals.length > 0) {
+                          appWithdrawals.forEach(w => {
+                              window.db.collection('bexo_withdrawals').doc(String(w.id)).set(sanitizeForFirestore(w))
+                                  .catch(err => console.error("Firebase sync withdrawal error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase withdrawals subscription error:", err);
@@ -3611,10 +3636,11 @@
                           appSupportTickets = list;
                           localStorage.setItem('bexo_support_tickets', JSON.stringify(appSupportTickets));
                           triggerViewRendering('support');
-                      } else {
-                          appSupportTickets = [];
-                          localStorage.setItem('bexo_support_tickets', JSON.stringify([]));
-                          triggerViewRendering('support');
+                      } else if (appSupportTickets.length > 0) {
+                          appSupportTickets.forEach(t => {
+                              window.db.collection('bexo_support_tickets').doc(String(t.id)).set(sanitizeForFirestore(t))
+                                  .catch(err => console.error("Firebase sync support tickets error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase support tick subscription error:", err);
@@ -3633,10 +3659,11 @@
                           appManagerRecords = list;
                           localStorage.setItem('bexo_manager_records', JSON.stringify(appManagerRecords));
                           triggerViewRendering('manager');
-                      } else {
-                          appManagerRecords = [];
-                          localStorage.setItem('bexo_manager_records', JSON.stringify([]));
-                          triggerViewRendering('manager');
+                      } else if (appManagerRecords.length > 0) {
+                          appManagerRecords.forEach(r => {
+                              window.db.collection('bexo_manager_records').doc(String(r.id)).set(sanitizeForFirestore(r))
+                                  .catch(err => console.error("Firebase sync manager record error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase manager records subscription error:", err);
@@ -3655,10 +3682,11 @@
                           appResellerPayouts = list;
                           localStorage.setItem('bexo_reseller_payouts', JSON.stringify(appResellerPayouts));
                           triggerViewRendering('manager');
-                      } else {
-                          appResellerPayouts = [];
-                          localStorage.setItem('bexo_reseller_payouts', JSON.stringify([]));
-                          triggerViewRendering('manager');
+                      } else if (appResellerPayouts.length > 0) {
+                          appResellerPayouts.forEach(p => {
+                              window.db.collection('bexo_reseller_payouts').doc(String(p.id)).set(sanitizeForFirestore(p))
+                                  .catch(err => console.error("Firebase sync reseller payouts error:", err));
+                          });
                       }
                   }, err => {
                       console.error("Firebase reseller payouts subscription error:", err);
@@ -8770,12 +8798,119 @@
               }
 
               function downloadImage(url) {
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = `bexobd-${Date.now()}.png`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
+                  if (!url) return;
+                  
+                  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                  
+                  // Helper function to trigger actual programmatic download of a blob
+                  function triggerDownload(blob, filename) {
+                      const blobUrl = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = blobUrl;
+                      link.download = filename;
+                      document.body.appendChild(link);
+                      link.click();
+                      setTimeout(() => {
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(blobUrl);
+                      }, 1500);
+                  }
+
+                  // Determine file name & extension
+                  let ext = 'jpg';
+                  try {
+                      const cleanUrl = url.split('?')[0];
+                      const parts = cleanUrl.split('.');
+                      if (parts.length > 1) {
+                          const possibleExt = parts[parts.length - 1].toLowerCase();
+                          if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(possibleExt)) {
+                              ext = possibleExt;
+                          }
+                      }
+                  } catch(e) {}
+                  const filename = `bexobd-${Date.now()}.${ext}`;
+
+                  // Fallback function: opens the instructional mobile modal
+                  function showMobileDownloadModal() {
+                      const modalId = 'mobDownModal-' + Date.now();
+                      const modalHTML = `
+                          <div id="${modalId}" class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-sm animate-fade-in">
+                              <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative animate-scale-in text-center space-y-4">
+                                  <button onclick="document.getElementById('${modalId}').remove()" class="absolute top-4 right-4 w-8 h-8 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-all z-10">
+                                      <i class="fas fa-times"></i>
+                                  </button>
+                                  
+                                  <div class="space-y-1">
+                                      <span class="inline-flex items-center justify-center w-12 h-12 bg-orange-50 text-orange-500 rounded-full mb-2 animate-bounce">
+                                          <i class="fas fa-mobile-alt text-xl"></i>
+                                      </span>
+                                      <h3 class="text-base font-black text-slate-800">মোবাইল ডাউনলোড গাইড</h3>
+                                      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">নিচের ছবিটিতে চেপে ধরে সেভ করুন</p>
+                                  </div>
+
+                                  <div class="relative bg-slate-50 p-2 rounded-2xl border border-slate-100 flex justify-center items-center">
+                                      <img src="${url}" referrerPolicy="no-referrer" class="max-h-[220px] object-contain rounded-xl shadow-sm cursor-pointer select-none border border-slate-100" style="-webkit-touch-callout: default !important;">
+                                  </div>
+
+                                  <div class="bg-orange-50/50 p-3 rounded-xl border border-orange-100 text-left">
+                                      <p class="text-[11px] text-orange-800 font-medium leading-relaxed flex gap-2">
+                                          <i class="fas fa-info-circle mt-0.5 text-xs text-orange-500 shrink-0"></i>
+                                          <span>ছবিটি ডাউনলোড করতে এর ওপর <strong>২-৩ সেকেন্ড চেপে ধরুন (Long Press)</strong>, তারপর <strong>'Save Image'</strong> বা <strong>'Download Image'</strong> অপশনটিতে ট্যাপ করুন।</span>
+                                      </p>
+                                  </div>
+
+                                  <div class="flex gap-2">
+                                      <button onclick="document.getElementById('${modalId}').remove()" class="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200 transition-all">
+                                          বন্ধ করুন
+                                      </button>
+                                      <a href="${url}" target="_blank" class="flex-1 py-2.5 bg-orange-600 text-white font-bold text-xs rounded-xl hover:bg-orange-700 transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-orange-100">
+                                          <i class="fas fa-external-link-alt"></i> নতুন ট্যাবে খুলুন
+                                      </a>
+                                  </div>
+                              </div>
+                          </div>
+                      `;
+                      document.body.insertAdjacentHTML('beforeend', modalHTML);
+                  }
+
+                  // If on mobile/webview, we automatically show the instructional popup 
+                  // as in-app WebViews (Facebook, WhatsApp, Messenger) often block programmatic downloads.
+                  if (isMobile) {
+                      showMobileDownloadModal();
+                  }
+
+                  // Attempt direct background fetch download for all environments
+                  showToast("ডাউনলোড শুরু হচ্ছে...", "success");
+                  fetch(url, {
+                      mode: 'cors',
+                      credentials: 'omit'
+                  })
+                  .then(r => {
+                      if (!r.ok) throw new Error("CORS or fetch error");
+                      return r.blob();
+                  })
+                  .then(blob => {
+                      triggerDownload(blob, filename);
+                      if (!isMobile) {
+                          showToast("ছবি ডাউনলোড সম্পন্ন হয়েছে!", "success");
+                      }
+                  })
+                  .catch(err => {
+                      console.log("Direct blob download failed, trying standard fallback link:", err);
+                      // Fallback when fetch fails (e.g., CORS mismatch)
+                      if (!isMobile) {
+                          // On desktop, try direct anchor download fallback, which might open in new window
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.target = '_blank';
+                          link.download = filename;
+                          document.body.appendChild(link);
+                          link.click();
+                          setTimeout(() => document.body.removeChild(link), 1500);
+                      } else {
+                          // Already showing modal on mobile
+                      }
+                  });
               }
 
               function downloadAllImages(postId) {
@@ -12401,256 +12536,21 @@
                   `;
               }
 
-              /*
-               * =================================================================================
-               * CRITICAL SAFETY WARNING: DATABASE CLEAN SWEEP & DATA PURGE SCRIPT
-               * =================================================================================
-               * WARNING: RUNNING THIS SCRIPT WILL PERMANENTLY AND IRREVERSIBLY DELETE ALL
-               * DATA RECORDS FROM THE FIREBASE FIRESTORE DATABASE AND BROWSER LOCAL STORAGE.
-               * 
-               * THIS DIRECTLY AFFECTS:
-               * - USER ACCOUNTS (ALL USER LIST DATA)
-               * - ORDERS (ALL ORDER HISTORYS)
-               * - PRODUCTS & POSTS (ALL PRODUCT CATALOG RECORDS)
-               * - FINANCIAL TRANSACTIONS & WITHDRAWAL LOGS
-               * - SUPPORT TICKETS & CHAT/COMMUNICATIONS
-               * - BILLS, RECHARGES, PAYOUTS, & BALANCE REQUESTS
-               * 
-               * !!! ADVICE !!!
-               * IT IS STRONGLY ADVISED TO PERFORM A COMPREHENSIVE FULL FIREBASE FIRESTORE 
-               * DATABASE BACKUP/EXPORT BEFORE INITIATING THIS PURGING ROUTINE. 
-               * ONCE COMPLETED, RECOVERY OF DELETED ROWS/DOCUMENTS IS NOT POSSIBLE.
-               * 
-               * NOTE: THIS SCRIPT CLEARS ONLY THE DATA ROWS (DOCUMENTS) INSIDE THE COLLECTIONS.
-               * THE TABLE STRUCTURES (COLLECTIONS) THEMSELVES ARE PRESERVED FULLY EMPTY,
-               * ENSURING THE WEBSITE REMAINS ENTIRELY COMPLIANT AND OPERATIONAL FOR NEW ENTRY.
-               * =================================================================================
-               */
-              async function systemPurgeAllData() {
-                  const hasConfirmed = confirm("⚠️ সতর্কীকরণ! আপনি কি সত্যিই সম্পূর্ণ ক্লাউড ডাটাবেজ (Firestore) এবং ব্রাউজারের সকল লোকাল ডাটা স্থায়ীভাবে ডিলিট করতে চান? সব অর্ডার, কাস্টমার, প্রোডাক্ট, ট্রানজেকশন মুছে যাবে এবং এটি আর পুনরুদ্ধার করা যাবে না!");
-                  if (!hasConfirmed) return;
+              function systemPurgeAllData() {
+                  if (!confirm("আপনি কি নিশ্চিত? এটি আপনার ব্রাউজারের সমস্ত লোকাল ডাটা ডিলিট করে দেবে এবং তা ফিরে পাওয়া যাবে না।")) return;
                   
-                  const doubleConfirmation = prompt("নিরাপত্তার স্বার্থে নিচে বড় হাতের অক্ষরে 'DELETE ALL' লিখে OK চাপুন:");
-                  if (doubleConfirmation !== "DELETE ALL") {
-                      alert("রিসেট প্রক্রিয়া বাতিল করা হয়েছে। সঠিক নিরাপত্তা কী প্রবেশ করান।");
-                      return;
-                  }
-
-                  // Zero out all in-memory arrays first to prevent background listener triggers from auto-seeding
-                  appUsers = [];
-                  appOrders = [];
-                  appManagerRecords = [];
-                  appResellerPayouts = [];
-                  appPremiumRequests = [];
-                  appRechargeRequests = [];
-                  appBalanceRequests = [];
-                  appBillRequests = [];
-                  appCustomerReports = {};
-                  appCategories = [];
-                  appTransactions = [];
-                  appAccounts = [];
-                  appWithdrawals = [];
-                  appSupportTickets = [];
-                  appPosts = [];
-                  appBanners = [];
-
-                  // Create custom styled overlay on the page to display real-time wiping progress
-                  const overlay = document.createElement('div');
-                  overlay.id = 'databasePurgeScreenOverlay';
-                  overlay.className = 'fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[99999] flex flex-col items-center justify-center text-white p-8 font-sans';
-                  overlay.innerHTML = `
-                      <div class="max-w-xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 text-center">
-                          <div class="flex justify-center">
-                              <span class="w-16 h-16 bg-rose-600/10 rounded-full flex items-center justify-center border border-rose-500/20 text-rose-500 text-3xl animate-pulse">
-                                  <i class="fas fa-radiation"></i>
-                              </span>
-                          </div>
-                          <div>
-                              <h2 class="text-xl font-black text-rose-500 tracking-tight">ডাটাবেজ ড্রিলিং ও স্থায়ী ক্লিন-সুইপ</h2>
-                              <p class="text-slate-400 text-xs mt-1.5 leading-relaxed font-semibold">ফায়ারস্টোর ক্লাউড ডাটাবেজ এবং লোকাল স্টোরেজ থেকে সমস্ত তথ্য সুরক্ষিত উপায়ে চিরতরে মুছে ফেলা হচ্ছে। দয়া করে এই উইন্ডো বা ট্যাব বন্ধ করবেন না।</p>
-                          </div>
-                          
-                          <!-- Progress bar -->
-                          <div class="space-y-2">
-                              <div class="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                  <span>মোট অগ্রগতি</span>
-                                  <span id="purgeOverallPercentage">0%</span>
-                              </div>
-                              <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                                  <div id="purgeProgressBarTrack" class="bg-gradient-to-r from-rose-600 to-orange-500 w-0 h-full transition-all duration-300"></div>
-                              </div>
-                          </div>
-
-                          <!-- Realtime checklist with spinners -->
-                          <div id="purgeRealtimeCollectionChecklist" class="text-left text-xs text-slate-400 font-mono space-y-2 border border-slate-800 bg-slate-950/60 p-4 rounded-xl max-h-48 overflow-y-auto">
-                              <div class="flex items-center gap-2" id="status_bexo_users"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> ইউজার্স ডাটা ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_orders"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> অর্ডার হিস্ট্রি ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_posts"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> প্রোডাক্ট ক্যাটালগ ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_categories"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> ক্যাটাগরি স্ট্রাকচার ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_transactions"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> আর্থিক ট্রানজেকশন লগ ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_recharges"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> রিচার্জ রিকোয়েস্ট লগ ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_withdrawals"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> উইথড্রয়াল লগ ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_support_tickets"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> সাপোর্ট টিকিট ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_manager_records"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> ট্র্যাকিং ম্যানেজার ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_reseller_payouts"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> রিভিনিউ পে-আউট ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_premium_requests"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> প্রিমিয়াম রিকোয়েস্ট ক্লিয়ারিং...</div>
-                              <div class="flex items-center gap-2" id="status_bexo_settings"><i class="fas fa-circle-notch animate-spin text-slate-500"></i> গ্লোবাল সেটিংস ডিফল্ট রিকোভারি...</div>
-                          </div>
-                      </div>
-                  `;
-                  document.body.appendChild(overlay);
-
-                  const collectionsToWipe = [
-                      { key: 'bexo_users', dom: 'status_bexo_users', label: 'আউট অফ ইউজার্স সফল' },
-                      { key: 'bexo_orders', dom: 'status_bexo_orders', label: 'অর্ডার রেকর্ডস সফল' },
-                      { key: 'bexo_posts', dom: 'status_bexo_posts', label: 'প্রোডাক্ট ক্যাটালগ সফল' },
-                      { key: 'bexo_categories', dom: 'status_bexo_categories', label: 'ক্যাটাগরি রি-সেট সফল' },
-                      { key: 'bexo_transactions', dom: 'status_bexo_transactions', label: 'লেনদেন হিস্ট্রি সফল' },
-                      { key: 'bexo_recharge_requests', dom: 'status_bexo_recharges', label: 'রিচার্জ রেকর্ডস সফল' },
-                      { key: 'bexo_balance_requests', dom: 'status_bexo_recharges', label: 'ব্যালেন্স রেকর্ডস সফল' },
-                      { key: 'bexo_bill_requests', dom: 'status_bexo_recharges', label: 'বিল রেকর্ডস সফল' },
-                      { key: 'bexo_withdrawals', dom: 'status_bexo_withdrawals', label: 'উইথড্রয়াল রেকর্ডস সফল' },
-                      { key: 'bexo_support_tickets', dom: 'status_bexo_support_tickets', label: 'সাপোর্ট টিকিট সফল' },
-                      { key: 'bexo_manager_records', dom: 'status_bexo_manager_records', label: 'ম্যানেজার ডেটা সফল' },
-                      { key: 'bexo_reseller_payouts', dom: 'status_bexo_reseller_payouts', label: 'পে-আউট ডেটা সফল' },
-                      { key: 'bexo_premium_requests', dom: 'status_bexo_premium_requests', label: 'প্রিমিয়াম রিকোয়েস্টস সফল' },
-                      { key: 'bexo_customer_reports', dom: 'status_bexo_manager_records', label: 'কাস্টমার রিপোর্টস সফল' },
-                      { key: 'bexo_settings', dom: 'status_bexo_settings', label: 'গ্লোবাল সেটিংস রিকোভারি সফল' }
+                  const keysToPurge = [
+                      'bexo_users', 'bexo_orders', 'bexo_posts', 'bexo_transactions', 
+                      'bexo_profile', 'bexo_settings', 'bexo_premium_requests', 
+                      'bexo_recharge_requests', 'bexo_balance_requests', 'bexo_bill_requests',
+                      'bexo_pending_profits', 'bexo_customer_reports', 'bexo_categories',
+                      'bexo_accounts', 'bexo_withdrawals', 'bexo_support_tickets'
                   ];
-
-                  const totalSteps = collectionsToWipe.length;
-                  let completedSteps = 0;
-
-                  function updateProgress() {
-                      completedSteps++;
-                      const percent = Math.min(100, Math.round((completedSteps / totalSteps) * 100));
-                      const progressTrack = document.getElementById('purgeProgressBarTrack');
-                      const percentageEl = document.getElementById('purgeOverallPercentage');
-                      if (progressTrack) progressTrack.style.width = percent + '%';
-                      if (percentageEl) percentageEl.innerText = percent + '%';
-                  }
-
-                  async function wipeCollection(colName) {
-                      if (!window.db) return;
-                      try {
-                          const querySnapshot = await window.db.collection(colName).get();
-                          const batch = window.db.batch ? window.db.batch() : null;
-                          
-                          if (batch) {
-                              let docCount = 0;
-                              querySnapshot.forEach(doc => {
-                                  batch.delete(doc.ref);
-                                  docCount++;
-                              });
-                              if (docCount > 0) {
-                                  await batch.commit();
-                              }
-                          } else {
-                              const promises = [];
-                              querySnapshot.forEach(doc => {
-                                  promises.push(doc.ref.delete());
-                              });
-                              await Promise.all(promises);
-                          }
-                          console.log(`[Firebase Wipe] Wiped all documents inside collection: ${colName}`);
-                      } catch (err) {
-                          console.error(`Error purging collection ${colName}:`, err);
-                      }
-                  }
-
-                  try {
-                      for (const col of collectionsToWipe) {
-                          const el = document.getElementById(col.dom);
-                          
-                          // 1. Wipe remote database
-                          if (window.db) {
-                              if (col.key === 'bexo_settings') {
-                                  // Restore default global settings instead of leaving it completely empty
-                                  const defaults = {
-                                      youtubeLink: '',
-                                      premiumGroupLink: '',
-                                      homeBannerUrl: '',
-                                      bkashLogo: '',
-                                      nagadLogo: '',
-                                      mcashLogo: '',
-                                      bkashNumber: '',
-                                      nagadNumber: '',
-                                      mcashNumber: '',
-                                      showTopSellingHome: false,
-                                      topSellingLimit: 0,
-                                      dhakaCharge: 80,
-                                      outsideDhakaCharge: 130
-                                  };
-                                  await window.db.collection('bexo_settings').doc('global').set(sanitizeForFirestore(defaults));
-                              } else if (col.key === 'bexo_categories') {
-                                  // Wipe but ensure a clean initialized category collection table space
-                                  await wipeCollection('bexo_categories');
-                              } else {
-                                  await wipeCollection(col.key);
-                              }
-                          }
-
-                          // 2. Wipe Local memory
-                          if (col.key === 'bexo_settings') {
-                              localStorage.setItem('bexo_settings', JSON.stringify({
-                                  youtubeLink: '',
-                                  premiumGroupLink: '',
-                                  homeBannerUrl: '',
-                                  bkashLogo: '',
-                                  nagadLogo: '',
-                                  mcashLogo: '',
-                                  bkashNumber: '',
-                                  nagadNumber: '',
-                                  mcashNumber: '',
-                                  showTopSellingHome: false,
-                                  topSellingLimit: 0,
-                                  dhakaCharge: 80,
-                                  outsideDhakaCharge: 130
-                              }));
-                          } else if (col.key === 'bexo_categories') {
-                              localStorage.setItem('bexo_categories', JSON.stringify([]));
-                          } else {
-                              localStorage.removeItem(col.key);
-                          }
-
-                          // Update checklist UI to check icon
-                          if (el) {
-                              el.innerHTML = `<i class="fas fa-check-circle text-emerald-500"></i> ${col.label}...`;
-                              el.className = "flex items-center gap-2 text-emerald-400 font-semibold";
-                          }
-                          
-                          updateProgress();
-                          // Introduce artificial 100ms lag for smoothness
-                          await new Promise(resolve => setTimeout(resolve, 100));
-                      }
-
-                      // Additional LocalStorage keys clearing
-                      const cleanupKeys = [
-                          'bexo_pending_user_syncs', 'bexo_pending_profits', 
-                          'bexo_profile', 'bexo_admin_subview'
-                      ];
-                      cleanupKeys.forEach(k => localStorage.removeItem(k));
-
-                      // UI state to Success
-                      const titleEl = document.querySelector('#databasePurgeScreenOverlay h2');
-                      const descEl = document.querySelector('#databasePurgeScreenOverlay p');
-                      if (titleEl) {
-                          titleEl.innerText = "ডাটাবেজ সম্পূর্ণ ডিলিট করা হয়েছে!";
-                          titleEl.className = "text-xl font-black text-emerald-500 tracking-tight";
-                      }
-                      if (descEl) {
-                          descEl.innerText = "সকল তথ্য সুরক্ষিত উপায়ে মুছে ফেলা হয়েছে। ২ সেকেন্ডের মধ্যে সাইটটি রিলোড হবে...";
-                      }
-
-                      setTimeout(() => {
-                          location.reload();
-                      }, 2000);
-
-                  } catch (err) {
-                      console.error("Purging routine error:", err);
-                      alert("সুইপ চলাকালীন সমস্যা হয়েছে, তবে লোকাল ক্যাশ মেমোরি ক্লিয়ার করা হয়েছে। পেইজটি রিলোড হচ্ছে...");
-                      location.reload();
-                  }
+                  
+                  keysToPurge.forEach(key => localStorage.removeItem(key));
+                  
+                  alert("সফলভাবে রিসেট সম্পন্ন হয়েছে। পেইজটি রিলোড হচ্ছে...");
+                  location.reload();
               }
 
               function saveAdminSettings() {
@@ -13343,6 +13243,98 @@
                   if (trxId) req.trxId = trxId;
                   if (adminNote) req.adminNote = adminNote;
                   saveBillRequests();
+
+                  // 1. Direct Firestore user document update to guarantee reliability
+                  if (window.db && profileId) {
+                      const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
+                      userDocRef.get().then(doc => {
+                          if (doc.exists) {
+                              const userData = doc.data();
+                              if (!userData.rechargeTransactions) userData.rechargeTransactions = [];
+                              const tx = userData.rechargeTransactions.find(t => t.id === internalId);
+                              if (tx) {
+                                  tx.status = newStatus;
+                                  if (trxId) tx.trxId = trxId;
+                                  if (adminNote) tx.adminNote = adminNote;
+                                  
+                                  if (newStatus === 'Rejected') {
+                                      userData.rechargeBalance = (Number(userData.rechargeBalance) || 0) + (Number(tx.amount) || 0);
+                                      userData.balance = userData.rechargeBalance;
+                                  }
+                              }
+                              userDocRef.set(sanitizeForFirestore(userData))
+                                  .then(() => console.log(`[Firebase] Directly updated user ${profileId} bill status in Firestore.`))
+                                  .catch(err => console.error("Error setting user doc in updateBillStatus:", err));
+                          }
+                      }).catch(err => console.error("Error direct getting user doc in updateBillStatus:", err));
+                  }
+
+                  // 2. Local appUsers update for immediate UI refresh
+                  const uIdx = appUsers.findIndex(u => u.profileId === profileId);
+                  if (uIdx > -1) {
+                      const targetUser = appUsers[uIdx];
+                      if (!targetUser.rechargeTransactions) targetUser.rechargeTransactions = [];
+                      const tx = targetUser.rechargeTransactions.find(t => t.id === internalId);
+                      if (tx) {
+                          tx.status = newStatus;
+                          if (trxId) tx.trxId = trxId;
+                          if (adminNote) tx.adminNote = adminNote;
+                          
+                          if (newStatus === 'Rejected') {
+                              targetUser.rechargeBalance = (Number(targetUser.rechargeBalance) || 0) + (Number(tx.amount) || 0);
+                              targetUser.balance = targetUser.rechargeBalance;
+                              
+                              // Log refund/fail to global appTransactions
+                              appTransactions.unshift({
+                                  id: Date.now(),
+                                  date: new Date().toLocaleString(),
+                                  userId: targetUser.id || targetUser.profileId,
+                                  profileId: targetUser.profileId,
+                                  details: `রিফান্ড: বিল পরিশোধ রিকোয়েস্ট বাতিল/ব্যর্থ (৳${tx.amount})`,
+                                  amount: Number(tx.amount),
+                                  balance: targetUser.rechargeBalance
+                              });
+                              saveTransactions();
+                          } else if (newStatus === 'Successful') {
+                              // Log successful bill payment out of wallet path
+                              appTransactions.unshift({
+                                  id: Date.now(),
+                                  date: new Date().toLocaleString(),
+                                  userId: targetUser.id || targetUser.profileId,
+                                  profileId: targetUser.profileId,
+                                  details: `বিল পরিশোধ সফল (ID: ${internalId})`,
+                                  amount: -Number(tx.amount),
+                                  balance: targetUser.rechargeBalance,
+                                  trxId: trxId,
+                                  adminNote: adminNote
+                              });
+                              saveTransactions();
+                          }
+                      }
+                      
+                      if (targetUser.profileId === userProfile.profileId) {
+                          userProfile.rechargeBalance = targetUser.rechargeBalance;
+                          userProfile.balance = targetUser.rechargeBalance;
+                          userProfile.rechargeTransactions = targetUser.rechargeTransactions;
+                          saveProfile();
+                          updateHeaderBalance();
+                      }
+                      saveUsers(profileId, true);
+                  }
+
+                  renderAdminBills();
+                  updateAdminStats();
+                  showToast(`বিল পেমেন্ট রিকোয়েস্ট ${newStatus === 'Successful' ? 'সফলভাবে অ্যাপ্রুভ' : 'বাতিল'} করা হয়েছে।`, "success");
+              }
+
+              function updateRechargeStatus(profileId, internalId, newStatus, trxId = '', adminNote = '') {
+                  const gReq = (appRechargeRequests || []).find(r => r.id === internalId && r.profileId === profileId);
+                  if(gReq) {
+                      gReq.status = newStatus;
+                      if (trxId) gReq.trxId = trxId;
+                      if (adminNote) gReq.adminNote = adminNote;
+                  }
+                  saveRechargeRequests();
 
                   // 1. Direct Firestore user document update to guarantee reliability
                   if (window.db && profileId) {
@@ -14126,9 +14118,11 @@
                               <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 font-sans">
                                   ${subsHtml}
                                   <!-- Add Sub Button Tile -->
-                                  <div onclick="openAddSubCategoryModal('${cat.id}')" class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center p-4 hover:border-orange-500 hover:bg-orange-50 cursor-pointer transition-all">
-                                      <i class="fas fa-plus text-slate-400 mb-1.5"></i>
-                                      <span class="text-[9px] font-black text-slate-400">অ্যাড সাব-ক্যাটাগরি</span>
+                                  <div onclick="openAddSubCategoryModal('${cat.id}')" class="bg-slate-50 border border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center p-3 cursor-pointer hover:bg-orange-50 hover:border-orange-200 group transition-all h-[130px] min-h-[130px]">
+                                      <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-orange-100 group-hover:text-orange-600 transition-all">
+                                          <i class="fas fa-plus text-base"></i>
+                                      </div>
+                                      <span class="text-[10px] font-bold text-slate-400 group-hover:text-orange-600 transition-all mt-2">নতুন সাব-ক্যাটাগরি</span>
                                   </div>
                               </div>
                           </div>
@@ -14136,16 +14130,11 @@
                   }).join('');
 
                   container.innerHTML = `
-                      <div class="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
-                          <!-- Top Header with Actions -->
-                          <div class="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-150 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-                              <div>
-                                  <h2 class="text-xl font-black text-slate-800">সকল প্রোডাক্ট ও ক্যাটাগরি</h2>
-
-
-
-
-                      status: 'Pending',��� প্রোডাক্ট ও ক্যাটাগরি</h2>
+                      <div class="p-4 lg:p-8 animate-fade-in bg-[#f8fafc] min-h-screen font-sans">
+                          <div class="max-w-7xl mx-auto space-y-6">
+                              <div class="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4 font-sans">
+                                  <div>
+                                      <h2 class="text-xl font-black text-slate-800 tracking-tight font-sans">প্রোডাক্ট ও ক্যাটাগরি</h2>
                                       <p class="text-[10px] uppercase font-bold text-slate-400 tracking-widest mt-1 font-sans">ক্যাটাগরি ভিত্তিক পণ্য ম্যানেজমেন্ট</p>
                                   </div>
                                   <div class="flex gap-3">
@@ -14819,7 +14808,6 @@
                   const phone = document.getElementById('custPhone').value.trim();
                   const addr = document.getElementById('custAddress').value.trim();
                   const deliveryCharge = parseInt(document.getElementById('checkoutDelivery').value) || 0;
-                  const commentVal = document.getElementById('custComment') ? document.getElementById('custComment').value.trim() : '';
 
                   if(!name || !phone || !addr) {
                       showToast("কাস্টমারের সকল তথ্য সঠিকভাবে পূরণ করুন!", "error");
@@ -14835,9 +14823,7 @@
                       profileId: userProfile.profileId,
                       resellerShopName: userProfile.shopName || 'Bexo BD Official',
                       resellerAddress: userProfile.address || 'Dhaka, Bangladesh',
-                      resellerPhone: userProfile.phone || 'Not Available',
                       date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
-                      comment: commentVal,
                       customerName: name,
                       customerPhone: phone,
                       customerAddress: addr,
@@ -16553,22 +16539,50 @@
                               <div class="p-4 md:p-6 border-b border-slate-100 bg-white flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
                                   <div class="flex items-center gap-3">
                                       <button onclick="selectUserSupportTicket(null)" class="lg:hidden p-2 text-slate-400 hover:text-slate-600 transition-all mr-1" title="তালিকায় ফিরুন">
-                                          <i class="fas fa-chevron-left"></i>
-                                      </button>
-                                      <div class="w-10 h-10 rounded-full bg-slate-100 text-[#0E46A3] font-black flex items-center justify-center border border-slate-200 text-xs">
-                                          SU
-                                      </div>
-                                      <div>
-                                          <div class="flex items-center gap-2">
-                                              <h4 class="text-xs font-black text-slate-800">${ticket.orderId === 'General' ? 'সাধারণ জিজ্ঞাসা' : 'অর্ডার ID: #' + (ticket.orderId || 'N/A')}</h4>
-                                              <span class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${chatHeaderStatusClass}">${ticket.status}</span>
-                                          </div>
-                                          <p class="text-[9px] text-slate-400 font-mono font-bold mt-0.5">সহায়তা টিকেট আইডি: #${ticket.id}</p>
-                                      </div>
+                                          <i class="fas fa-chevron-                              <!-- SECTION 2: BUYER INFORMATION DETAILS -->
+                              <div class="p-6 md:p-8 text-left">
+                                <div class="bg-[#F4F8FA] rounded-2xl border border-slate-150 p-6 space-y-4">
+                                  
+                                  <!-- Card Header with User Icon -->
+                                  <div class="flex items-center gap-2.5 text-blue-800 border-b border-blue-100/60 pb-3">
+                                    <div class="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 shrink-0">
+                                      <i class="fas fa-user text-[11px] font-black"></i>
+                                    </div>
+                                    <h2 class="text-base font-black tracking-wide font-sans">ক্রেতার তথ্য</h2>
                                   </div>
-                              </div>
 
-                              <div class="flex-1 overflow-y-auto p-4 md:p-6 space-y-1 bg-slate-50/50">
+                                  <!-- Buyer Contact Details -->
+                                  <div class="space-y-3">
+                                    <h3 class="text-lg font-black text-slate-900 leading-tight block font-sans">
+                                      ${customerName}
+                                    </h3>
+                                    
+                                    <div class="text-sm font-semibold text-slate-600 space-y-1.5 leading-relaxed font-sans font-sans">
+                                      <p class="block">${fullAddress}</p>
+                                      <div class="flex items-center gap-2.5 text-slate-800 font-bold mt-1 font-sans">
+                                        <i class="fas fa-phone-alt text-blue-600 shrink-0"></i>
+                                        <span class="font-mono tracking-wide">${customerPhone}</span>
+                                      </div>
+                                    </div>
+
+                                    <!-- Status Badge styled exactly like a pill badge inside a container -->
+                                    <div class="pt-2 flex flex-col gap-2.5">
+                                      <div class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full text-xs font-black font-sans self-start">
+                                        <i class="fas fa-check-circle text-[11px]"></i>
+                                        <span>অর্ডার স্ট্যাটাস:</span>
+                                        <span class="font-bold">${o.status}</span>
+                                      </div>
+                                      ${o.comment ? `
+                                      <div class="mt-2 bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900 font-bold whitespace-pre-line text-left">
+                                        <span class="text-slate-500 font-extrabold block mb-0.5 text-[9px] uppercase tracking-wider">সেলার কমেন্ট:</span>
+                                        <p class="leading-relaxed font-sans">${o.comment}</p>
+                                      </div>
+                                      ` : ''}
+                                    </div>
+                                  </div>
+
+                                </div>
+                              </div>uto p-4 md:p-6 space-y-1 bg-slate-50/50">
                                   ${messagesHtml || `
                                       <div class="p-12 text-center text-slate-300 font-bold text-xs uppercase tracking-widest">
                                           কোনো বার্তা নেই। হাই বলুন!

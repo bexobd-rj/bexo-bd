@@ -2,6 +2,42 @@ import fs from 'fs';
 import vm from 'vm';
 
 try {
+  let fileContent = fs.readFileSync('index.html', 'utf8');
+  const searchStr = '<!-- Add Sub Button Tile -->';
+  const targetIndex = fileContent.indexOf(searchStr);
+  if (targetIndex !== -1 && fileContent.includes('confirmOrderSubmit()') && fileContent.includes('প্রোডাক্ট ও ক্যাটাগরি</h2>')) {
+    console.log("Found corrupted block. Patching index.html...");
+    const endAnchor = `<p class="text-[10px] uppercase font-bold text-slate-400 tracking-widest mt-1 font-sans">ক্যাটাগরি ভিত্তিক পণ্য ম্যানেজমেন্ট</p>`;
+    const endIndex = fileContent.indexOf(endAnchor, targetIndex);
+    if (endIndex !== -1) {
+      const partBefore = fileContent.substring(0, targetIndex);
+      const partAfter = fileContent.substring(endIndex);
+      const middleRepl = `<!-- Add Sub Button Tile -->
+                                  <div onclick="openAddSubCategoryModal('\${cat.id}')" class="bg-slate-50 border border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center p-3 cursor-pointer hover:bg-orange-50 hover:border-orange-200 group transition-all h-[130px] min-h-[130px]">
+                                      <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-orange-100 group-hover:text-orange-600 transition-all">
+                                          <i class="fas fa-plus text-base"></i>
+                                      </div>
+                                      <span class="text-[10px] font-bold text-slate-400 group-hover:text-orange-600 transition-all mt-2">নতুন সাব-ক্যাটাগরি</span>
+                                  </div>
+                              </div>
+                          </div>
+                      \`;
+                  }).join('');
+
+                  container.innerHTML = \`
+                      <div class="p-4 lg:p-8 animate-fade-in bg-[#f8fafc] min-h-screen font-sans">
+                          <div class="max-w-7xl mx-auto space-y-6">
+                              <div class="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4 font-sans">
+                                  <div>
+                                      <h2 class="text-xl font-black text-slate-800 tracking-tight font-sans">প্রোডাক্ট ও ক্যাটাগরি</h2>
+                                      `;
+      fs.writeFileSync('index.html', partBefore + middleRepl + partAfter, 'utf8');
+      console.log("Successfully patched index.html!");
+    } else {
+      console.log("Could not find endIndex of the corrupted block.");
+    }
+  }
+
   const html = fs.readFileSync('index.html', 'utf8');
   // Match script blocks that have JS (lines between <script> and </script>, ignoring the CDN one if it is self-closing or external)
   const regex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
