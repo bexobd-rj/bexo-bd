@@ -2489,6 +2489,7 @@
                       hasWebsite: profile.hasWebsite || false,
                       lastActive: profile.lastActive || 'Never',
                       joinDate: profile.joinDate || new Date().toLocaleDateString('bn-BD'),
+                      createdAt: profile.createdAt || Date.now(),
                       notifications: profile.notifications || []
                   };
 
@@ -4274,7 +4275,8 @@
                           password: pass,
                           referredBy: referredBy,
                           profileId: 'BX-' + Math.floor(100000 + Math.random() * 900000),
-                          joinDate: new Date().toLocaleDateString('bn-BD')
+                          joinDate: new Date().toLocaleDateString('bn-BD'),
+                          createdAt: Date.now()
                       };
 
                       // Migrate guest session resources to new registered profileId
@@ -5377,6 +5379,17 @@
                           return matchesToken || matchesOrderId || matchesResellerName || matchesResellerId || matchesCustomerName;
                       }
                       return true;
+                  });
+
+                  filteredRecords.sort((a, b) => {
+                      const tA = Number(a.created_at) || 0;
+                      const tB = Number(b.created_at) || 0;
+                      if (tA !== tB) return tB - tA;
+                      const parseId = (id) => {
+                          const numMatch = String(id).match(/\d+/);
+                          return numMatch ? Number(numMatch[0]) : 0;
+                      };
+                      return parseId(b.order_id) - parseId(a.order_id);
                   });
 
                   // Render Dashboard base
@@ -7690,7 +7703,7 @@
                       const matchSub = filterSub === 'all' || p.subCategory === filterSub;
                       const isPublished = p.isPublished !== false; // Active products by default, unless explicitly unpublished
                       return matchMain && matchSub && isPublished;
-                  });
+                  }).sort((a, b) => Number(b.id) - Number(a.id));
 
                   if (filtered.length === 0) {
                       feed.innerHTML = `
@@ -10277,7 +10290,7 @@
                       if (category) return p.category === category;
                       if (subCategory) return p.subCategory === subCategory;
                       return true;
-                  });
+                  }).sort((a, b) => Number(b.id) - Number(a.id));
 
                   // Flatten products for image-based view
                   const allFlattened = [];
@@ -11247,6 +11260,7 @@
                       isPremium: isPremium,
                       hasWebsite: hasWebsite,
                       joinDate: new Date().toLocaleDateString('bn-BD'),
+                      createdAt: Date.now(),
                       lastActive: 'Never'
                   };
 
@@ -11294,7 +11308,21 @@
               }
 
               function renderAdminUserRows(users) {
-                  return (users || []).map(u => {
+                  const sortedUsers = (users || []).slice().sort((a, b) => {
+                      const cA = Number(a.createdAt) || 0;
+                      const cB = Number(b.createdAt) || 0;
+                      if (cA !== cB) return cB - cA;
+
+                      const dA = a.joinDate ? (getDateOfRecord(a.joinDate)?.getTime() || 0) : 0;
+                      const dB = b.joinDate ? (getDateOfRecord(b.joinDate)?.getTime() || 0) : 0;
+                      if (dA !== dB) return dB - dA;
+
+                      const numA = Number(String(a.profileId).replace(/\D/g, '')) || 0;
+                      const numB = Number(String(b.profileId).replace(/\D/g, '')) || 0;
+                      return numB - numA;
+                  });
+
+                  return sortedUsers.map(u => {
                       const balance = Number(u.rechargeBalance !== undefined ? u.rechargeBalance : u.balance) || 0;
                       const profit = Number(u.salesProfit) || 0;
                       const totalOrders = Number(u.orders) || 0;
@@ -12815,7 +12843,7 @@
                           return matchName || matchPhone || matchOrder || matchProfile || matchMsg;
                       }
                       return true;
-                  });
+                  }).sort((a, b) => Number(b.id) - Number(a.id));
 
                   // Active chat logic
                   const activeTicket = tickets.find(t => String(t.id) === String(window.activeAdminSupportTicketId));
@@ -14355,7 +14383,7 @@
                       if (category) return p.category === category;
                       if (subCategory) return p.subCategory === subCategory;
                       return true;
-                  });
+                  }).sort((a, b) => Number(b.id) - Number(a.id));
 
                   container.innerHTML = `
                       <div class="p-4 lg:p-8 animate-fade-in bg-[#f8fafc] min-h-screen">
@@ -14473,7 +14501,8 @@
 
                   appCustomerReports[phone] = {
                       delivered: delCount,
-                      returned: retCount
+                      returned: retCount,
+                      updatedAt: Date.now()
                   };
                   localStorage.setItem('bexo_customer_reports', JSON.stringify(appCustomerReports));
                   showToast("রিপোর্ট সফলভাবে সেভ করা হয়েছে");
@@ -14537,7 +14566,17 @@
                   const canceledCount = allOrders.filter(o => o.status === 'Canceled').length;
 
                   // Filter orders depending on currentAdminOrderStatusTab
-                  let filteredOrders = allOrders.slice().reverse();
+                  let filteredOrders = allOrders.slice().sort((a, b) => {
+                      const parseId = (id) => {
+                          if (typeof id === 'number') return id;
+                          if (typeof id === 'string') {
+                              const numMatch = id.match(/\d+/);
+                              return numMatch ? Number(numMatch[0]) : 0;
+                          }
+                          return 0;
+                      };
+                      return parseId(b.id) - parseId(a.id);
+                  });
                   if (currentAdminOrderStatusTab !== 'All') {
                       if (currentAdminOrderStatusTab === 'Completed' || currentAdminOrderStatusTab === 'Delivery Completed') {
                           filteredOrders = filteredOrders.filter(o => o.status === 'Completed' || o.status === 'Delivered' || o.status === 'Delivery Completed');
@@ -14842,6 +14881,12 @@
                   if(filter) {
                       phones = phones.filter(p => p.includes(filter));
                   }
+
+                  phones.sort((a, b) => {
+                      const tA = appCustomerReports[a].updatedAt || 0;
+                      const tB = appCustomerReports[b].updatedAt || 0;
+                      return tB - tA;
+                  });
 
                   const rowsHtml = phones.map(p => {
                       const rep = appCustomerReports[p];
@@ -15589,7 +15634,7 @@
                   const main = document.getElementById('mainContent');
                   
                   // Filter transactions for the current user only
-                  const myTransactions = appTransactions.filter(t => t.profileId === userProfile.profileId);
+                  const myTransactions = window.sortByNewestFirst(appTransactions.filter(t => t.profileId === userProfile.profileId));
 
                   const rows = myTransactions.map(t => `
                       <tr class="border-b border-slate-50 text-[10px] sm:text-xs transition-colors hover:bg-slate-50/50 cursor-default">
@@ -16043,7 +16088,7 @@
                   const main = document.getElementById('mainContent');
                   
                   // Filter transactions for the current user only
-                  const myTransactions = appTransactions.filter(t => t.profileId === userProfile.profileId);
+                  const myTransactions = window.sortByNewestFirst(appTransactions.filter(t => t.profileId === userProfile.profileId));
 
                   const rows = myTransactions.map(t => `
                       <tr class="border-b border-slate-50 text-[10px] sm:text-xs transition-colors hover:bg-slate-50/50 cursor-default">
@@ -17209,6 +17254,8 @@
                       } else if (type === 'sku') {
                           filtered = appPosts.filter(p => p.sku && p.sku.toLowerCase().includes(inputVal));
                       }
+
+                      filtered.sort((a, b) => Number(b.id) - Number(a.id));
 
                       if (filtered.length === 0) {
                           placeholder.innerHTML = `
@@ -18633,19 +18680,21 @@
 
                   if (mobile && mobile.length >= 11) {
                       if (!appCustomerReports[mobile]) {
-                          appCustomerReports[mobile] = { delivered: 0, returned: 0 };
+                          appCustomerReports[mobile] = { delivered: 0, returned: 0, updatedAt: Date.now() };
                       }
 
                       // If marked as successful
                       if ((newStatus === 'Completed' || newStatus === 'Delivered' || newStatus === 'Delivery Completed') &&
                           (prevStatus !== 'Completed' && prevStatus !== 'Delivered' && prevStatus !== 'Delivery Completed')) {
                           appCustomerReports[mobile].delivered++;
+                          appCustomerReports[mobile].updatedAt = Date.now();
                           saveCustomerReports();
                       }
 
                       // If marked as returned
                       if (newStatus === 'Returned' && prevStatus !== 'Returned') {
                           appCustomerReports[mobile].returned++;
+                          appCustomerReports[mobile].updatedAt = Date.now();
                           saveCustomerReports();
                       }
                   }
