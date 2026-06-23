@@ -17550,7 +17550,7 @@
                               </div>
                           ` : ''}
 
-                          <div id="invoiceContainer" class="max-w-3xl mx-auto bg-white border border-slate-200/80 rounded-[2rem] shadow-xl overflow-hidden font-sans relative">
+                          <div id="invoiceContainer" class="w-full max-w-3xl mx-auto bg-white border border-slate-200/80 rounded-[2rem] shadow-xl overflow-hidden font-sans relative">
                               ${isPaidOrDelivered ? `
                                   <div class="absolute top-[28%] right-[10%] rotate-[-12deg] border-4 border-emerald-500 text-emerald-500 font-black text-2xl px-6 py-2 rounded-xl border-dashed opacity-85 pointer-events-none select-none z-50 uppercase tracking-widest bg-emerald-50/40">
                                       PAID / DELIVERED
@@ -17758,24 +17758,24 @@
                                 <div class="md:col-span-4 flex flex-col justify-center items-stretch pl-0 md:pl-8 text-xs font-bold text-slate-700 md:text-white z-10 text-left">
                                   <div class="space-y-3 bg-slate-50 md:bg-transparent p-4 md:p-0 rounded-2xl md:rounded-none border border-slate-100 md:border-none">
                                     <div class="grid grid-cols-12 gap-1 items-center font-sans">
-                                      <span class="col-span-12 md:col-span-5 md:text-blue-100">📄 Invoice No</span>
+                                      <span class="col-span-5 md:col-span-5 md:text-blue-100">📄 Invoice No</span>
                                       <span class="hidden md:inline col-span-1 text-center font-bold">:</span>
-                                      <span class="col-span-12 md:col-span-6 text-right md:text-left font-mono tracking-tight font-extrabold">${getInvoiceNo()}</span>
+                                      <span class="col-span-7 md:col-span-6 text-right md:text-left font-mono tracking-tight font-extrabold">${getInvoiceNo()}</span>
                                     </div>
                                     <div class="grid grid-cols-12 gap-1 items-center font-sans">
-                                      <span class="col-span-12 md:col-span-5 md:text-blue-100">🆔 Order ID</span>
+                                      <span class="col-span-5 md:col-span-5 md:text-blue-100">🆔 Order ID</span>
                                       <span class="hidden md:inline col-span-1 text-center font-bold">:</span>
-                                      <span class="col-span-12 md:col-span-6 text-right md:text-left font-mono truncate font-extrabold">#${o.orderNo || o.id}</span>
+                                      <span class="col-span-7 md:col-span-6 text-right md:text-left font-mono truncate font-extrabold">#${o.orderNo || o.id}</span>
                                     </div>
                                     <div class="grid grid-cols-12 gap-1 items-center font-sans">
-                                      <span class="col-span-12 md:col-span-5 md:text-blue-100">📅 Order Date</span>
+                                      <span class="col-span-5 md:col-span-5 md:text-blue-100">📅 Order Date</span>
                                       <span class="hidden md:inline col-span-1 text-center font-bold">:</span>
-                                      <span class="col-span-12 md:col-span-6 text-right md:text-left font-extrabold">${getFormattedDate(o.date)}</span>
+                                      <span class="col-span-7 md:col-span-6 text-right md:text-left font-extrabold">${getFormattedDate(o.date)}</span>
                                     </div>
                                     <div class="grid grid-cols-12 gap-1 items-center font-sans font-sans">
-                                      <span class="col-span-12 md:col-span-5 md:text-blue-100">💳 Payment Method</span>
+                                      <span class="col-span-5 md:col-span-5 md:text-blue-100">💳 Payment Method</span>
                                       <span class="hidden md:inline col-span-1 text-center font-bold">:</span>
-                                      <span class="col-span-12 md:col-span-6 text-right md:text-left break-words whitespace-normal inline-block text-slate-800 md:text-slate-100 font-extrabold">Cash on Delivery (COD)</span>
+                                      <span class="col-span-7 md:col-span-6 text-right md:text-left break-words whitespace-normal inline-block text-slate-800 md:text-slate-100 font-extrabold">Cash on Delivery (COD)</span>
                                     </div>
                                   </div>
                                 </div>
