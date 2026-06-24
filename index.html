@@ -905,7 +905,7 @@
       <!-- MAIN WINDOW -->
       <main
         id="mainWrapper"
-        class="main-container bg-slate-50 relative flex-1 flex flex-col"
+        class="main-container bg-slate-50 relative flex-1 flex flex-col w-full max-w-full overflow-x-hidden min-w-0"
       >
         <!-- HEADER -->
         <header
@@ -933,7 +933,7 @@
             <div
               id="balanceContainer"
               onclick="toggleBalanceVisibility()"
-              class="group relative flex items-center bg-white/10 backdrop-blur-md border border-white/30 pl-3 pr-1 py-1 rounded-2xl cursor-pointer transition-all duration-300 shadow-sm hover:bg-white/20 min-w-[130px] justify-between active:scale-95"
+              class="group relative flex items-center bg-white/10 backdrop-blur-md border border-white/30 pl-2 sm:pl-3 pr-1 py-1 rounded-2xl cursor-pointer transition-all duration-300 shadow-sm hover:bg-white/20 min-w-[110px] sm:min-w-[130px] justify-between active:scale-95"
             >
               <div class="flex flex-col leading-none">
                 <span
@@ -1060,7 +1060,7 @@
         <!-- MAIN DYNAMIC CONTENT -->
         <div
           id="mainContent"
-          class="flex-1 bg-slate-50 overflow-y-auto no-scrollbar"
+          class="flex-1 bg-slate-50 overflow-y-auto overflow-x-hidden no-scrollbar w-full max-w-full min-w-0"
         >
           <!-- Content will be rendered by JS -->
         </div>
@@ -17517,10 +17517,19 @@
                       }) + ' টাকা';
                   };
 
-                  const resellerAddress = (reseller && reseller.address && reseller.address.trim()) || o.resellerAddress || 'Not Available';
-                  const resellerPhone = (reseller && reseller.phone && reseller.phone.trim()) || o.resellerPhone || 'Not Available';
-                  const resellerEmail = (reseller && reseller.email && reseller.email.trim()) || o.resellerEmail || 'Not Available';
-                  const resellerWebsite = (reseller && reseller.website && reseller.website.trim()) || o.resellerWebsite || 'www.bexo.com.bd';
+                  const cleanValue = (val) => {
+                      if (!val) return null;
+                      const s = String(val).trim();
+                      if (s === '' || s.toLowerCase() === 'n/a' || s.toLowerCase() === 'not available' || s.toLowerCase() === 'undefined' || s.toLowerCase() === 'null') {
+                          return null;
+                      }
+                      return s;
+                  };
+
+                  const resellerAddress = cleanValue(reseller && reseller.address) || cleanValue(o.resellerAddress) || 'Information Not Available';
+                  const resellerPhone = cleanValue(reseller && reseller.phone) || cleanValue(o.resellerPhone) || 'Information Not Available';
+                  const resellerEmail = cleanValue(reseller && reseller.email) || cleanValue(o.resellerEmail) || 'Information Not Available';
+                  const resellerWebsite = cleanValue(reseller && reseller.website) || cleanValue(o.resellerWebsite) || 'Information Not Available';
 
                   const brandLogoHTML = `
                     <div class="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center p-0.5 border border-slate-200 shadow-sm overflow-hidden shrink-0">
@@ -17536,8 +17545,8 @@
 
                   const brandNameHTML = resellerShopName || 'Not Available';
 
-                  main.innerHTML = `
-                      <div class="p-4 lg:p-8 animate-fade-in bg-[#fdfdfd] min-h-screen font-sans w-full overflow-x-hidden">
+                   main.innerHTML = `
+                      <div class="p-2 sm:p-4 lg:p-8 animate-fade-in bg-[#fdfdfd] min-h-screen font-sans w-full overflow-x-hidden">
                           ${isAdminMode ? `
                               <div class="max-w-4xl mx-auto mb-6 flex items-center justify-between bg-slate-900 text-white px-6 py-4 rounded-2xl">
                                   <h1 class="text-sm font-black flex items-center gap-2">
@@ -17548,16 +17557,26 @@
                                       <i class="fas fa-arrow-left mr-2"></i> ফিরে যান
                                   </button>
                               </div>
-                          ` : ''}
+                          ` : `
+                              <div class="max-w-3xl mx-auto mb-6 flex items-center justify-between bg-slate-900 text-white px-6 py-4 rounded-2xl">
+                                  <h1 class="text-sm font-black flex items-center gap-2">
+                                      <i class="fas fa-file-invoice text-orange-500"></i>
+                                      অর্ডার ইনভয়েস
+                                  </h1>
+                                  <button onclick="switchMenu('order-list')" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                                      <i class="fas fa-arrow-left mr-2"></i> ফিরে যান
+                                  </button>
+                              </div>
+                          `}
 
-                          <div id="invoiceContainer" class="w-full max-w-full md:max-w-3xl mx-auto bg-white border border-slate-200/80 rounded-[2rem] shadow-xl overflow-hidden font-sans relative">
+                          <div id="invoiceContainer" class="w-full max-w-full md:max-w-3xl mx-auto bg-white border border-slate-200/80 rounded-2xl md:rounded-[2rem] shadow-xl overflow-hidden font-sans relative">
                               ${isPaidOrDelivered ? `
                                   <div class="absolute top-[28%] right-[10%] rotate-[-12deg] border-4 border-emerald-500 text-emerald-500 font-black text-2xl px-6 py-2 rounded-xl border-dashed opacity-85 pointer-events-none select-none z-50 uppercase tracking-widest bg-emerald-50/40">
                                       PAID / DELIVERED
                                   </div>
                               ` : ''}
                               ${isAdminMode ? `
-                                  <div class="m-6 p-6 bg-indigo-50 border border-indigo-100/70 rounded-3xl text-left flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in shadow-sm">
+                                  <div class="m-4 sm:m-6 p-4 sm:p-6 bg-indigo-50 border border-indigo-100/70 rounded-3xl text-left flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in shadow-sm">
                                       <div class="flex items-start gap-3">
                                           <div class="p-3 bg-indigo-100 text-indigo-600 rounded-2xl shrink-0">
                                               <i class="fas fa-ticket-alt text-lg"></i>
@@ -17579,7 +17598,7 @@
 
                               <!-- Warning Notification Trigger for Missing Reseller Shop Name -->
                               ${isAdminMode && isShopNameMissing ? `
-                                  <div class="mx-6 my-4 p-4 bg-amber-50 rounded-2xl border border-amber-200 shadow-sm text-left flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in text-[12px] font-sans">
+                                  <div class="mx-4 sm:mx-6 my-4 p-4 bg-amber-50 rounded-2xl border border-amber-200 shadow-sm text-left flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in text-[12px] font-sans">
                                       <div class="flex items-start gap-3">
                                           <div class="p-2.5 bg-amber-100 text-amber-600 rounded-xl shrink-0">
                                               <i class="fas fa-exclamation-triangle text-lg"></i>
@@ -17597,7 +17616,7 @@
 
                               <!-- Admin-Only Reseller Identity Verification Block -->
                               ${isAdminMode ? `
-                                  <div class="mx-6 my-4 p-6 bg-gradient-to-r from-orange-50 to-amber-50/50 rounded-2xl border border-orange-100 shadow-sm relative overflow-hidden text-left">
+                                  <div class="mx-4 sm:mx-6 my-4 p-4 sm:p-6 bg-gradient-to-r from-orange-50 to-amber-50/50 rounded-2xl border border-orange-100 shadow-sm relative overflow-hidden text-left">
                                       <div class="absolute -right-8 -top-8 w-24 h-24 bg-orange-100/30 rounded-full blur-xl"></div>
                                       <div class="absolute -left-6 -bottom-6 w-16 h-16 bg-amber-100/30 rounded-full blur-xl"></div>
                                       
@@ -17687,7 +17706,7 @@
                               ` : ''}
 
                               <!-- SECTION 1: HEADER BANNER (LAYOUT DESIGN IDENTICAL TO SCREENSHOT) -->
-                              <div class="relative border-b-2 border-slate-100 bg-white grid grid-cols-1 md:grid-cols-12 overflow-hidden h-auto py-6 md:py-8 pl-6 md:pl-10 pr-6 gap-6 md:gap-0">
+                              <div class="relative border-b-2 border-slate-100 bg-white grid grid-cols-1 md:grid-cols-12 overflow-hidden h-auto py-3 md:py-8 px-4 md:pl-10 md:pr-6 gap-3 md:gap-0">
                                 
                                 <!-- Wave background container for desktop overlay -->
                                 <div class="absolute inset-0 hidden md:block select-none pointer-events-none z-0">
@@ -17711,9 +17730,6 @@
                                         <h1 class="text-2xl font-black text-[#0D3B66] tracking-tight leading-tight">
                                           ${brandNameHTML}
                                         </h1>
-                                        <p class="text-xs text-slate-500 font-bold mt-0.5">
-                                          স্মার্টলি পণ্যের বিক্রয়ের ঠিকানা
-                                        </p>
                                       </div>
                                     </div>
 
@@ -17740,38 +17756,38 @@
                                 </div>
 
                                 <!-- Middle Column: Blue slanted center box containing 'INVOICE' + stamp circle (30% on desktop) -->
-                                <div class="md:col-span-3 flex flex-col items-center justify-center relative min-h-[140px] z-10 md:text-white">
+                                <div class="md:col-span-3 flex flex-col items-center justify-center relative py-4 md:py-0 min-h-[100px] md:min-h-[140px] z-10 md:text-white">
                                   <!-- Mobile-only background block for slanted center box -->
-                                  <div class="absolute inset-0 bg-[#0E46A3] rounded-3xl -z-10 md:hidden animate-fade-in"></div>
-                                  <div class="text-center text-white space-y-4">
-                                    <span class="text-4xl font-extrabold tracking-widest block font-serif">INVOICE</span>
+                                  <div class="absolute inset-0 bg-[#0E46A3] rounded-2xl sm:rounded-3xl -z-10 md:hidden animate-fade-in"></div>
+                                  <div class="text-center text-white space-y-2.5 md:space-y-4">
+                                    <span class="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-wider md:tracking-widest block font-serif">INVOICE</span>
                                     <!-- White circular stamp seal -->
-                                    <div class="w-16 h-16 rounded-full bg-white border-2 border-[#092C62] flex items-center justify-center p-1 shadow-md mx-auto">
+                                    <div class="w-12 h-12 md:w-16 md:h-16 rounded-full bg-white border-2 border-[#092C62] flex items-center justify-center p-1 shadow-md mx-auto">
                                       <div class="w-full h-full rounded-full border border-dashed border-[#092C62] flex items-center justify-center">
-                                        <i class="fas fa-file-invoice text-[#0E46A3] text-2xl"></i>
+                                        <i class="fas fa-file-invoice text-[#0E46A3] text-lg md:text-2xl"></i>
                                       </div>
                                     </div>
                                   </div>
                                 </div>
 
                                 <!-- Right Column: Order Meta Fields (30% on desktop) -->
-                                <div class="md:col-span-4 flex flex-col justify-center items-stretch pl-0 md:pl-8 text-xs font-bold text-slate-705 md:text-white z-10 text-left font-sans">
-                                  <div class="space-y-3 bg-slate-50 md:bg-transparent p-4 md:p-5 rounded-2xl md:rounded-none border border-slate-100 md:border-none md:p-0">
-                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 py-1.5 border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
+                                <div class="md:col-span-4 flex flex-col justify-center items-stretch pl-0 md:pl-8 text-xs font-bold text-slate-700 md:text-white z-10 text-left font-sans">
+                                  <div class="space-y-2 md:space-y-3 bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-2xl md:rounded-none border border-slate-100 md:border-none">
+                                    <div class="flex flex-row items-center justify-between gap-2 py-1 border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
                                       <span class="text-slate-500 md:text-blue-100 font-bold shrink-0 font-sans">📄 Invoice No</span>
-                                      <span class="font-mono tracking-tight font-extrabold text-[#334155] md:text-white break-all text-right sm:text-left">${getInvoiceNo()}</span>
+                                      <span class="font-mono tracking-tight font-extrabold text-[#334155] md:text-white break-all text-right">${getInvoiceNo()}</span>
                                     </div>
-                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 py-1.5 border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
+                                    <div class="flex flex-row items-center justify-between gap-2 py-1 border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
                                       <span class="text-slate-500 md:text-blue-100 font-bold shrink-0 font-sans">🆔 Order ID</span>
-                                      <span class="font-mono tracking-tight font-extrabold text-[#334155] md:text-white break-all text-right sm:text-left">#${o.orderNo || o.id}</span>
+                                      <span class="font-mono tracking-tight font-extrabold text-[#334155] md:text-white break-all text-right">#${o.orderNo || o.id}</span>
                                     </div>
-                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 py-1.5 border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
+                                    <div class="flex flex-row items-center justify-between gap-2 py-1 border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
                                       <span class="text-slate-500 md:text-blue-100 font-bold shrink-0 font-sans">📅 Order Date</span>
-                                      <span class="font-sans font-extrabold text-[#334155] md:text-white break-all text-right sm:text-left">${getFormattedDate(o.date)}</span>
+                                      <span class="font-sans font-extrabold text-[#334155] md:text-white break-all text-right">${getFormattedDate(o.date)}</span>
                                     </div>
-                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 py-1.5 border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans font-sans font-sans">
-                                      <span class="text-slate-500 md:text-blue-100 font-bold shrink-0 font-sans font-sans">💳 Payment Method</span>
-                                      <span class="font-sans font-extrabold text-slate-800 md:text-slate-100 break-words text-right sm:text-left">Cash on Delivery (COD)</span>
+                                    <div class="flex flex-row items-center justify-between gap-2 py-1 last:border-0 md:border-none font-sans">
+                                      <span class="text-slate-500 md:text-blue-100 font-bold shrink-0 font-sans">💳 Payment Method</span>
+                                      <span class="font-sans font-extrabold text-slate-800 md:text-slate-100 break-words text-right">Cash on Delivery (COD)</span>
                                     </div>
                                   </div>
                                 </div>
@@ -17779,8 +17795,8 @@
                               </div>
 
                               <!-- SECTION 2: BUYER INFORMATION DETAILS -->
-                              <div class="p-6 md:p-8 text-left">
-                                <div class="bg-[#F4F8FA] rounded-2xl border border-slate-150 p-6 space-y-4">
+                              <div class="p-4 sm:p-6 md:p-8 text-left">
+                                <div class="bg-[#F4F8FA] rounded-2xl border border-slate-150 p-4 sm:p-6 space-y-4">
                                   
                                   <!-- Card Header with User Icon -->
                                   <div class="flex items-center gap-2.5 text-blue-800 border-b border-blue-100/60 pb-3">
@@ -17824,7 +17840,7 @@
                               </div>
 
                               <!-- SECTION 3: ORDER ITEMS DETAILS TABLE -->
-                              <div class="px-6 md:px-8 pb-8 overflow-x-auto text-left no-scrollbar">
+                              <div class="w-full max-w-full px-4 sm:px-6 md:px-8 pb-6 md:pb-8 overflow-x-auto text-left no-scrollbar">
                                 <table class="w-full min-w-[650px] border-collapse border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                                   <thead>
                                     <tr class="bg-[#0E46A3] text-white text-xs font-black uppercase text-center border-b border-slate-200">
@@ -17926,10 +17942,10 @@
                               </div>
 
                               <!-- SECTION 4: CALCULATIONS / BILLING BREAKDOWNS -->
-                              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-6 md:p-8 bg-[#FAF9F7] border-t border-slate-100 text-left font-sans">
+                              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 p-4 sm:p-6 md:p-8 bg-[#FAF9F7] border-t border-slate-100 text-left font-sans">
                                 
                                 <!-- Left Block Card: মূল্য বিবরণী (Price Summary) -->
-                                <div class="bg-white rounded-2xl border border-slate-200/60 p-5 space-y-4 shadow-sm flex flex-col justify-between">
+                                <div class="bg-white rounded-2xl border border-slate-200/60 p-4 sm:p-5 space-y-4 shadow-sm flex flex-col justify-between">
                                   <div class="flex items-center gap-2 text-blue-800 border-b border-slate-100 pb-3">
                                     <i class="fas fa-receipt text-blue-600 font-bold"></i>
                                     <h3 class="text-sm font-black uppercase tracking-wider">মূল্য বিবরণী</h3>
@@ -17957,7 +17973,7 @@
                                 </div>
 
                                 <!-- Right Block Card: পেমেন্ট ও কালেকশন বিবরণী (Collection details) -->
-                                <div class="bg-white rounded-2xl border border-slate-200/60 p-5 space-y-5 shadow-sm flex flex-col justify-between">
+                                <div class="bg-white rounded-2xl border border-slate-200/60 p-4 sm:p-5 space-y-5 shadow-sm flex flex-col justify-between">
                                   <div class="flex items-center gap-2 text-emerald-800 border-b border-slate-100 pb-3 font-sans">
                                     <i class="fas fa-shield-alt text-emerald-600"></i>
                                     <h3 class="text-sm font-black uppercase tracking-wider">পেমেন্ট ও কালেকশন বিবরণী</h3>
@@ -17990,7 +18006,7 @@
                               </div>
 
                               <!-- SECTION 5: NOTES MODULE -->
-                              <div class="p-6 md:p-8 border-t border-slate-100 bg-[#FAF9F7] text-left font-sans">
+                              <div class="p-4 sm:p-6 md:p-8 border-t border-slate-100 bg-[#FAF9F7] text-left font-sans">
                                 <div class="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 flex items-start gap-3">
                                   <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 shrink-0 mt-0.5">
                                     <i class="fas fa-file-alt text-xs"></i>
@@ -18013,33 +18029,30 @@
                                   </div>
                                 </div>
                                 ` : ''}
-                                <p style="display:none"
-                                  </p>
-                                </div>
                               </div>
 
                               <!-- SECTION 6: FOOTER LINKS BAR -->
-                              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 md:p-8 bg-white border-t border-slate-100 text-center text-slate-700 z-10 font-bold text-xs font-sans">
+                              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 p-4 sm:p-6 md:p-8 bg-white border-t border-slate-100 text-center text-slate-700 z-10 font-bold text-xs font-sans">
                                 
-                                <div class="flex flex-col items-center p-3 rounded-2xl border border-slate-50 shadow-xs">
+                                <div class="flex flex-col items-center p-2 sm:p-3 rounded-2xl border border-slate-50 shadow-xs">
                                   <i class="fas fa-globe text-[#0E46A3] text-lg mb-2"></i>
                                   <span class="text-[10px] font-black text-slate-505 uppercase tracking-widest block mb-1">ওয়েবসাইট</span>
-                                  <span class="font-mono text-slate-800 break-all">${resellerWebsite || 'www.bexo.com.bd'}</span>
+                                  <span class="font-mono text-slate-800 break-all">${resellerWebsite}</span>
                                 </div>
 
-                                <div class="flex flex-col items-center p-3 rounded-2xl border border-slate-50 shadow-xs">
+                                <div class="flex flex-col items-center p-2 sm:p-3 rounded-2xl border border-slate-50 shadow-xs">
                                   <i class="fas fa-phone-alt text-[#0E46A3] text-lg mb-2"></i>
                                   <span class="text-[10px] font-black text-slate-550 uppercase tracking-widest block mb-1">সাপোর্ট / হেল্পলাইন</span>
-                                  <span class="font-mono text-slate-800 break-all">${resellerPhone || '01990608143'}</span>
+                                  <span class="font-mono text-slate-800 break-all">${resellerPhone}</span>
                                 </div>
 
-                                <div class="flex flex-col items-center p-3 rounded-2xl border border-slate-50 shadow-xs">
+                                <div class="flex flex-col items-center p-2 sm:p-3 rounded-2xl border border-slate-50 shadow-xs">
                                   <i class="fas fa-envelope text-[#0E46A3] text-lg mb-2"></i>
                                   <span class="text-[10px] font-black text-slate-550 uppercase tracking-widest block mb-1">ইমেইল</span>
-                                  <span class="text-slate-800 break-all">${resellerEmail || 'support@bexo.com'}</span>
+                                  <span class="text-slate-800 break-all">${resellerEmail}</span>
                                 </div>
 
-                                <div class="flex flex-col items-center p-3 rounded-2xl border border-slate-50 shadow-xs">
+                                <div class="flex flex-col items-center p-2 sm:p-3 rounded-2xl border border-slate-50 shadow-xs">
                                   <i class="fas fa-shield-alt text-emerald-600 text-lg mb-2"></i>
                                   <span class="text-[10px] font-black text-slate-550 uppercase tracking-widest block mb-1">নিরাপদ লেনদেন</span>
                                   <span class="text-emerald-700 font-black">100% বিশ্বস্ত</span>
@@ -18048,7 +18061,7 @@
                               </div>
 
                               <!-- SECTION 7: DEEP BLUE FOOTER CARD WITH COMPLIANCE BENGALI SENTENCES -->
-                              <div class="bg-[#0E46A3] text-white py-5 px-6 text-center text-xs font-semibold relative overflow-hidden select-none border-t-2 border-dashed border-white/25 font-sans">
+                              <div class="bg-[#0E46A3] text-white py-4 sm:py-5 px-4 sm:px-6 text-center text-xs font-semibold relative overflow-hidden select-none border-t-2 border-dashed border-white/25 font-sans">
                                 <div class="flex items-center justify-center gap-2 mb-2 font-black">
                                   <i class="fas fa-heart text-red-400 animate-pulse"></i>
                                   <span>Dear ${customerName || 'Not Available'}, thanks for your order.</span>
@@ -18059,7 +18072,6 @@
                               </div>
 
                           </div>
-                      </div>
                       </div>
 
                           ${!isAdminMode ? `

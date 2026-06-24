@@ -421,7 +421,7 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
         )}
         
         {/* SECTION 1: HEADER BANNER (LAYOUT DESIGN IDENTICAL TO SCREENSHOT) */}
-        <div className="relative border-b-2 border-slate-100 bg-white grid grid-cols-1 md:grid-cols-12 overflow-hidden h-auto py-6 md:py-8 pl-6 md:pl-10 pr-6 gap-6 md:gap-0">
+        <div className="relative border-b-2 border-slate-100 bg-white grid grid-cols-1 md:grid-cols-12 overflow-hidden h-auto py-3 md:py-8 px-4 md:pl-10 md:pr-6 gap-3 md:gap-0">
           
           {/* Wave background container for desktop overlay */}
           <div className="absolute inset-0 hidden md:block select-none pointer-events-none z-0">
@@ -484,17 +484,17 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
           </div>
 
           {/* Middle Column: Blue slanted center box containing 'INVOICE' + stamp circle (30% on desktop) */}
-          <div className="md:col-span-3 flex flex-col items-center justify-center relative min-h-[140px] z-10 md:text-white">
+          <div className="md:col-span-3 flex flex-col items-center justify-center relative py-4 md:py-0 min-h-[100px] md:min-h-[140px] z-10 md:text-white">
             {/* Mobile-only background block for slanted center box */}
-            <div className="absolute inset-0 bg-[#0E46A3] rounded-3xl -z-10 md:hidden" />
+            <div className="absolute inset-0 bg-[#0E46A3] rounded-2xl sm:rounded-3xl -z-10 md:hidden" />
             
-            <div className="text-center text-white space-y-4">
-              <span className="text-4xl font-extrabold tracking-widest block font-serif">INVOICE</span>
+            <div className="text-center text-white space-y-2.5 md:space-y-4">
+              <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-wider md:tracking-widest block font-serif">INVOICE</span>
               
               {/* White circular seal stamp */}
-              <div className="w-16 h-16 rounded-full bg-white border-2 border-[#092C62] flex items-center justify-center p-1 shadow-md mx-auto">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-white border-2 border-[#092C62] flex items-center justify-center p-1 shadow-md mx-auto">
                 <div className="w-full h-full rounded-full border border-dashed border-[#092C62] flex items-center justify-center">
-                  <FileText size={24} className="text-[#0E46A3] stroke-[2.5]" />
+                  <FileText size={18} className="text-[#0E46A3] stroke-[2.5] md:w-6 md:h-6" />
                 </div>
               </div>
             </div>
@@ -503,35 +503,40 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
           {/* Right Column: Order Meta Fields (30% on desktop) */}
           <div className="md:col-span-4 flex flex-col justify-center items-stretch pl-0 md:pl-8 text-xs font-bold text-slate-700 md:text-white z-10 text-left">
             {/* List with proper key-value layouts */}
-            <div className="space-y-3 bg-slate-50 md:bg-transparent p-4 md:p-0 rounded-2xl md:rounded-none border border-slate-100 md:border-none">
-              <div className="grid grid-cols-12 gap-1 items-center">
-                <span className="col-span-12 md:col-span-5 md:text-blue-100">📄 Invoice No</span>
-                <span className="hidden md:inline col-span-1 text-center font-bold">:</span>
-                <span className="col-span-12 md:col-span-6 text-right md:text-left font-mono tracking-tight font-extrabold">{generateInvoiceNo()}</span>
+            <div className="space-y-2 md:space-y-3 bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-2xl md:rounded-none border border-slate-100 md:border-none">
+              
+              <div className="flex flex-row items-center justify-between gap-2 py-1 md:grid md:grid-cols-12 md:gap-1 md:items-center border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
+                <span className="md:col-span-5 text-slate-500 md:text-blue-100 font-bold shrink-0">📄 Invoice No</span>
+                <span className="hidden md:inline md:col-span-1 text-center font-bold">:</span>
+                <span className="md:col-span-6 font-mono tracking-tight font-extrabold text-[#334155] md:text-white break-all text-right md:text-left">{generateInvoiceNo()}</span>
               </div>
-              <div className="grid grid-cols-12 gap-1 items-center">
-                <span className="col-span-12 md:col-span-5 md:text-blue-100">🆔 Order ID</span>
-                <span className="hidden md:inline col-span-1 text-center font-bold">:</span>
-                <span className="col-span-12 md:col-span-6 text-right md:text-left font-mono truncate font-extrabold">#{(order as any).orderNo || order.id}</span>
+
+              <div className="flex flex-row items-center justify-between gap-2 py-1 md:grid md:grid-cols-12 md:gap-1 md:items-center border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
+                <span className="md:col-span-5 text-slate-500 md:text-blue-100 font-bold shrink-0">🆔 Order ID</span>
+                <span className="hidden md:inline md:col-span-1 text-center font-bold">:</span>
+                <span className="md:col-span-6 font-mono tracking-tight font-extrabold text-[#334155] md:text-white break-all text-right md:text-left">#{(order as any).orderNo || order.id}</span>
               </div>
-              <div className="grid grid-cols-12 gap-1 items-center">
-                <span className="col-span-12 md:col-span-5 md:text-blue-100">📅 Order Date</span>
-                <span className="hidden md:inline col-span-1 text-center font-bold">:</span>
-                <span className="col-span-12 md:col-span-6 text-right md:text-left font-sans font-extrabold">{formatDate(order.date)}</span>
+
+              <div className="flex flex-row items-center justify-between gap-2 py-1 md:grid md:grid-cols-12 md:gap-1 md:items-center border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
+                <span className="md:col-span-5 text-slate-500 md:text-blue-100 font-bold shrink-0">📅 Order Date</span>
+                <span className="hidden md:inline md:col-span-1 text-center font-bold">:</span>
+                <span className="md:col-span-6 font-sans font-extrabold text-[#334155] md:text-white break-all text-right md:text-left">{formatDate(order.date)}</span>
               </div>
-              <div className="grid grid-cols-12 gap-1 items-center">
-                <span className="col-span-12 md:col-span-5 md:text-blue-100">💳 Payment Method</span>
-                <span className="hidden md:inline col-span-1 text-center font-bold">:</span>
-                <span className="col-span-12 md:col-span-6 text-right md:text-left break-words whitespace-normal inline-block text-slate-800 md:text-slate-100 font-extrabold">Cash on Delivery (COD)</span>
+
+              <div className="flex flex-row items-center justify-between gap-2 py-1 md:grid md:grid-cols-12 md:gap-1 md:items-center last:border-0 md:border-none font-sans">
+                <span className="md:col-span-5 text-slate-500 md:text-blue-100 font-bold shrink-0">💳 Payment Method</span>
+                <span className="hidden md:inline md:col-span-1 text-center font-bold">:</span>
+                <span className="md:col-span-6 font-sans font-extrabold text-slate-800 md:text-slate-100 break-words text-right md:text-left">Cash on Delivery (COD)</span>
               </div>
+
             </div>
           </div>
 
         </div>
 
         {/* SECTION 2: BUYER INFORMATION DETAILS */}
-        <div className="p-6 md:p-8 text-left">
-          <div className="bg-[#F4F8FA] rounded-2xl border border-slate-105 p-6 space-y-4">
+        <div className="p-4 sm:p-6 md:p-8 text-left">
+          <div className="bg-[#F4F8FA] rounded-2xl border border-slate-105 p-4 sm:p-6 space-y-4">
             
             {/* Card Header with User Icon */}
             <div className="flex items-center gap-2.5 text-blue-800 border-b border-blue-100/60 pb-3">
@@ -575,7 +580,7 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
         </div>
 
         {/* SECTION 3: ORDER ITEMS DETAILS TABLE (EXACT AS SCREENSHOT) */}
-        <div className="px-6 md:px-8 pb-8 overflow-x-auto">
+        <div className="px-4 sm:px-6 md:px-8 pb-6 md:pb-8 overflow-x-auto">
           <table className="w-full border-collapse border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             <thead>
               <tr className="bg-[#0E46A3] text-white text-xs font-black uppercase text-center border-b border-slate-200">
@@ -679,10 +684,10 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
         </div>
 
         {/* SECTION 4: CALCULATIONS / BILLING BREAKDOWNS (EXACT LAYOUT RECONSTRUCTION) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6 md:p-8 bg-[#FAF9F7] border-t border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 p-4 sm:p-6 md:p-8 bg-[#FAF9F7] border-t border-slate-100">
           
           {/* Left Block Card: মূল্য বিবরণী (Price Summary) */}
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-5 space-y-4 shadow-sm flex flex-col justify-between text-left">
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-4 sm:p-5 space-y-4 shadow-sm flex flex-col justify-between text-left">
             <div className="flex items-center gap-2 text-blue-800 border-b border-slate-100 pb-3">
               <Receipt size={16} className="text-blue-600 font-black stroke-[2.5]" />
               <h3 className="text-sm font-black uppercase tracking-wider font-sans">মূল্য বিবরণী</h3>
@@ -710,7 +715,7 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
           </div>
 
           {/* Right Block Card: পেমেন্ট ও কালেকশন বিবরণী (Collection details) */}
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-5 space-y-5 shadow-sm flex flex-col justify-between text-left">
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-4 sm:p-5 space-y-5 shadow-sm flex flex-col justify-between text-left">
             <div className="flex items-center gap-2 text-emerald-800 border-b border-slate-100 pb-3">
               <ShieldCheck size={16} className="text-emerald-600 stroke-[2.5]" />
               <h3 className="text-sm font-black uppercase tracking-wider font-sans">পেমেন্ট ও কালেকশন বিবরণী</h3>
@@ -743,7 +748,7 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
         </div>
 
         {/* SECTION 5: NOTES MODULE */}
-        <div className="p-6 md:p-8 border-t border-slate-100 bg-[#FAF9F7] text-left space-y-4">
+        <div className="p-4 sm:p-6 md:p-8 border-t border-slate-100 bg-[#FAF9F7] text-left space-y-4">
           <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 flex items-start gap-3">
             <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 shrink-0 mt-0.5">
               <FileText size={13} className="stroke-[2.5]" />
@@ -769,27 +774,27 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
         </div>
 
         {/* SECTION 6: FOOTER LINKS BAR */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 md:p-8 bg-white border-t border-slate-100 text-center text-slate-700 z-10 font-bold text-xs">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 p-4 sm:p-6 md:p-8 bg-white border-t border-slate-100 text-center text-slate-700 z-10 font-bold text-xs">
           
-          <div className="flex flex-col items-center p-3 rounded-2xl border border-slate-50 shadow-xs">
+          <div className="flex flex-col items-center p-2 sm:p-3 rounded-2xl border border-slate-50 shadow-xs">
             <Globe className="text-[#0E46A3] w-5 h-5 mb-2" />
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1 font-sans">ওয়েবসাইট</span>
             <span className="font-mono text-slate-800 break-all">{resellerWebsite || 'www.bexo.com.bd'}</span>
           </div>
 
-          <div className="flex flex-col items-center p-3 rounded-2xl border border-slate-50 shadow-xs">
+          <div className="flex flex-col items-center p-2 sm:p-3 rounded-2xl border border-slate-50 shadow-xs">
             <Phone className="text-[#0E46A3] w-5 h-5 mb-2" />
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1 font-sans">সাপোর্ট / হেল্পলাইন</span>
             <span className="font-mono text-slate-800 break-all">{resellerPhone || '01990608143'}</span>
           </div>
 
-          <div className="flex flex-col items-center p-3 rounded-2xl border border-slate-50 shadow-xs">
+          <div className="flex flex-col items-center p-2 sm:p-3 rounded-2xl border border-slate-50 shadow-xs">
             <Mail className="text-[#0E46A3] w-5 h-5 mb-2" />
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1 font-sans animate-pulse">ইমেইল</span>
             <span className="text-slate-800 break-all">{resellerEmail || 'support@bexo.com'}</span>
           </div>
 
-          <div className="flex flex-col items-center p-3 rounded-2xl border border-slate-50 shadow-xs">
+          <div className="flex flex-col items-center p-2 sm:p-3 rounded-2xl border border-slate-50 shadow-xs">
             <ShieldCheck className="text-emerald-600 w-5 h-5 mb-2" />
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1 font-sans">নিরাপদ লেনদেন</span>
             <span className="text-emerald-700 font-bold font-sans">100% বিশ্বস্ত</span>
@@ -798,7 +803,7 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
         </div>
 
         {/* SECTION 7: DEEP BLUE FOOTER CARD WITH COMPLIANCE BENGALI SENTENCES */}
-        <div className="bg-[#0E46A3] text-white py-5 px-6 text-center text-xs font-semibold relative overflow-hidden select-none border-t-2 border-dashed border-white/25 font-sans">
+        <div className="bg-[#0E46A3] text-white py-4 sm:py-5 px-4 sm:px-6 text-center text-xs font-semibold relative overflow-hidden select-none border-t-2 border-dashed border-white/25 font-sans">
           <div className="flex items-center justify-center gap-2 mb-2 font-black font-sans">
             <Heart size={13} className="text-red-400 fill-red-400" />
             <span>Dear {order.customerName || 'Not Available'}, thanks for your order.</span>
