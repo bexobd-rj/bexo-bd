@@ -5134,7 +5134,7 @@
               // Make Order Paid implementation
               window.markManagerOrderAsPaid = function(recordId) {
                   try {
-                      if (!userProfile || !userProfile.isAdmin) {
+                      if (localStorage.getItem('bexo_is_admin') !== 'true') {
                           showToast("Unauthorized request!", "error");
                           return;
                       }
@@ -5296,7 +5296,7 @@
 
               window.confirmMarkAsPaidSubmission = function(recordId) {
                   try {
-                      if (!userProfile || !userProfile.isAdmin) {
+                      if (localStorage.getItem('bexo_is_admin') !== 'true') {
                           showToast("Unauthorized request!", "error");
                           return;
                       }
@@ -10510,6 +10510,11 @@
 
 
               function renderProductList(selectedCategory = null, selectedSubCategory = null) {
+                  if (!selectedCategory && !selectedSubCategory) {
+                      window.productSearchQuery = '';
+                      window.productPriceMin = '';
+                      window.productPriceMax = '';
+                  }
                   const main = document.getElementById('mainContent');
 
                   if (selectedCategory || selectedSubCategory) {
@@ -10581,17 +10586,38 @@
                   `;
               }
 
+              window.productSearchQuery = window.productSearchQuery || '';
+              window.productPriceMin = window.productPriceMin || '';
+              window.productPriceMax = window.productPriceMax || '';
+              
+              window.applyProductFilters = function(cat, subcat) {
+                  window.productSearchQuery = document.getElementById('prodSearchQuery').value;
+                  window.productPriceMin = document.getElementById('prodPriceMin').value;
+                  window.productPriceMax = document.getElementById('prodPriceMax').value;
+                  productCurrentPage = 1;
+                  renderFilteredProductList(cat || null, subcat || null);
+              };
+
               function renderFilteredProductList(category, subCategory) {
                   const main = document.getElementById('mainContent');
 
                   // Filter products
+                  const sq = window.productSearchQuery.toLowerCase();
+                  const pMin = parseInt(window.productPriceMin) || 0;
+                  const pMax = parseInt(window.productPriceMax) || Infinity;
+
                   const filtered = appPosts.filter(p => {
                       const isPublished = p.isPublished !== false;
                       if (!isPublished) return false;
 
-                      if (category && subCategory) return p.category === category && p.subCategory === subCategory;
-                      if (category) return p.category === category;
-                      if (subCategory) return p.subCategory === subCategory;
+                      if (category && subCategory && (p.category !== category || p.subCategory !== subCategory)) return false;
+                      else if (category && !subCategory && p.category !== category) return false;
+                      else if (!category && subCategory && p.subCategory !== subCategory) return false;
+
+                      if (sq && !(p.title.toLowerCase().includes(sq) || String(p.id).includes(sq))) return false;
+                      if (pMin > 0 && (Number(p.price) || 0) < pMin) return false;
+                      if (pMax < Infinity && (Number(p.price) || 0) > pMax) return false;
+
                       return true;
                   }).sort((a, b) => Number(b.id) - Number(a.id));
 
@@ -10618,19 +10644,28 @@
                   main.innerHTML = `
                       <div class="p-2 lg:p-6 animate-fade-in bg-[#f0f4f9] min-h-screen">
                           <div class="max-w-full mx-auto space-y-4">
-                              <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
-                                  <div class="flex items-center gap-4">
-                                      <button onclick="renderProductList()" class="w-9 h-9 bg-slate-50 text-slate-400 rounded-lg flex items-center justify-center hover:bg-orange-50 hover:text-orange-600 transition-all border border-slate-100">
-                                          <i class="fas fa-chevron-left text-sm"></i>
-                                      </button>
-                                      <div>
-                                          <h2 class="text-xl font-black text-slate-800 tracking-tight">${subCategory || category || 'সকল প্রোডাক্ট'}</h2>
-                                          <p class="text-slate-400 text-[10px] font-bold">বেক্সো বিডি-র সকল লেটেস্ট কালেকশন এখানে পাবেন</p>
+                              <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-4">
+                                  <div class="flex items-center justify-between">
+                                      <div class="flex items-center gap-4">
+                                          <button onclick="renderProductList()" class="w-9 h-9 bg-slate-50 text-slate-400 rounded-lg flex items-center justify-center hover:bg-orange-50 hover:text-orange-600 transition-all border border-slate-100">
+                                              <i class="fas fa-chevron-left text-sm"></i>
+                                          </button>
+                                          <div>
+                                              <h2 class="text-xl font-black text-slate-800 tracking-tight">${subCategory || category || 'সকল প্রোডাক্ট'}</h2>
+                                              <p class="text-slate-400 text-[10px] font-bold">বেক্সো বিডি-র সকল লেটেস্ট কালেকশন এখানে পাবেন</p>
+                                          </div>
                                       </div>
                                   </div>
-
-                                  <div class="w-10 h-10 bg-orange-600 text-white rounded-lg flex items-center justify-center text-lg shadow-lg shadow-orange-100">
-                                      <i class="fas fa-th"></i>
+                                  
+                                  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                      <input type="text" id="prodSearchQuery" value="${window.productSearchQuery}" placeholder="প্রোডাক্ট খুঁজুন (নাম বা আইডি)..." class="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-100 transition-all">
+                                      <input type="number" id="prodPriceMin" value="${window.productPriceMin}" placeholder="সর্বনিম্ন মূল্য (৳)" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-100 transition-all">
+                                      <div class="flex gap-2">
+                                          <input type="number" id="prodPriceMax" value="${window.productPriceMax}" placeholder="সর্বোচ্চ মূল্য (৳)" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-100 transition-all">
+                                          <button onclick="applyProductFilters('${category || ''}', '${subCategory || ''}')" class="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-md">
+                                              <i class="fas fa-search"></i> খুঁজুন
+                                          </button>
+                                      </div>
                                   </div>
                               </div>
 
@@ -15076,7 +15111,7 @@
 
 
               function adminDeleteOrder(orderId) {
-                  if (!userProfile || !userProfile.isAdmin) { showToast("Unauthorized access!", "error"); return; }
+                  if (localStorage.getItem("bexo_is_admin") !== "true") { showToast("Unauthorized access!", "error"); return; }
                   if(confirm("অর্ডারটি মুছে ফেলতে চান?")) {
                       const idx = appOrders.findIndex(o => o.id === orderId || String(o.id) === String(orderId));
                       if(idx > -1) {
@@ -15098,12 +15133,12 @@
               }
 
               function adminUpdateOrderStatus(orderId, newStatus) {
-                  if (!userProfile || !userProfile.isAdmin) { showToast("Unauthorized access!", "error"); return; }
+                  if (localStorage.getItem("bexo_is_admin") !== "true") { showToast("Unauthorized access!", "error"); return; }
                   updateOrderStatus(orderId, newStatus, 'Admin');
               }
 
               function adminUpdateTrackingLink(orderId, link) {
-                  if (!userProfile || !userProfile.isAdmin) { showToast("Unauthorized access!", "error"); return; }
+                  if (localStorage.getItem("bexo_is_admin") !== "true") { showToast("Unauthorized access!", "error"); return; }
                   const idx = appOrders.findIndex(o => String(o.id) === String(orderId));
                   if(idx === -1) return;
 
@@ -15121,7 +15156,7 @@
               }
 
               function adminUpdateAdminNote(orderId, note) {
-                  if (!userProfile || !userProfile.isAdmin) { showToast("Unauthorized access!", "error"); return; }
+                  if (localStorage.getItem("bexo_is_admin") !== "true") { showToast("Unauthorized access!", "error"); return; }
                   const idx = appOrders.findIndex(o => String(o.id) === String(orderId));
                   if(idx === -1) return;
 
@@ -15131,7 +15166,7 @@
               }
 
               function adminUpdatePaymentCode(orderId, code) {
-                  if (!userProfile || !userProfile.isAdmin) { showToast("Unauthorized access!", "error"); return; }
+                  if (localStorage.getItem("bexo_is_admin") !== "true") { showToast("Unauthorized access!", "error"); return; }
                   const idx = appOrders.findIndex(o => String(o.id) === String(orderId));
                   if(idx === -1) return;
                   appOrders[idx].paymentCode = code;
@@ -18709,7 +18744,7 @@
               let isAdminMode = false;
 
               function adminAddHistoryNote(orderId, note) {
-                  if (!userProfile || !userProfile.isAdmin) { showToast("Unauthorized access!", "error"); return; }
+                  if (localStorage.getItem("bexo_is_admin") !== "true") { showToast("Unauthorized access!", "error"); return; }
                   if(!note.trim()) return;
                   const idx = appOrders.findIndex(o => String(o.id) === String(orderId));
                   if(idx === -1) return;
