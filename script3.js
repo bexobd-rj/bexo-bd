@@ -6245,7 +6245,8 @@
                       const matchMain = filterMain === 'সব' || p.category === filterMain;
                       const matchSub = filterSub === 'all' || p.subCategory === filterSub;
                       const isPublished = p.isPublished !== false; // Active products by default, unless explicitly unpublished
-                      return matchMain && matchSub && isPublished;
+                      const isStockOut = p.isStockOut === true;
+                      return matchMain && matchSub && isPublished && !isStockOut;
                   }).sort((a, b) => Number(b.id) - Number(a.id));
 
                   if (filtered.length === 0) {
@@ -8644,6 +8645,7 @@
                   const filtered = appPosts.filter(p => {
                       const isPublished = p.isPublished !== false;
                       if (!isPublished) return false;
+                      if (p.isStockOut === true) return false;
 
                       if (category && subCategory) return p.category === category && p.subCategory === subCategory;
                       if (category) return p.category === category;
@@ -9877,6 +9879,13 @@
                                                       <div class="space-y-2">
                                                           <label class="text-[10px] uppercase font-black text-slate-400 tracking-widest">ছবির লিঙ্ক (ম্যানুয়াল)</label>
                                                           <textarea id="apImages" rows="3" class="w-full px-6 py-3.5 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-orange-500 font-bold text-xs transition-all resize-none font-mono" placeholder="ছবির লিঙ্ক এখানে দিন (প্রতি লাইনে একটি)...">${p ? p.images.join('\n') : ''}</textarea>
+                                                          ${!p ? `<div class="flex items-center gap-2 mt-2">
+                                                              <label class="relative inline-flex items-center cursor-pointer">
+                                                                  <input type="checkbox" id="apBulkUpload" class="sr-only peer">
+                                                                  <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                                              </label>
+                                                              <span class="text-[11px] font-bold text-slate-500">প্রতিটি ছবির জন্য আলাদা প্রোডাক্ট তৈরি করুন (Bulk Upload)</span>
+                                                          </div>` : ''}
                                                       </div>
                                                       <div class="space-y-2">
                                                           <label class="text-[10px] uppercase font-black text-slate-400 tracking-widest">বিস্তারিত তথ্য (টেকনিক্যাল ডিটেইলস)</label>
@@ -15041,6 +15050,7 @@
 
                       if (type === 'name') {
                           filtered = appPosts.filter(p => {
+                              if (p.isPublished === false || p.isStockOut === true) return false;
                               return searchKeywords.every(keyword =>
                                   p.title.toLowerCase().includes(keyword) ||
                                   (p.desc && p.desc.toLowerCase().includes(keyword)) ||
@@ -15049,7 +15059,7 @@
                               );
                           });
                       } else if (type === 'sku') {
-                          filtered = appPosts.filter(p => p.sku && p.sku.toLowerCase().includes(inputVal));
+                          filtered = appPosts.filter(p => p.sku && p.sku.toLowerCase().includes(inputVal) && p.isPublished !== false && p.isStockOut !== true);
                       }
 
                       filtered.sort((a, b) => Number(b.id) - Number(a.id));

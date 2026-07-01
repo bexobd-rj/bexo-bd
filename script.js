@@ -2101,6 +2101,45 @@
                   }
               }
 
+              function toggleFavorite(productId, imgIdx) {
+                  if (!userProfile) {
+                      showToast('লগইন করুন', 'error');
+                      return;
+                  }
+                  if (!userProfile.favorites) {
+                      userProfile.favorites = [];
+                  }
+                  
+                  const key = `${productId}-${imgIdx}`;
+                  const idx = userProfile.favorites.indexOf(key);
+                  if (idx > -1) {
+                      userProfile.favorites.splice(idx, 1);
+                      showToast('ফেভারিট থেকে রিমুভ করা হয়েছে', 'success');
+                  } else {
+                      userProfile.favorites.push(key);
+                      showToast('ফেভারিটে যোগ করা হয়েছে', 'success');
+                  }
+                  
+                  saveProfile();
+                  
+                  // Optimistic UI updates
+                  if (typeof renderAllPosts === 'function' && document.getElementById('allPostsContainer')) {
+                      // Note: renderAllPosts does not take args but might depend on state
+                      // It might be expensive to re-render everything, but it works
+                      // We will check if we are in post detail
+                      const isPostDetail = document.getElementById('postDetailContainer');
+                      if (isPostDetail) {
+                          // Render post detail
+                          renderPostDetail(productId, imgIdx);
+                      } else if (currentMenu === 'favorites' && typeof renderFavorites === 'function') {
+                          renderFavorites();
+                      } else {
+                          renderAllPosts();
+                      }
+                  }
+              }
+
+
               // copyToClipboard is defined once later in the file
 
               // Passive Heartbeat for last active tracking
@@ -2500,6 +2539,8 @@
 
                   const auth = document.getElementById('authSection');
                   const dash = document.getElementById('dashboardSection');
+                  const landing = document.getElementById('landingSection');
+                  if(landing) landing.classList.add('hidden');
 
                   auth.classList.add('hidden');
                   dash.classList.remove('hidden');
@@ -2712,6 +2753,8 @@
 
                   auth.classList.remove('hidden');
                   dash.classList.add('hidden');
+                  const landing = document.getElementById('landingSection');
+                  if(landing) landing.classList.add('hidden');
                   admin.classList.add('hidden');
 
                   // Explicitly show login form, hide registration
@@ -6245,7 +6288,8 @@
                       const matchMain = filterMain === 'সব' || p.category === filterMain;
                       const matchSub = filterSub === 'all' || p.subCategory === filterSub;
                       const isPublished = p.isPublished !== false; // Active products by default, unless explicitly unpublished
-                      return matchMain && matchSub && isPublished;
+                      const isStockOut = p.isStockOut === true || (p.stockCount !== undefined && p.stockCount <= 0);
+                      return matchMain && matchSub && isPublished && !isStockOut;
                   }).sort((a, b) => Number(b.id) - Number(a.id));
 
                   if (filtered.length === 0) {
@@ -7875,7 +7919,7 @@
                                   </div>
 
                                   <div class="text-slate-700 font-bold text-sm leading-relaxed space-y-4">
-                                      <p class="text-emerald-700">অ্যাকাউন্টের নিরাপত্তা: আপনার অ্যাকাউন্টের পাসওয়ার্ড কোন অবস্থাতেই কাউকে শেয়ার করবেন না। অ্যাকাউন্ট করার সাথে সাথে আপনার নগদ এবং বিকাশ নাম্বার অ্যাড করে ফেলবেন, তাহলে কেউ পাসওয়ার্ড পেয়ে গেলেও উইথড্র দিতে পারবে না। কোন ধরনের প্রবলেম হওয়ার সাথে সাথে শপবেইজের সাপোর্ট নাম্বারে যোগাযোগ করবেন।</p>
+                                      <p class="text-emerald-700">অ্যাকাউন্টের নিরাপত্তা: আপনার অ্যাকাউন্টের পাসওয়ার্ড কোন অবস্থাতেই কাউকে শেয়ার করবেন না। অ্যাকাউন্ট করার সাথে সাথে আপনার নগদ এবং বিকাশ নাম্বার অ্যাড করে ফেলবেন, তাহলে কেউ পাসওয়ার্ড পেয়ে গেলেও উইথড্র দিতে পারবে না। কোন ধরনের প্রবলেম হওয়ার সাথে সাথে Bexo BD এর সাপোর্ট নাম্বারে যোগাযোগ করবেন।</p>
                                       <p class="text-emerald-700">ফ্রি মেম্বারশিপ: আমাদের প্ল্যাটফর্মে কাজ করার জন্য এবং সেলার কোড পাওয়ার জন্য কোন রকম টাকা বা ফীর প্রয়োজন নেই। আপনারা সুযোগ নিয়ে কারো কাছ থেকে কোন টাকা নিবেন না এবং দিবেন না।</p>
                                   </div>
                               </div>
@@ -8644,6 +8688,7 @@
                   const filtered = appPosts.filter(p => {
                       const isPublished = p.isPublished !== false;
                       if (!isPublished) return false;
+                      if (p.isStockOut === true) return false;
 
                       if (category && subCategory) return p.category === category && p.subCategory === subCategory;
                       if (category) return p.category === category;
@@ -9877,6 +9922,13 @@
                                                       <div class="space-y-2">
                                                           <label class="text-[10px] uppercase font-black text-slate-400 tracking-widest">ছবির লিঙ্ক (ম্যানুয়াল)</label>
                                                           <textarea id="apImages" rows="3" class="w-full px-6 py-3.5 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-orange-500 font-bold text-xs transition-all resize-none font-mono" placeholder="ছবির লিঙ্ক এখানে দিন (প্রতি লাইনে একটি)...">${p ? p.images.join('\n') : ''}</textarea>
+                                                          ${!p ? `<div class="flex items-center gap-2 mt-2">
+                                                              <label class="relative inline-flex items-center cursor-pointer">
+                                                                  <input type="checkbox" id="apBulkUpload" class="sr-only peer">
+                                                                  <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                                              </label>
+                                                              <span class="text-[11px] font-bold text-slate-500">প্রতিটি ছবির জন্য আলাদা প্রোডাক্ট তৈরি করুন (Bulk Upload)</span>
+                                                          </div>` : ''}
                                                       </div>
                                                       <div class="space-y-2">
                                                           <label class="text-[10px] uppercase font-black text-slate-400 tracking-widest">বিস্তারিত তথ্য (টেকনিক্যাল ডিটেইলস)</label>
@@ -12486,48 +12538,91 @@
                       finalImages = [`https://picsum.photos/seed/${Date.now()}/800/600`];
                   }
 
-                  const postData = {
-                      id: pId || Date.now(),
-                      author: 'বেক্সো অফিসিয়াল',
-                      time: pId ? (appPosts.find(p => String(p.id) === String(pId))?.time || 'এইমাত্র') : 'এইমাত্র',
-                      category: cat,
-                      subCategory: sub,
-                      price: price,
-                      costPrice: costPrice,
-                      maxSellingPrice: suggestedMaxPrice,
-                      stockCount: stockCount,
-                      unitType: unitType,
-                      variants: variants, // Save new variant structure
-                      availableSizes: variants.find(v => v.name.toLowerCase() === 'size')?.options || [], // Fallback for legacy display
-                      discountAmount: discountAmount,
-                      remarks: remarks,
-                      isVerified: true,
-                      rating: 5,
-                      title: title,
-                      desc: "", // Removed from UI
-                      details: details,
-                      images: finalImages,
-                      imageCount: finalImages.length,
-                      videoUrl: document.getElementById('apVideoUrl') ? document.getElementById('apVideoUrl').value.trim() : '',
-                      isStockOut: isStockOut,
-                      sku: sku,
-                      isPublished: autoPost
-                  };
+                  const isBulkUpload = !pId && document.getElementById('apBulkUpload') && document.getElementById('apBulkUpload').checked;
+                  
+                  let newPosts = [];
+                  
+                  if (isBulkUpload && finalImages.length > 1) {
+                      newPosts = finalImages.map((img, i) => {
+                          return {
+                              id: Date.now() + i,
+                              author: 'বেক্সো অফিসিয়াল',
+                              time: 'এইমাত্র',
+                              category: cat,
+                              subCategory: sub,
+                              price: price,
+                              costPrice: costPrice,
+                              maxSellingPrice: suggestedMaxPrice,
+                              stockCount: stockCount,
+                              unitType: unitType,
+                              variants: variants,
+                              availableSizes: variants.find(v => v.name.toLowerCase() === 'size')?.options || [],
+                              discountAmount: discountAmount,
+                              remarks: remarks,
+                              isVerified: true,
+                              rating: 5,
+                              title: title,
+                              desc: "",
+                              details: details,
+                              images: [img],
+                              imageCount: 1,
+                              videoUrl: document.getElementById('apVideoUrl') ? document.getElementById('apVideoUrl').value.trim() : '',
+                              isStockOut: isStockOut,
+                              sku: sku + (i > 0 ? '-' + i : ''),
+                              isPublished: autoPost
+                          };
+                      });
+                  } else {
+                      newPosts = [{
+                          id: pId || Date.now(),
+                          author: 'বেক্সো অফিসিয়াল',
+                          time: pId ? (appPosts.find(p => String(p.id) === String(pId))?.time || 'এইমাত্র') : 'এইমাত্র',
+                          category: cat,
+                          subCategory: sub,
+                          price: price,
+                          costPrice: costPrice,
+                          maxSellingPrice: suggestedMaxPrice,
+                          stockCount: stockCount,
+                          unitType: unitType,
+                          variants: variants,
+                          availableSizes: variants.find(v => v.name.toLowerCase() === 'size')?.options || [],
+                          discountAmount: discountAmount,
+                          remarks: remarks,
+                          isVerified: true,
+                          rating: 5,
+                          title: title,
+                          desc: "",
+                          details: details,
+                          images: finalImages,
+                          imageCount: finalImages.length,
+                          videoUrl: document.getElementById('apVideoUrl') ? document.getElementById('apVideoUrl').value.trim() : '',
+                          isStockOut: isStockOut,
+                          sku: sku,
+                          isPublished: autoPost
+                      }];
+                  }
 
                   if (pId) {
                       const idx = appPosts.findIndex(p => String(p.id) === String(pId));
-                      if (idx > -1) appPosts[idx] = postData;
+                      if (idx > -1) appPosts[idx] = newPosts[0];
                   } else {
-                      appPosts.unshift(postData);
+                      appPosts.unshift(...newPosts);
                   }
                   savePosts();
+
                   if (window.db) {
-                      window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForFirestore(postData))
-                          .catch(err => console.error("Firebase save post error:", err));
+                      newPosts.forEach(postData => {
+                          window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForFirestore(postData))
+                              .catch(err => console.error("Firebase save post error:", err));
+                      });
                   }
 
                   // Success feedback
-                  showToast(pId ? "পণ্যটি সফলভাবে আপডেটেড হয়েছে!" : "পণ্যটি সফলভাবে সংরক্ষিত হয়েছে!");
+                  if (newPosts.length > 1) {
+                      showToast(newPosts.length + " টি পণ্য সফলভাবে সংরক্ষিত হয়েছে!");
+                  } else {
+                      showToast(pId ? "পণ্যটি সফলভাবে আপডেটেড হয়েছে!" : "পণ্যটি সফলভাবে সংরক্ষিত হয়েছে!");
+                  }
 
                   // Refresh view
                   renderAdminPostList();
@@ -15042,6 +15137,7 @@
 
                       if (type === 'name') {
                           filtered = appPosts.filter(p => {
+                              if (p.isPublished === false || p.isStockOut === true) return false;
                               return searchKeywords.every(keyword =>
                                   p.title.toLowerCase().includes(keyword) ||
                                   (p.desc && p.desc.toLowerCase().includes(keyword)) ||
@@ -15050,7 +15146,7 @@
                               );
                           });
                       } else if (type === 'sku') {
-                          filtered = appPosts.filter(p => p.sku && p.sku.toLowerCase().includes(inputVal));
+                          filtered = appPosts.filter(p => p.sku && p.sku.toLowerCase().includes(inputVal) && p.isPublished !== false && p.isStockOut !== true);
                       }
 
                       filtered.sort((a, b) => Number(b.id) - Number(a.id));
@@ -17761,3 +17857,109 @@
                        `;
                     }).join('');
                 }
+
+// --- LANDING PAGE LOGIC ---
+window.showAuth = function(isLogin) {
+    const landing = document.getElementById('landingSection');
+    const auth = document.getElementById('authSection');
+    
+    if (landing) landing.classList.add('hidden');
+    if (auth) {
+        auth.classList.remove('hidden');
+        auth.classList.add('flex');
+    }
+    
+    // Call the existing toggleAuth function which switches between login and register forms
+    if (typeof toggleAuth === 'function') {
+        toggleAuth(isLogin);
+    }
+};
+
+// Fetch categories/products for landing page
+async function loadLandingProducts() {
+    const container = document.getElementById('landingProductsContainer');
+    if (!container) return;
+    
+    try {
+        const snapshot = await window.db.collection('bexo_categories').get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="col-span-full py-10 text-slate-400">কোন প্রোডাক্ট পাওয়া যায়নি।</div>';
+            return;
+        }
+        
+        let allItems = [];
+        snapshot.forEach(doc => {
+            const cat = doc.data();
+            if (cat.subCategories && Array.isArray(cat.subCategories)) {
+                cat.subCategories.forEach(sub => {
+                    if (sub.image) {
+                        allItems.push({
+                            name: sub.name || cat.name,
+                            image: sub.image,
+                            order: sub.order || 999
+                        });
+                    }
+                });
+            } else if (cat.image) {
+                allItems.push({
+                    name: cat.name,
+                    image: cat.image,
+                    order: cat.order || 999
+                });
+            }
+        });
+        
+        allItems.sort((a,b) => a.order - b.order);
+        allItems = allItems.slice(0, 24); // Show top 24
+        
+        if (allItems.length === 0) {
+            container.innerHTML = '<div class="col-span-full py-10 text-slate-400">কোন প্রোডাক্ট পাওয়া যায়নি।</div>';
+            return;
+        }
+        
+        let html = '';
+        allItems.forEach(item => {
+            const imageUrl = item.image || 'https://via.placeholder.com/150';
+            const name = item.name || 'Unknown';
+            
+            html += `
+              <div class="bg-white rounded-lg shadow-sm border border-slate-100 overflow-hidden flex flex-col items-center justify-center p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="showAuth(false)">
+                <img src="${imageUrl}" alt="${name}" class="w-full h-32 object-contain mb-3" onerror="this.src='https://via.placeholder.com/150'" />
+                <h4 class="text-slate-700 font-medium text-sm text-center">${name}</h4>
+              </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error("Error loading landing products:", error);
+        container.innerHTML = '<div class="col-span-full py-10 text-rose-400 text-center text-sm"><i class="fas fa-exclamation-triangle mb-2 text-2xl"></i><br/>প্রোডাক্ট লোড করতে সমস্যা হয়েছে।</div>';
+    }
+}
+
+// Ensure loadLandingProducts is called on load
+const originalWindowLoad = window.onload;
+window.onload = function(e) {
+    if (originalWindowLoad) originalWindowLoad(e);
+    // Add logic here if needed
+};
+
+// Wait for firebase to be ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Try to load immediately if db is ready, otherwise let the initializeFirebaseIfReady handle it
+    if (window.db !== null && typeof window.db !== 'undefined') {
+        loadLandingProducts();
+    } else {
+        // Poll for db
+        const interval = setInterval(() => {
+            if (window.db !== null && typeof window.db !== 'undefined') {
+                clearInterval(interval);
+                loadLandingProducts();
+            }
+        }, 500);
+        // Timeout after 10s
+        setTimeout(() => clearInterval(interval), 10000);
+    }
+});

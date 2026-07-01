@@ -187,6 +187,7 @@
     </script>
 
     <style>
+      html { scroll-behavior: smooth; }
       :root {
         --orange: #ff6b00;
         --orange-dark: #cc5600;
@@ -446,13 +447,346 @@
       }
     </style>
   </head>
-  <body class="bg-slate-50 text-slate-900">
+  <body class="bg-slate-50 text-slate-900 overflow-x-hidden">
     <!-- Admin User Password Edit Section (Now handled inline, removing old modal) -->
+
+    
+    <!-- === SECTION 0: LANDING PAGE === -->
+    <section id="landingSection" class="min-h-screen bg-[#FFF4E6] flex flex-col font-sans">
+      <!-- Navbar -->
+      <nav class="flex flex-col sm:flex-row items-center justify-between px-4 sm:px-8 py-4 bg-orange-500 text-white gap-4 sm:gap-0">
+        <div class="flex items-center gap-2">
+          <i class="fas fa-shopping-bag text-3xl"></i>
+          <div>
+            <h1 class="text-2xl font-bold leading-none tracking-tight">Bexo BD</h1>
+            <p class="text-[10px] uppercase tracking-wider">Dropshipping Platform</p>
+          </div>
+        </div>
+        <div class="hidden md:flex gap-6 font-medium">
+          <a href="#" class="hover:text-orange-200 transition-colors">হোম</a>
+          <a href="#about" class="hover:text-orange-200 transition-colors">আমাদের সম্পর্কে</a>
+          <a href="#products" class="hover:text-orange-200 transition-colors">প্রোডাক্টস</a>
+          <a href="#services" class="hover:text-orange-200 transition-colors">সার্ভিস সমূহ</a>
+          <a href="#contact" class="hover:text-orange-200 transition-colors">যোগাযোগ</a>
+        </div>
+        <div class="flex gap-3">
+          <button onclick="showAuth(false)" class="px-3 py-1.5 sm:px-5 sm:py-2 text-sm sm:text-base rounded font-bold text-orange-600 bg-yellow-400 hover:bg-yellow-300 transition-colors">রেজিস্ট্রেশন <i class="fas fa-user-plus ml-1"></i></button>
+          <button onclick="showAuth(true)" class="px-3 py-1.5 sm:px-5 sm:py-2 text-sm sm:text-base rounded font-bold text-white border border-white hover:bg-white hover:text-orange-600 transition-colors">লগইন <i class="fas fa-sign-in-alt ml-1"></i></button>
+        </div>
+      </nav>
+
+      <!-- Hero Section -->
+      <div class="flex flex-col md:flex-row items-center justify-between px-4 sm:px-8 py-8 md:py-20 flex-grow relative overflow-hidden">
+        <div class="md:w-1/2 z-10 space-y-6">
+          <h2 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-800 leading-tight">
+            দেশের সর্ববৃহৎ <span class="text-orange-600">ড্রপশিপিং</span> এবং <br/>
+            <span class="text-orange-600">রিসেলিং</span> প্লাটফর্ম
+          </h2>
+          <p class="text-lg text-slate-600 max-w-lg">
+            কোন প্রকার পুঁজি বা ইনভেস্ট ছাড়াই ফ্রি'তে রেজিস্ট্রেশন করে ঘরে বসে বিজনেস করুন Bexo BD এর মাধ্যমে।
+          </p>
+          <div class="flex flex-col sm:flex-row gap-4 pt-4 w-full sm:w-auto">
+            <button onclick="showAuth(false)" class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-orange-400 to-orange-500 text-white font-bold rounded shadow-lg hover:shadow-orange-500/30 transition-all transform hover:-translate-y-1">রেজিস্ট্রেশন করুন</button>
+            <a href="#services" class="w-full sm:w-auto px-8 py-3 bg-white text-orange-600 border border-orange-200 font-bold rounded shadow-lg hover:shadow-orange-500/30 transition-all transform hover:-translate-y-1 inline-flex items-center justify-center">বিস্তারিত জানুন</a>
+          </div>
+        </div>
+        <div class="md:w-1/2 z-10 mt-12 md:mt-0 flex justify-center relative">
+          <!-- Illustration Placeholder (Using CSS shapes) -->
+          <div class="w-full max-w-md relative">
+            <div class="bg-teal-100 rounded-full w-80 h-80 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -z-10 blur-3xl opacity-50"></div>
+            <!-- Mockup of the process -->
+            <div class="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 relative">
+              <div class="flex justify-between items-center mb-6 border-b pb-4">
+                 <i class="fas fa-store text-4xl text-teal-500"></i>
+                 <i class="fas fa-arrow-right text-slate-300"></i>
+                 <i class="fas fa-box text-4xl text-orange-400"></i>
+                 <i class="fas fa-arrow-right text-slate-300"></i>
+                 <i class="fas fa-user text-4xl text-blue-500"></i>
+              </div>
+              <h3 class="text-center font-bold text-xl text-slate-700">DROPSHIPPING MODEL</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="bg-[#FFF4E6] px-8 pb-16">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-6xl mx-auto">
+          <div class="bg-gradient-to-br from-yellow-100 to-yellow-200 p-6 rounded-lg text-center shadow-sm border border-yellow-300">
+            <h4 class="text-2xl font-bold text-orange-600">2,00,000+</h4>
+            <p class="text-sm font-medium text-slate-700 mt-1">রিসেলার/ড্রপশিপার</p>
+          </div>
+          <div class="bg-gradient-to-br from-yellow-100 to-yellow-200 p-6 rounded-lg text-center shadow-sm border border-yellow-300">
+            <h4 class="text-2xl font-bold text-orange-600">10,000+</h4>
+            <p class="text-sm font-medium text-slate-700 mt-1">ট্রেন্ডি প্রোডাক্টস</p>
+          </div>
+          <div class="bg-gradient-to-br from-yellow-100 to-yellow-200 p-6 rounded-lg text-center shadow-sm border border-yellow-300">
+            <h4 class="text-2xl font-bold text-orange-600">100K+</h4>
+            <p class="text-sm font-medium text-slate-700 mt-1">অ্যাপস ডাউনলোড</p>
+          </div>
+          <div class="bg-gradient-to-br from-yellow-100 to-yellow-200 p-6 rounded-lg text-center shadow-sm border border-yellow-300">
+            <h4 class="text-2xl font-bold text-orange-600">24/7</h4>
+            <p class="text-sm font-medium text-slate-700 mt-1">সাপোর্ট সেন্টার</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- About Us -->
+      <div id="about" class="bg-[#FFF4E6] px-8 py-16">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row gap-4 sm:gap-8 px-4 sm:px-0">
+          <div class="md:w-1/2 bg-white p-8 rounded-xl shadow-sm border border-slate-100">
+            <h3 class="text-3xl font-bold text-slate-800 mb-6">আমাদের সম্পর্কে</h3>
+            <p class="text-slate-600 leading-relaxed text-justify">
+              Bexo BD বাংলাদেশের সর্ববৃহৎ একটি ড্রপশিপিং এবং রিসেলিং প্লাটফর্ম। কোন প্রকার পুঁজি বা ইনভেস্টমেন্ট ছাড়াই ঘরে বসে অসংখ্য ক্যাটাগরির প্রায় দশ হাজারেরও বেশি প্রোডাক্ট নিয়ে বিজনেস করতে পারবেন অনলাইনে আমাদের মাধ্যমে। ইনস্ট্যান্ট পেমেন্ট, ভেরিফাইড প্রোডাক্ট, ছবি দিয়ে সার্চ, ক্যাশ অন ডেলিভারি এবং কল সেন্টার সাপোর্ট সহ অত্যাধুনিক সকল সুবিধা রয়েছে এখানে।
+            </p>
+          </div>
+          <div class="md:w-1/2 rounded-xl overflow-hidden shadow-sm relative group bg-slate-200 flex items-center justify-center min-h-[250px]">
+             <i class="fab fa-youtube text-red-500 text-6xl cursor-pointer hover:scale-110 transition-transform"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Services -->
+      <div id="services" class="bg-[#FFF4E6] px-8 py-16">
+        <div class="max-w-6xl mx-auto text-center px-4 sm:px-0">
+          <h3 class="text-3xl font-bold text-slate-800 mb-2">আমাদের সার্ভিস সমূহ</h3>
+          <p class="text-slate-500 mb-10">আমাদের এই প্ল্যাটফর্মের মাধ্যমে আপনি পাচ্ছেন অসংখ্য বিজনেস এবং ইনকাম করার সুযোগ।</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-center gap-3"><i class="fas fa-recycle text-orange-500"></i><span class="font-medium text-slate-700">রিসেলিং / ড্রপশিপিং</span></div>
+              <i class="fas fa-arrow-right text-orange-300"></i>
+            </div>
+            <div class="bg-white p-4 rounded shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-center gap-3"><i class="fas fa-box-open text-orange-500"></i><span class="font-medium text-slate-700">হোলসেল প্রোডাক্ট</span></div>
+              <i class="fas fa-arrow-right text-orange-300"></i>
+            </div>
+            <div class="bg-white p-4 rounded shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-center gap-3"><i class="fas fa-print text-orange-500"></i><span class="font-medium text-slate-700">কাস্টমাইজ প্রিন্ট</span></div>
+              <i class="fas fa-arrow-right text-orange-300"></i>
+            </div>
+            <div class="bg-white p-4 rounded shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-center gap-3"><i class="fas fa-truck-loading text-orange-500"></i><span class="font-medium text-slate-700">সাপ্লায়ার / ভেন্ডরশিপ</span></div>
+              <i class="fas fa-arrow-right text-orange-300"></i>
+            </div>
+            <div class="bg-white p-4 rounded shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-center gap-3"><i class="fas fa-wallet text-orange-500"></i><span class="font-medium text-slate-700">লিডারশিপ ইনকাম</span></div>
+              <i class="fas fa-arrow-right text-orange-300"></i>
+            </div>
+            <div class="bg-white p-4 rounded shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-center gap-3"><i class="fas fa-laptop-code text-orange-500"></i><span class="font-medium text-slate-700">ফ্রিল্যান্সিং মার্কেটপ্লেস</span></div>
+              <i class="fas fa-arrow-right text-orange-300"></i>
+            </div>
+            <div class="bg-white p-4 rounded shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-center gap-3"><i class="fas fa-tasks text-orange-500"></i><span class="font-medium text-slate-700">মাইক্রো জবস</span></div>
+              <i class="fas fa-arrow-right text-orange-300"></i>
+            </div>
+            <div class="bg-white p-4 rounded shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-center gap-3"><i class="fas fa-mobile-alt text-orange-500"></i><span class="font-medium text-slate-700">মোবাইল রিচার্জ</span></div>
+              <i class="fas fa-arrow-right text-orange-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Special Features -->
+      <div class="bg-[#FFF4E6] px-8 py-16">
+        <div class="max-w-6xl mx-auto text-center px-4 sm:px-0">
+          <h3 class="text-3xl font-bold text-slate-800 mb-2">আমাদের স্পেশাল ফিচারস</h3>
+          <p class="text-slate-500 mb-10">ড্রপশিপিং এবং রিসেলিং এর জগতে আমরাই দিচ্ছি সবচেয়ে বেশি এবং আকর্ষণীয় সুবিধা।</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
+            <div class="bg-white p-6 rounded shadow-sm border border-slate-100">
+              <i class="fas fa-money-bill-wave text-3xl text-orange-500 mb-4"></i>
+              <h4 class="text-xl font-bold text-slate-800 mb-2">জিরো ইনভেস্টমেন্ট</h4>
+              <p class="text-slate-500 text-sm">কোন রকম পুঁজি বা ইনভেস্টমেন্ট ছাড়াই সম্পূর্ণ ফ্রি'তে রেজিস্ট্রেশন করে ফুল ক্যাশ অন ডেলিভারিতে বিজনেস করতে পারবেন।</p>
+            </div>
+            <div class="bg-white p-6 rounded shadow-sm border border-slate-100">
+              <i class="fas fa-wallet text-3xl text-orange-500 mb-4"></i>
+              <h4 class="text-xl font-bold text-slate-800 mb-2">ইনস্ট্যান্ট পেমেন্ট</h4>
+              <p class="text-slate-500 text-sm">আপনার অর্ডার ডেলিভারি হওয়ার পর প্রফিটের টাকা উইথড্র দেওয়ার সাথে সাথেই অটোমেটিক ভাবে সেকেন্ডেই চলে যাবে।</p>
+            </div>
+            <div class="bg-white p-6 rounded shadow-sm border border-slate-100">
+              <i class="fas fa-truck text-3xl text-orange-500 mb-4"></i>
+              <h4 class="text-xl font-bold text-slate-800 mb-2">ক্যাশ অন ডেলিভারি</h4>
+              <p class="text-slate-500 text-sm">আমাদের প্ল্যাটফর্মের মাধ্যমে বিজনেস করে আপনি কাস্টমারের নিকট থেকে ফুল ক্যাশ অন ডেলিভারি কন্ডিশনে অর্ডার নিতে পারবেন।</p>
+            </div>
+            <div class="bg-white p-6 rounded shadow-sm border border-slate-100">
+              <i class="fas fa-check-circle text-3xl text-orange-500 mb-4"></i>
+              <h4 class="text-xl font-bold text-slate-800 mb-2">ভেরিফাইড প্রোডাক্টস</h4>
+              <p class="text-slate-500 text-sm">প্রোডাক্ট কোয়ালিটির দিক দিয়ে আমাদের রয়েছে ভেরিফাইড এবং বুস্টিং ক্যাটাগরির প্রোডাক্ট।</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Products from DB -->
+      <div id="products" class="bg-yellow-100/50 px-8 py-16">
+        <div class="max-w-6xl mx-auto text-center px-4 sm:px-0">
+          <h3 class="text-3xl font-bold text-slate-800 mb-2">আমাদের প্রোডাক্ট সমূহ</h3>
+          <p class="text-slate-500 mb-10">আমাদের রয়েছে অসংখ্য ক্যাটাগরির প্রোডাক্ট, যেগুলো আপনি সহজেই সেল করতে পারবেন।</p>
+          
+          <!-- Landing Products Container -->
+          <div id="landingProductsContainer" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+             <!-- Products will be injected here via JS -->
+             <div class="col-span-full py-10 text-slate-400">
+                <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                <p>প্রোডাক্ট লোড হচ্ছে...</p>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      
+      <!-- How to do business -->
+      <div class="bg-[#FFF4E6] px-8 py-16">
+        <div class="max-w-6xl mx-auto text-center px-4 sm:px-0">
+          <h3 class="text-3xl font-bold text-slate-800 mb-2">কিভাবে আমাদের মাধ্যমে বিজনেস করবেন</h3>
+          <p class="text-slate-500 mb-10">কোনরকম ঝুঁকি বা ঝামেলা ছাড়া সহজে অনলাইনে বিজনেস করুন ড্রপ শিপিং মডেলে।</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-orange-500 rounded-lg p-6 flex flex-col gap-4 text-left">
+              <div class="flex items-center gap-4 bg-white p-4 rounded shadow-sm">
+                <div class="bg-yellow-100 text-orange-600 font-bold rounded-full w-8 h-8 flex items-center justify-center shrink-0">১</div>
+                <p class="text-slate-700 text-sm">সম্পূর্ণ ফ্রি তে রেজিস্ট্রেশন করুন আমাদের প্ল্যাটফর্মে আপনার পেইজ অথবা শপ নাম দিয়ে।</p>
+              </div>
+              <div class="flex items-center gap-4 bg-white p-4 rounded shadow-sm">
+                <div class="bg-yellow-100 text-orange-600 font-bold rounded-full w-8 h-8 flex items-center justify-center shrink-0">২</div>
+                <p class="text-slate-700 text-sm">প্রোডাক্টের ছবি এবং ডেসক্রিপশন ডাউনলোড করে আপলোড করুন আপনার নিজস্ব পেজ অথবা ওয়েবসাইটে।</p>
+              </div>
+              <div class="flex items-center gap-4 bg-white p-4 rounded shadow-sm">
+                <div class="bg-yellow-100 text-orange-600 font-bold rounded-full w-8 h-8 flex items-center justify-center shrink-0">৩</div>
+                <p class="text-slate-700 text-sm">প্রোডাক্টগুলো ২০০-৩০০ টাকা প্রফিট রেখে সেল করুন অনলাইনে ডিজিটাল মার্কেটিং এর মাধ্যমে।</p>
+              </div>
+            </div>
+            
+            <div class="bg-orange-500 rounded-lg p-6 flex flex-col gap-4 text-left">
+              <div class="flex items-center gap-4 bg-white p-4 rounded shadow-sm">
+                <div class="bg-yellow-100 text-orange-600 font-bold rounded-full w-8 h-8 flex items-center justify-center shrink-0">৪</div>
+                <p class="text-slate-700 text-sm">আপনার পাওয়া অর্ডারগুলো প্লেস করে দিন আমাদের অ্যাপসের মাধ্যমে কাস্টমারের নাম ঠিকানা দিয়ে।</p>
+              </div>
+              <div class="flex items-center gap-4 bg-white p-4 rounded shadow-sm">
+                <div class="bg-yellow-100 text-orange-600 font-bold rounded-full w-8 h-8 flex items-center justify-center shrink-0">৫</div>
+                <p class="text-slate-700 text-sm">আমাদের টিম আপনার অর্ডারটি আপনার শপের নামে ইনভয়েস করে পাঠিয়ে দিবে আপনার কাস্টমারের হাতে।</p>
+              </div>
+              <div class="flex items-center gap-4 bg-white p-4 rounded shadow-sm">
+                <div class="bg-yellow-100 text-orange-600 font-bold rounded-full w-8 h-8 flex items-center justify-center shrink-0">৬</div>
+                <p class="text-slate-700 text-sm">অর্ডারটি ডেলিভারি হওয়ার সাথে সাথেই প্রফিটের টাকা পেয়ে যাবেন আপনার দেওয়া বিকাশ, নগদ অথবা ব্যাংক অ্যাকাউন্টে।</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dropshipper Reviews & Experience -->
+      <div class="bg-[#FFF4E6] px-8 py-16">
+        <div class="max-w-6xl mx-auto text-center px-4 sm:px-0">
+          <h3 class="text-3xl font-bold text-slate-800 mb-2 text-left">ড্রপশিপার রিভিউস</h3>
+          <p class="text-slate-500 mb-10 text-left">অসংখ্য সেলার এত ড্রপশিপার অত্যন্ত সন্তুষ্টির সহিত আমাদের সাথে বিজনেস করে আসছে প্রায় তিন বছর যাবত। আমাদের সার্ভিসের প্রতি তাদের আস্থা এবং সন্তুষ্টির কারনেই Bexo BD আজকে বাংলাদেশের নাম্বার ওয়ান ড্রপশিপিং প্ল্যাটফর্ম।</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-16">
+            <div class="bg-white p-6 rounded border border-slate-100 shadow-sm text-left">
+               <div class="flex items-center gap-4 mb-4">
+                 <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-400"><i class="fas fa-user text-2xl"></i></div>
+                 <div>
+                   <h4 class="font-bold text-slate-800">Sobuj Akon</h4>
+                   <div class="text-yellow-400 text-xs"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                 </div>
+               </div>
+               <p class="text-sm text-slate-600 leading-relaxed">এই প্ল্যাটফর্মে আমি বিগত ২ বছর ধরে কাজ করছি। আপনাদের পেমেন্ট সিস্টেম, স্টক সাপোর্ট, প্রোডাক্ট কোয়ালিটি এবং দ্রুত বুকিং সিস্টেম আমাকে ব্যবসায় প্রভূত সাফল্য অর্জনে সাহায্য করেছে। Bexo BD Reseller Place অ্যাপসটি আমার ব্যবসার জন্য একটি অমূল্য সম্পদ।</p>
+            </div>
+            <div class="bg-white p-6 rounded border border-slate-100 shadow-sm text-left">
+               <div class="flex items-center gap-4 mb-4">
+                 <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-400"><i class="fas fa-user text-2xl"></i></div>
+                 <div>
+                   <h4 class="font-bold text-slate-800">হৃদয়ে বাংলাদেশ</h4>
+                   <div class="text-yellow-400 text-xs"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                 </div>
+               </div>
+               <p class="text-sm text-slate-600 leading-relaxed">আমি প্রায় তিন বছর ধরে Bexo BD তে কাজ করছি। আমি কোন রকম পুঁজি বা ইনভেস্ট ছাড়াই একটা সেলস টিম তৈরি করে মাসে ৩০-৩৫ হাজার টাকা অটোমেটিক ইনকাম করছি। আপনাদের সার্ভিস, সাপোর্ট সত্যিই অসাধারণ, সত্য বলতে একটা আস্থার প্লাটফর্ম।</p>
+            </div>
+            <div class="bg-white p-6 rounded border border-slate-100 shadow-sm text-left">
+               <div class="flex items-center gap-4 mb-4">
+                 <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-400"><i class="fas fa-user text-2xl"></i></div>
+                 <div>
+                   <h4 class="font-bold text-slate-800">Salek Sakib</h4>
+                   <div class="text-yellow-400 text-xs"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                 </div>
+               </div>
+               <p class="text-sm text-slate-600 leading-relaxed">আমি কোন ধরনের মূলধন ছাড়াই আপনাদের প্রোডাক্ট নিয়ে বিজনেস করে আমি মাসে ৭০ হাজার এবং সিজনে ১.৫ লক্ষ+ টাকা ইনকাম করছি। আমি এখন পরিবারের সাথে থেকে পরিবারের হাল ধরতে পেরে Bexo BD এর প্রতি আমি চির কৃতজ্ঞতা জানাচ্ছি।</p>
+            </div>
+            <div class="bg-white p-6 rounded border border-slate-100 shadow-sm text-left">
+               <div class="flex items-center gap-4 mb-4">
+                 <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-400"><i class="fas fa-user text-2xl"></i></div>
+                 <div>
+                   <h4 class="font-bold text-slate-800">Raihanul Islam</h4>
+                   <div class="text-yellow-400 text-xs"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                 </div>
+               </div>
+               <p class="text-sm text-slate-600 leading-relaxed">বিজনেস করার মত তেমন কিছুই ছিলো না, ২০২৪ সালে আপনাদের প্রোডাক্ট নিয়ে বিজনেস শুরু করে নিজের একটি ছোট প্রতিষ্ঠান (১০জন স্টাফ) তৈরি করতে পেরেছি। আপনাদের টিমের এই সাপোর্টের জন্য শুধু ধন্যবাদ দিয়ে ছোট করতে চাই না। চাই আমরা যেন এগিয়ে যাই অনেকদূর।</p>
+            </div>
+          </div>
+
+          <h3 class="text-3xl font-bold text-slate-800 mb-2">আমাদের এক্সপেরিয়েন্স</h3>
+          <p class="text-slate-500 mb-10">আমরা প্রায় দুই বছর যাবত আমাদের অভিজ্ঞ টিমের মাধ্যমে অত্যন্ত সুনামের সাথে আমাদের সম্মানিত সেলারদের অর্ডার প্রসেস করে আসছি এছাড়াও আমাদের আরও রয়েছে......</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-8 rounded border border-slate-100 shadow-sm text-center">
+              <i class="fas fa-box text-4xl text-orange-500 mb-4"></i>
+              <p class="text-slate-600 font-medium leading-relaxed">এক দিনে সর্বোচ্চ ৫০০০+ অর্ডার সহ মাসে ৭০,০০০ অর্ডার হ্যান্ডেল করার অভিজ্ঞতা।</p>
+            </div>
+            <div class="bg-white p-8 rounded border border-slate-100 shadow-sm text-center">
+              <i class="fas fa-chart-line text-4xl text-orange-500 mb-4"></i>
+              <p class="text-slate-600 font-medium leading-relaxed">আমাদের রয়েছে এক মাসে সর্বোচ্চ ৬০ লক্ষ+ টাকা রিসেলারদের প্রফিট দেওয়ার অভিজ্ঞতা।</p>
+            </div>
+            <div class="bg-white p-8 rounded border border-slate-100 shadow-sm text-center">
+              <i class="fas fa-award text-4xl text-orange-500 mb-4"></i>
+              <p class="text-slate-600 font-medium leading-relaxed">সর্বোচ্চ পার্সেল ভলিউমের দিক দিয়ে স্টেডফাস্ট কুরিয়ারের ২য় স্থান অর্জনের অভিজ্ঞতা।</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="bg-yellow-50 pt-16 pb-8 px-8 text-sm">
+        <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 border-b border-orange-200 pb-8 mb-8">
+          <div>
+            <div class="flex items-center gap-2 mb-4 text-orange-600">
+              <i class="fas fa-shopping-bag text-2xl"></i>
+              <h2 class="text-xl font-bold">Bexo BD</h2>
+            </div>
+            <p class="text-slate-600 mb-2">Largest Drop-shipping Platform in Bangladesh</p>
+            <p class="text-slate-600 mb-1"><strong>Call:</strong> 09647300100</p>
+            <p class="text-slate-600 mb-1"><strong>Email:</strong> support@bexobd.com</p>
+            <p class="text-slate-600"><strong>Address:</strong> Dhaka-1207</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-800 mb-4 text-lg">Legal & Information</h4>
+            <ul class="space-y-2 text-slate-600">
+              <li><a href="#" class="hover:text-orange-500">Terms and Conditions</a></li>
+              <li><a href="#" class="hover:text-orange-500">Return & Refund Policy</a></li>
+              <li><a href="#" class="hover:text-orange-500">Privacy Policy</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-800 mb-4 text-lg">Menu</h4>
+            <ul class="space-y-2 text-slate-600">
+              <li><a href="#about" class="hover:text-orange-500">About Us</a></li>
+              <li><a href="#services" class="hover:text-orange-500">Our Services</a></li>
+              <li><a href="#products" class="hover:text-orange-500">Products</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="text-center text-slate-500">
+          Copyright &copy; All rights reserved by Bexo BD 2024
+        </div>
+      </footer>
+    </section>
 
     <!-- === SECTION 1: AUTHENTICATION === -->
     <section
       id="authSection"
-      class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-orange-50 to-white"
+      class="min-h-screen hidden items-center justify-center p-4 bg-gradient-to-br from-orange-50 to-white"
     >
       <div
         class="w-full max-w-6xl flex flex-col md:flex-row bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl overflow-hidden md:min-h-[650px] border border-slate-100 transition-all transform animate-scale-up"
@@ -486,6 +820,7 @@
 
         <!-- Right Form Side -->
         <div class="w-full md:w-1/2 p-4 sm:p-8 md:p-14 flex flex-col justify-center overflow-y-auto">
+          <button onclick="const l=document.getElementById('landingSection'); if(l) l.classList.remove('hidden'); document.getElementById('authSection').classList.add('hidden');" class="text-slate-400 hover:text-orange-500 font-bold mb-6 self-start flex items-center gap-2 transition-colors"><i class="fas fa-arrow-left"></i> হোম পেজ</button>
           <!-- Registration Form -->
           <div id="registerForm" class="fade-in">
             <div class="mb-8">
@@ -3836,6 +4171,41 @@
                   }
               }
 
+              function toggleFavorite(productId, imgIdx) {
+                  if (!userProfile) {
+                      showToast('লগইন করুন', 'error');
+                      return;
+                  }
+                  if (!userProfile.favorites) {
+                      userProfile.favorites = [];
+                  }
+                  
+                  const key = `${productId}-${imgIdx}`;
+                  const idx = userProfile.favorites.indexOf(key);
+                  if (idx > -1) {
+                      userProfile.favorites.splice(idx, 1);
+                      showToast('ফেভারিট থেকে রিমুভ করা হয়েছে', 'success');
+                  } else {
+                      userProfile.favorites.push(key);
+                      showToast('ফেভারিটে যোগ করা হয়েছে', 'success');
+                  }
+                  
+                  saveProfile();
+                  
+                  // Optimistic UI updates
+                  if (typeof renderAllPosts === 'function' && document.getElementById('allPostsContainer')) {
+                      const isPostDetail = document.getElementById('postDetailContainer');
+                      if (isPostDetail) {
+                          renderPostDetail(productId, imgIdx);
+                      } else if (currentMenu === 'favorites' && typeof renderFavorites === 'function') {
+                          renderFavorites();
+                      } else {
+                          renderAllPosts();
+                      }
+                  }
+              }
+
+
               // copyToClipboard is defined once later in the file
 
               // Passive Heartbeat for last active tracking
@@ -3907,6 +4277,8 @@
                       if (auth && dash) {
                           auth.classList.add('hidden');
                           dash.classList.remove('hidden');
+                          var landing = document.getElementById('landingSection');
+                          if(landing) landing.classList.add('hidden');
                       }
                   }
                   renderHome();
@@ -4247,11 +4619,15 @@
 
                   const auth = document.getElementById('authSection');
                   const dash = document.getElementById('dashboardSection');
+                  var landing = document.getElementById('landingSection');
+                  if(landing) landing.classList.add('hidden');
 
                   auth.classList.add('hidden');
-                  dash.classList.remove('hidden');
-                  dash.classList.add('fade-in');
-                  renderHome();
+                          dash.classList.remove('hidden');
+                          dash.classList.add('fade-in');
+                          var landing = document.getElementById('landingSection');
+                          if(landing) landing.classList.add('hidden');
+                          renderHome();
                   window.scrollTo({ top: 0, behavior: 'smooth' });
               }
 
@@ -4434,6 +4810,8 @@
                           auth.classList.add('hidden');
                           dash.classList.remove('hidden');
                           dash.classList.add('fade-in');
+                          var landing = document.getElementById('landingSection');
+                          if(landing) landing.classList.add('hidden');
                           renderHome();
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                       } else {
@@ -4456,8 +4834,15 @@
                   const auth = document.getElementById('authSection');
                   const dash = document.getElementById('dashboardSection');
                   const admin = document.getElementById('adminSection');
+                  var landing = document.getElementById('landingSection');
 
-                  auth.classList.remove('hidden');
+                  if (landing) {
+                      landing.classList.remove('hidden');
+                      auth.classList.add('hidden');
+                  } else {
+                      auth.classList.remove('hidden');
+                  }
+                  
                   dash.classList.add('hidden');
                   admin.classList.add('hidden');
 
@@ -8000,7 +8385,8 @@
                       const matchMain = filterMain === 'সব' || p.category === filterMain;
                       const matchSub = filterSub === 'all' || p.subCategory === filterSub;
                       const isPublished = p.isPublished !== false; // Active products by default, unless explicitly unpublished
-                      return matchMain && matchSub && isPublished;
+                      const isStockOut = p.isStockOut === true || (p.stockCount !== undefined && p.stockCount <= 0);
+                      return matchMain && matchSub && isPublished && !isStockOut;
                   }).sort((a, b) => Number(b.id) - Number(a.id));
 
                   if (filtered.length === 0) {
@@ -8314,8 +8700,8 @@
                                       ` : ''}
                                       <div class="space-y-4">
                                           <h3 class="text-xs font-black text-slate-800 border-b border-slate-100 pb-4 uppercase tracking-widest">পণ্যের বিবরণ</h3>
-                                          <div class="text-[12px] text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">${p.desc}\n\n${p.details || ''}</div>
-                                          <button onclick="copyToClipboard(\`${p.title}\\n\\n${p.desc}\\n\\n${p.details || ''}\`)" class="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-6 py-2 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all font-black text-[9px] uppercase tracking-widest mt-4">
+                                          <div class="text-[12px] text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">${p.desc}${p.details || ''}</div>
+                                          <button onclick="copyToClipboard(\`${p.title}\\${p.desc}\\${p.details || ''}\`)" class="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-6 py-2 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all font-black text-[9px] uppercase tracking-widest mt-4">
                                               <i class="fas fa-copy"></i> কপি করুন
                                           </button>
                                       </div>
@@ -9631,7 +10017,7 @@
                                   </div>
 
                                   <div class="text-slate-700 font-bold text-sm leading-relaxed space-y-4">
-                                      <p class="text-emerald-700">অ্যাকাউন্টের নিরাপত্তা: আপনার অ্যাকাউন্টের পাসওয়ার্ড কোন অবস্থাতেই কাউকে শেয়ার করবেন না। অ্যাকাউন্ট করার সাথে সাথে আপনার নগদ এবং বিকাশ নাম্বার অ্যাড করে ফেলবেন, তাহলে কেউ পাসওয়ার্ড পেয়ে গেলেও উইথড্র দিতে পারবে না। কোন ধরনের প্রবলেম হওয়ার সাথে সাথে শপবেইজের সাপোর্ট নাম্বারে যোগাযোগ করবেন।</p>
+                                      <p class="text-emerald-700">অ্যাকাউন্টের নিরাপত্তা: আপনার অ্যাকাউন্টের পাসওয়ার্ড কোন অবস্থাতেই কাউকে শেয়ার করবেন না। অ্যাকাউন্ট করার সাথে সাথে আপনার নগদ এবং বিকাশ নাম্বার অ্যাড করে ফেলবেন, তাহলে কেউ পাসওয়ার্ড পেয়ে গেলেও উইথড্র দিতে পারবে না। কোন ধরনের প্রবলেম হওয়ার সাথে সাথে Bexo BD এর সাপোর্ট নাম্বারে যোগাযোগ করবেন।</p>
                                       <p class="text-emerald-700">ফ্রি মেম্বারশিপ: আমাদের প্ল্যাটফর্মে কাজ করার জন্য এবং সেলার কোড পাওয়ার জন্য কোন রকম টাকা বা ফীর প্রয়োজন নেই। আপনারা সুযোগ নিয়ে কারো কাছ থেকে কোন টাকা নিবেন না এবং দিবেন না।</p>
                                   </div>
                               </div>
@@ -10421,6 +10807,7 @@
                   const filtered = appPosts.filter(p => {
                       const isPublished = p.isPublished !== false;
                       if (!isPublished) return false;
+                      if (p.isStockOut === true) return false;
 
                       if (category && subCategory && (p.category !== category || p.subCategory !== subCategory)) return false;
                       else if (category && !subCategory && p.category !== category) return false;
@@ -11658,7 +12045,14 @@
                                                   <div class="space-y-4">
                                                       <div class="space-y-2">
                                                           <label class="text-[10px] uppercase font-black text-slate-400 tracking-widest">ছবির লিঙ্ক (ম্যানুয়াল)</label>
-                                                          <textarea id="apImages" rows="3" class="w-full px-6 py-3.5 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-orange-500 font-bold text-xs transition-all resize-none font-mono" placeholder="ছবির লিঙ্ক এখানে দিন (প্রতি লাইনে একটি)...">${p ? p.images.join('\n') : ''}</textarea>
+                                                          <textarea id="apImages" rows="3" class="w-full px-6 py-3.5 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-orange-500 font-bold text-xs transition-all resize-none font-mono" placeholder="ছবির লিঙ্ক এখানে দিন (প্রতি লাইনে একটি)...">${p ? p.images.join('') : ''}</textarea>
+                                                          ${!p ? `<div class="flex items-center gap-2 mt-2">
+                                                              <label class="relative inline-flex items-center cursor-pointer">
+                                                                  <input type="checkbox" id="apBulkUpload" class="sr-only peer">
+                                                                  <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                                              </label>
+                                                              <span class="text-[11px] font-bold text-slate-500">প্রতিটি ছবির জন্য আলাদা প্রোডাক্ট তৈরি করুন (Bulk Upload)</span>
+                                                          </div>` : ''}
                                                       </div>
                                                       <div class="space-y-2">
                                                           <label class="text-[10px] uppercase font-black text-slate-400 tracking-widest">বিস্তারিত তথ্য (টেকনিক্যাল ডিটেইলস)</label>
@@ -14259,7 +14653,7 @@
                   }
 
                   // Image handling
-                  let finalImages = imagesText.split('\n').map(l => l.trim()).filter(l => l !== '');
+                  let finalImages = imagesText.split('').map(l => l.trim()).filter(l => l !== '');
                   if (typeof adminUploadedImages !== 'undefined' && adminUploadedImages.length > 0) {
                       finalImages = [...adminUploadedImages, ...finalImages];
                   }
@@ -14268,48 +14662,91 @@
                       finalImages = [`https://picsum.photos/seed/${Date.now()}/800/600`];
                   }
 
-                  const postData = {
-                      id: pId || Date.now(),
-                      author: 'বেক্সো অফিসিয়াল',
-                      time: pId ? (appPosts.find(p => String(p.id) === String(pId))?.time || 'এইমাত্র') : 'এইমাত্র',
-                      category: cat,
-                      subCategory: sub,
-                      price: price,
-                      costPrice: costPrice,
-                      maxSellingPrice: suggestedMaxPrice,
-                      stockCount: stockCount,
-                      unitType: unitType,
-                      variants: variants, // Save new variant structure
-                      availableSizes: variants.find(v => v.name.toLowerCase() === 'size')?.options || [], // Fallback for legacy display
-                      discountAmount: discountAmount,
-                      remarks: remarks,
-                      isVerified: true,
-                      rating: 5,
-                      title: title,
-                      desc: "", // Removed from UI
-                      details: details,
-                      images: finalImages,
-                      imageCount: finalImages.length,
-                      videoUrl: document.getElementById('apVideoUrl') ? document.getElementById('apVideoUrl').value.trim() : '',
-                      isStockOut: isStockOut,
-                      sku: sku,
-                      isPublished: autoPost
-                  };
+                  const isBulkUpload = !pId && document.getElementById('apBulkUpload') && document.getElementById('apBulkUpload').checked;
+                  
+                  let newPosts = [];
+                  
+                  if (isBulkUpload && finalImages.length > 1) {
+                      newPosts = finalImages.map((img, i) => {
+                          return {
+                              id: Date.now() + i,
+                              author: 'বেক্সো অফিসিয়াল',
+                              time: 'এইমাত্র',
+                              category: cat,
+                              subCategory: sub,
+                              price: price,
+                              costPrice: costPrice,
+                              maxSellingPrice: suggestedMaxPrice,
+                              stockCount: stockCount,
+                              unitType: unitType,
+                              variants: variants,
+                              availableSizes: variants.find(v => v.name.toLowerCase() === 'size')?.options || [],
+                              discountAmount: discountAmount,
+                              remarks: remarks,
+                              isVerified: true,
+                              rating: 5,
+                              title: title,
+                              desc: "",
+                              details: details,
+                              images: [img],
+                              imageCount: 1,
+                              videoUrl: document.getElementById('apVideoUrl') ? document.getElementById('apVideoUrl').value.trim() : '',
+                              isStockOut: isStockOut,
+                              sku: sku + (i > 0 ? '-' + i : ''),
+                              isPublished: autoPost
+                          };
+                      });
+                  } else {
+                      newPosts = [{
+                          id: pId || Date.now(),
+                          author: 'বেক্সো অফিসিয়াল',
+                          time: pId ? (appPosts.find(p => String(p.id) === String(pId))?.time || 'এইমাত্র') : 'এইমাত্র',
+                          category: cat,
+                          subCategory: sub,
+                          price: price,
+                          costPrice: costPrice,
+                          maxSellingPrice: suggestedMaxPrice,
+                          stockCount: stockCount,
+                          unitType: unitType,
+                          variants: variants,
+                          availableSizes: variants.find(v => v.name.toLowerCase() === 'size')?.options || [],
+                          discountAmount: discountAmount,
+                          remarks: remarks,
+                          isVerified: true,
+                          rating: 5,
+                          title: title,
+                          desc: "",
+                          details: details,
+                          images: finalImages,
+                          imageCount: finalImages.length,
+                          videoUrl: document.getElementById('apVideoUrl') ? document.getElementById('apVideoUrl').value.trim() : '',
+                          isStockOut: isStockOut,
+                          sku: sku,
+                          isPublished: autoPost
+                      }];
+                  }
 
                   if (pId) {
                       const idx = appPosts.findIndex(p => String(p.id) === String(pId));
-                      if (idx > -1) appPosts[idx] = postData;
+                      if (idx > -1) appPosts[idx] = newPosts[0];
                   } else {
-                      appPosts.unshift(postData);
+                      appPosts.unshift(...newPosts);
                   }
                   savePosts();
+
                   if (window.db) {
-                      window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForFirestore(postData))
-                          .catch(err => console.error("Firebase save post error:", err));
+                      newPosts.forEach(postData => {
+                          window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForFirestore(postData))
+                              .catch(err => console.error("Firebase save post error:", err));
+                      });
                   }
 
                   // Success feedback
-                  showToast(pId ? "পণ্যটি সফলভাবে আপডেটেড হয়েছে!" : "পণ্যটি সফলভাবে সংরক্ষিত হয়েছে!");
+                  if (newPosts.length > 1) {
+                      showToast(newPosts.length + " টি পণ্য সফলভাবে সংরক্ষিত হয়েছে!");
+                  } else {
+                      showToast(pId ? "পণ্যটি সফলভাবে আপডেটেড হয়েছে!" : "পণ্যটি সফলভাবে সংরক্ষিত হয়েছে!");
+                  }
 
                   // Refresh view
                   renderAdminPostList();
@@ -17345,6 +17782,7 @@
 
                       if (type === 'name') {
                           filtered = appPosts.filter(p => {
+                              if (p.isPublished === false || p.isStockOut === true) return false;
                               return searchKeywords.every(keyword =>
                                   p.title.toLowerCase().includes(keyword) ||
                                   (p.desc && p.desc.toLowerCase().includes(keyword)) ||
@@ -17353,7 +17791,7 @@
                               );
                           });
                       } else if (type === 'sku') {
-                          filtered = appPosts.filter(p => p.sku && p.sku.toLowerCase().includes(inputVal));
+                          filtered = appPosts.filter(p => p.sku && p.sku.toLowerCase().includes(inputVal) && p.isPublished !== false && p.isStockOut !== true);
                       }
 
                       filtered.sort((a, b) => Number(b.id) - Number(a.id));
@@ -19290,7 +19728,7 @@
                         return;
                     }
 
-                    if (!confirm(`আপনি কি নিশ্চিত যে আপনি সকল ${settlements.length}টি নিষ্পত্তির রেকর্ড এবং প্রফিট অডিট ট্রেইল ডিলিট করতে চান?\nএটি ডাটাবেস থেকে স্থায়ীভাবে মুছে যাবে!`)) {
+                    if (!confirm(`আপনি কি নিশ্চিত যে আপনি সকল ${settlements.length}টি নিষ্পত্তির রেকর্ড এবং প্রফিট অডিট ট্রেইল ডিলিট করতে চান?এটি ডাটাবেস থেকে স্থায়ীভাবে মুছে যাবে!`)) {
                         return;
                     }
 
@@ -20154,6 +20592,100 @@ function verifySuperAdminPin() {
                        `;
                     }).join('');
                 }
+
+// --- LANDING PAGE LOGIC ---
+window.showAuth = function(isLogin) {
+    var landing = document.getElementById('landingSection');
+    const auth = document.getElementById('authSection');
+    
+    if (landing) landing.classList.add('hidden');
+    if (auth) {
+        auth.classList.remove('hidden');
+        auth.classList.add('flex');
+    }
+    
+    // Call the existing toggleAuth function which switches between login and register forms
+    if (typeof toggleAuth === 'function') {
+        toggleAuth(isLogin);
+    }
+};
+
+async function loadLandingProducts() {
+    const container = document.getElementById('landingProductsContainer');
+    if (!container) return;
+    
+    try {
+        const snapshot = await window.db.collection('bexo_categories').get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="col-span-full py-10 text-slate-400">কোন প্রোডাক্ট পাওয়া যায়নি।</div>';
+            return;
+        }
+        
+        let allItems = [];
+        snapshot.forEach(doc => {
+            const cat = doc.data();
+            if (cat.subCategories && Array.isArray(cat.subCategories)) {
+                cat.subCategories.forEach(sub => {
+                    if (sub.image) {
+                        allItems.push({
+                            name: sub.name || cat.name,
+                            image: sub.image,
+                            order: sub.order || 999
+                        });
+                    }
+                });
+            } else if (cat.image) {
+                allItems.push({
+                    name: cat.name,
+                    image: cat.image,
+                    order: cat.order || 999
+                });
+            }
+        });
+        
+        allItems.sort((a,b) => a.order - b.order);
+        allItems = allItems.slice(0, 24);
+        
+        if (allItems.length === 0) {
+            container.innerHTML = '<div class="col-span-full py-10 text-slate-400">কোন প্রোডাক্ট পাওয়া যায়নি।</div>';
+            return;
+        }
+        
+        let htmlStr = '';
+        allItems.forEach(item => {
+            const imageUrl = item.image || 'https://via.placeholder.com/150';
+            const name = item.name || 'Unknown';
+            
+            htmlStr += `
+              <div class="bg-white rounded-lg shadow-sm border border-slate-100 overflow-hidden flex flex-col items-center justify-center p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="showAuth(false)">
+                <img src="${imageUrl}" alt="${name}" class="w-full h-32 object-contain mb-3" onerror="this.src='https://via.placeholder.com/150'" />
+                <h4 class="text-slate-700 font-medium text-sm text-center">${name}</h4>
+              </div>
+            `;
+        });
+        
+        container.innerHTML = htmlStr;
+        
+    } catch (error) {
+        console.error("Error loading landing products:", error);
+        container.innerHTML = '<div class="col-span-full py-10 text-rose-400 text-center text-sm"><i class="fas fa-exclamation-triangle mb-2 text-2xl"></i><br/>প্রোডাক্ট লোড করতে সমস্যা হয়েছে।</div>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.db !== null && typeof window.db !== 'undefined') {
+        loadLandingProducts();
+    } else {
+        const interval = setInterval(() => {
+            if (window.db !== null && typeof window.db !== 'undefined') {
+                clearInterval(interval);
+                loadLandingProducts();
+            }
+        }, 500);
+        setTimeout(() => clearInterval(interval), 10000);
+    }
+});
 </script>
   </body>
 </html>
