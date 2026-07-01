@@ -7390,8 +7390,23 @@
                }
 
                function triggerProxyDownload(url, filename) {
-                    const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
-                    window.location.href = proxyUrl;
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '/api/proxy-download';
+                    form.target = '_self';
+                    
+                    const urlInput = document.createElement('input');
+                    urlInput.type = 'hidden';
+                    urlInput.name = 'url';
+                    urlInput.value = url;
+                    
+                    form.appendChild(urlInput);
+                    document.body.appendChild(form);
+                    form.submit();
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(form);
+                    }, 1000);
                 }
 
                function triggerLocalDownload(blob, filename) {
@@ -7408,232 +7423,37 @@
                    }, 1500);
                }
 
-               async function downloadImage(url) {
+                              async function downloadImage(url) {
                    if (!url) return;
-                   
-                   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth < 768);
-                   
-                   let ext = 'jpg';
+                   let ext = "jpg";
                    try {
-                       const cleanUrl = url.split('?')[0];
-                       const parts = cleanUrl.split('.');
+                       const cleanUrl = url.split("?")[0];
+                       const parts = cleanUrl.split(".");
                        if (parts.length > 1) {
                            const possibleExt = parts[parts.length - 1].toLowerCase();
-                           if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(possibleExt)) {
+                           if (["jpg", "jpeg", "png", "webp", "gif"].includes(possibleExt)) {
                                ext = possibleExt;
                            }
                        }
                    } catch(e) {}
                    const filename = `bexobd-${Date.now()}.${ext}`;
-
-                   const bottomSheetId = 'bexobd-down-sheet-' + Date.now();
                    
-                   if (isMobile) {
-                       // Clean any existing download help drawers
-                       const existingSheets = document.querySelectorAll('[id^="bexobd-down-sheet-"]');
-                       existingSheets.forEach(el => el.remove());
-                       
-                       // Insert an elegant, premium, floating bottom-sheet helper
-                       const sheetHTML = `
-                           <div id="${bottomSheetId}" class="fixed inset-0 z-[10000] flex items-end justify-center bg-slate-900/60 backdrop-blur-xs transition-opacity duration-300">
-                               <div class="bg-white w-full max-w-md rounded-t-[2.5rem] p-6 pb-8 shadow-2xl relative translate-y-full transition-transform duration-300 ease-out flex flex-col items-center text-center space-y-4">
-                                   
-                                   <!-- Handle -->
-                                   <div class="w-12 h-1 bg-slate-200 rounded-full mb-1"></div>
-                                   
-                                   <!-- Close button -->
-                                   <button onclick="closeDownloadSheet('${bottomSheetId}')" class="absolute top-4 right-6 w-8 h-8 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-all z-10 font-bold">
-                                       <i class="fas fa-times"></i>
-                                   </button>
-                                   
-                                   <div class="flex flex-col items-center">
-                                       <div id="${bottomSheetId}-icon-container" class="w-12 h-12 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mb-2 animate-pulse">
-                                           <i class="fas fa-spinner fa-spin text-lg"></i>
-                                       </div>
-                                       <h3 id="${bottomSheetId}-title" class="text-base font-black text-slate-800">ডাউনলোড প্রস্তুত হচ্ছে...</h3>
-                                       <p id="${bottomSheetId}-sub" class="text-xs text-slate-500 font-medium px-4 mt-1">দয়া করে কিছুক্ষণ অপেক্ষা করুন, ইমেজটি তৈরি করা হচ্ছে।</p>
-                                   </div>
-
-                                   <!-- Preview image -->
-                                   <div id="${bottomSheetId}-preview-container" class="hidden relative bg-slate-50 p-1.5 rounded-2xl border border-slate-100 max-h-[140px] overflow-hidden flex justify-center items-center">
-                                       <img id="${bottomSheetId}-preview-img" src="" class="max-h-[120px] object-contain rounded-xl shadow-xs" />
-                                   </div>
-
-                                   <!-- Actions -->
-                                   <div id="${bottomSheetId}-actions" class="w-full hidden flex flex-col gap-2 px-2">
-                                       <button id="${bottomSheetId}-btn-share" class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm">
-                                           <i class="fas fa-share-alt text-sm"></i> শেয়ার ও সরাসরি গ্যালারিতে সেভ
-                                       </button>
-                                       
-                                       <button id="${bottomSheetId}-btn-longpress" class="w-full py-3 bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 border border-teal-100">
-                                           <i class="fas fa-fingerprint text-sm"></i> ২ সেকেন্ড চেপে ধরুন (গ্যালারি সেভ গাইড)
-                                       </button>
-
-                                       <button id="${bottomSheetId}-btn-file" class="w-full py-3 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-2">
-                                           <i class="fas fa-file-download text-sm text-blue-500"></i> পুনরায় ডাউনলোড করুন (ফাইল ম্যানেজার)
-                                       </button>
-                                   </div>
-
-                                   <!-- Helpful Tip -->
-                                   <div class="bg-amber-50 rounded-xl p-3 border border-amber-100/70 text-left w-full text-xs">
-                                       <p class="text-amber-900 leading-relaxed font-medium flex gap-2">
-                                           <i class="fas fa-info-circle text-amber-600 text-sm shrink-0"></i>
-                                           <span><strong>টিউটোরিয়াল:</strong> যদি ফোনে ছবি খুঁজে না পান, তবে <strong>"শেয়ার ও সরাসরি গ্যালারিতে সেভ"</strong> চাপুন এবং 'Save Image' নির্ধারণ করুন।</span>
-                                       </p>
-                                   </div>
-                               </div>
-                           </div>
-                       `;
-                       document.body.insertAdjacentHTML('beforeend', sheetHTML);
-                       
-                       // Animate bottom drawer up
-                       setTimeout(() => {
-                           const sheet = document.getElementById(bottomSheetId);
-                           if (sheet) {
-                               const content = sheet.querySelector('.bg-white');
-                               if (content) {
-                                   content.classList.remove('translate-y-full');
-                               }
-                           }
-                       }, 50);
-                   } else {
-                       showToast("ডাউনলোড শুরু হচ্ছে...", "success");
-                   }
+                   showToast("ডাউনলোড শুরু হচ্ছে...", "success");
 
                    try {
-                       // 1. Core download setup & fetching
-                       const blob = await getSafeBlob(url);
-                       const mime = blob.type || 'image/jpeg';
-                       
-                       // 2. Fire direct simulated automatic click download
-                        if (isMobile) { triggerProxyDownload(url, filename); } else
-                       triggerLocalDownload(blob, filename);
-
-                       if (isMobile) {
-                           const sheet = document.getElementById(bottomSheetId);
-                           if (sheet) {
-                               // Change loading state to success custom icon
-                               const iconContainer = document.getElementById(`${bottomSheetId}-icon-container`);
-                               if (iconContainer) {
-                                   iconContainer.classList.remove('animate-pulse', 'bg-orange-50', 'text-orange-600');
-                                   iconContainer.classList.add('bg-emerald-50', 'text-emerald-500');
-                                   iconContainer.innerHTML = `<i class="fas fa-check-circle text-2xl animate-spin-once"></i>`;
-                               }
-                               
-                               // Adjust messages
-                               const titleEl = document.getElementById(`${bottomSheetId}-title`);
-                               if (titleEl) titleEl.innerText = "ডাউনলোড সম্পন্ন হয়েছে!";
-                               
-                               const subEl = document.getElementById(`${bottomSheetId}-sub`);
-                               if (subEl) subEl.innerText = "ছবিটি আপনার মোবাইলের 'Download' ফোল্ডারে পাঠানো হয়েছে।";
-
-                               // Set preview image source using blob URL safely
-                               const previewContainer = document.getElementById(`${bottomSheetId}-preview-container`);
-                               const previewImg = document.getElementById(`${bottomSheetId}-preview-img`);
-                               if (previewContainer && previewImg) {
-                                   const localBlobUrl = URL.createObjectURL(blob);
-                                   previewImg.src = localBlobUrl;
-                                   previewContainer.classList.remove('hidden');
-                               }
-
-                               // Render interactive mobile option buttons
-                               const actionsBlock = document.getElementById(`${bottomSheetId}-actions`);
-                               if (actionsBlock) actionsBlock.classList.remove('hidden');
-
-                               // Set click triggers
-                               // Trigger Share sheet securely (gesture matches this button click perfectly)
-                               const shareBtn = document.getElementById(`${bottomSheetId}-btn-share`);
-                                if (shareBtn) {
-                                    shareBtn.onclick = async () => {
-                                        try {
-                                            const file = new File([blob], filename, { type: mime });
-                                            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                                                await navigator.share({ files: [file], title: 'BexoBd Product', text: 'BexoBd product image' });
-                                                showToast("শেয়ার সম্পন্ন হয়েছে!", "success");
-                                            } else {
-                                                triggerProxyDownload(url, filename);
-                                                showToast("শেয়ার সুবিধা অপ্রতুল, সরাসরি ডাউনলোড শুরু হয়েছে।", "info");
-                                            }
-                                        } catch (e) {
-                                            console.log("Share failed, fallback download:", e);
-                                            triggerProxyDownload(url, filename);
-                                        }
-                                    };
-                                }
-                                const dummyShareBtn = null;
-                                if (false)
-                               if (shareBtn) {
-                                   shareBtn.onclick = async () => {
-                                       try {
-                                           const file = new File([blob], filename, { type: mime });
-                                           if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                                               await navigator.share({
-                                                   files: [file],
-                                                   title: 'BexoBd Product',
-                                                   text: 'BexoBd dropshipping product image'
-                                               });
-                                               showToast("শেয়ার সম্পন্ন হয়েছে!", "success");
-                                           } else {
-                                               showToast("এই লিঙ্কে ছবি শেয়ার সাপোর্টেড নয়!", "error");
-                                           }
-                                       } catch (shareErr) {
-                                           console.log("Share API closed or cancelled:", shareErr);
-                                       }
-                                   };
-                               }
-
-                               // Long-press flow modal
-                               const lpBtn = document.getElementById(`${bottomSheetId}-btn-longpress`);
-                               if (lpBtn) {
-                                   lpBtn.onclick = () => {
-                                       const localBlobUrl = URL.createObjectURL(blob);
-                                       const overlayId = 'bexobd-lp-overlay-' + Date.now();
-                                       const overlayHTML = `
-                                           <div id="${overlayId}" class="fixed inset-0 z-[11000] bg-slate-950/95 flex flex-col items-center justify-center p-4">
-                                               <!-- Close -->
-                                               <button onclick="document.getElementById('${overlayId}').remove()" class="absolute top-6 right-6 w-10 h-10 bg-white/10 text-white rounded-full flex items-center justify-center hover:bg-rose-600 transition-all font-bold">
-                                                   <i class="fas fa-times"></i>
-                                               </button>
-
-                                               <div class="text-center text-white max-w-sm space-y-2 mb-6 px-4">
-                                                   <h4 class="text-sm font-black text-amber-400">মোবাইল গ্যালারি সেভ গাইড</h4>
-                                                   <p class="text-[11px] text-slate-300 leading-relaxed">ছবির ওপরে <span class="bg-amber-400 text-slate-950 font-bold px-1 rounded">২ সেকেন্ড চেপে ধরুন (Long Press)</span> এবং পপ-আপ থেকে <span class="text-amber-400 font-semibold font-sans">"Download Image" / "Save Image"</span> অপশন সিলেক্ট করুন।</p>
-                                               </div>
-
-                                               <div class="relative max-w-full max-h-[55vh] flex items-center justify-center border-2 border-dashed border-slate-700 p-2 rounded-2xl bg-slate-900">
-                                                   <img src="${localBlobUrl}" class="max-w-full max-h-[50vh] object-contain rounded-xl select-all pointer-events-auto" style="-webkit-touch-callout: default !important; -webkit-user-select: auto !important; -moz-user-select: auto !important; user-select: auto !important;" />
-                                               </div>
-
-                                               <button onclick="document.getElementById('${overlayId}').remove()" class="mt-8 px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md">
-                                                   ফিরে যান
-                                               </button>
-                                           </div>
-                                       `;
-                                       document.body.insertAdjacentHTML('beforeend', overlayHTML);
-                                   };
-                               }
-
-                               // File manual Redownloader
-                               const fileBtn = document.getElementById(`${bottomSheetId}-btn-file`);
-                               if (fileBtn) { fileBtn.onclick = () => { triggerProxyDownload(url, filename); showToast("ডাউনলোড পুনরায় শুরু করা হয়েছে", "success"); }; }
-                               const dummyFileBtn = null;
-                               if (false)
-                               if (fileBtn) {
-                                   fileBtn.onclick = () => {
-                                       triggerLocalDownload(blob, filename);
-                                       showToast("ডাউনলোড পুনরায় শুরু করা হয়েছে", "success");
-                                   };
-                               }
-                           }
+                       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth < 768);
+                       if (url.startsWith("data:") || url.startsWith("blob:")) {
+                           const blob = await getSafeBlob(url);
+                           triggerLocalDownload(blob, filename);
+                       } else if (isMobile) {
+                           triggerProxyDownload(url, filename);
                        } else {
-                           showToast("ডাউনলোড সম্পন্ন হয়েছে!", "success");
+                           const blob = await getSafeBlob(url);
+                           triggerLocalDownload(blob, filename);
                        }
-                   } catch (err) {
-                       console.error("Preparation failed:", err);
+                   } catch (error) {
+                       console.error("Download failed:", error);
                        showToast("ডাউনলোড ব্যর্থ হয়েছে!", "error");
-                       if (isMobile) {
-                           closeDownloadSheet(bottomSheetId);
-                       }
                    }
                }
 
