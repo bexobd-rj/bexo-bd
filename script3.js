@@ -7381,10 +7381,19 @@
                            console.log("Direct client fetch failed, attempting proxy fetch:", e);
                        }
                        
-                       // Fallback to proxy-download
-                       const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-                       const res = await fetch(proxyUrl);
-                       if (res.ok) return await res.blob();
+                       // Try our own proxy first
+                       try {
+                           const proxyUrl1 = `/api/proxy-download?url=${encodeURIComponent(url)}`;
+                           const res1 = await fetch(proxyUrl1);
+                           if (res1.ok) return await res1.blob();
+                       } catch (e) {
+                           console.log("Own proxy failed, falling back to allorigins:", e);
+                       }
+                       
+                       // Fallback to allorigins
+                       const proxyUrl2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                       const res2 = await fetch(proxyUrl2);
+                       if (res2.ok) return await res2.blob();
                        throw new Error("Unable to fetch image content via proxy");
                    }
                }
