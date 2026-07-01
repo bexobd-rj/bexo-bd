@@ -138,7 +138,7 @@ async function startServer() {
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Type", "application/octet-stream");
       res.setHeader("Content-Disposition", `attachment; filename="bexobd-${Date.now()}.${ext}"`);
       res.send(buffer);
     } catch (error) {

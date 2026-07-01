@@ -10657,16 +10657,7 @@
                                       </div>
                                   </div>
                                   
-                                  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                      <input type="text" id="prodSearchQuery" value="${window.productSearchQuery}" placeholder="প্রোডাক্ট খুঁজুন (নাম বা আইডি)..." class="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-100 transition-all">
-                                      <input type="number" id="prodPriceMin" value="${window.productPriceMin}" placeholder="সর্বনিম্ন মূল্য (৳)" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-100 transition-all">
-                                      <div class="flex gap-2">
-                                          <input type="number" id="prodPriceMax" value="${window.productPriceMax}" placeholder="সর্বোচ্চ মূল্য (৳)" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-100 transition-all">
-                                          <button onclick="applyProductFilters('${category || ''}', '${subCategory || ''}')" class="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-md">
-                                              <i class="fas fa-search"></i> খুঁজুন
-                                          </button>
-                                      </div>
-                                  </div>
+
                               </div>
 
                               <div id="productGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 lg:gap-3">
@@ -15024,8 +15015,7 @@
                                                                    <i class="fas fa-comment shadow-xs mr-1"></i> সেলার কমেন্ট: ${o.comment}
                                                                </div>
                                                                ` : ''}
-                                                               <p style="display:none"
-                                                              </p>
+                                                               <span style="display:none;">${o.secretToken || ''} ${o.paymentCode || ''}</span>
                                                           </div>
                                                       </td>
                                                       <td class="px-8 py-8">
@@ -15127,7 +15117,7 @@
                   const query = document.getElementById('adminOrderSearch').value.toLowerCase();
                   const rows = document.querySelectorAll('tbody tr');
                   rows.forEach(row => {
-                      const text = row.innerText.toLowerCase();
+                      const text = row.textContent.toLowerCase();
                       row.style.display = text.includes(query) ? '' : 'none';
                   });
               }
@@ -18446,7 +18436,8 @@
                                <!-- Chat-like Timeline -->
                                <div class="space-y-6 max-w-2xl mx-auto">
                                    ${(() => {
-                                       const filteredHistory = (o.history || []).filter(h => !h.message || (!h.message.includes("পেমেন্ট কোড") && !h.message.includes("Payment Code") && !h.message.includes("paymentCode") && !h.message.includes("payment code")));
+                                       const mappedHistory = (o.history || []).map((h, originalIndex) => ({...h, originalIndex}));
+                                       const filteredHistory = mappedHistory.filter(h => !h.message || (!h.message.includes("পেমেন্ট কোড") && !h.message.includes("Payment Code") && !h.message.includes("paymentCode") && !h.message.includes("payment code")));
                                        return filteredHistory.length === 0 ? `
                                            <div class="text-center py-12 bg-white rounded-[2rem] border border-dashed border-slate-200">
                                                <i class="fas fa-history text-4xl text-slate-100 mb-4"></i>
@@ -18458,13 +18449,16 @@
                                                    <i class="${h.actor === 'Admin' ? 'fas fa-shield-alt text-orange-600' : 'fas fa-user-circle text-blue-500'} text-sm"></i>
                                                </div>
                                                <div class="flex-1 space-y-1">
-                                                   <div class="flex items-center gap-3">
-                                                       <span class="text-[10px] font-black text-slate-800 uppercase tracking-widest">${h.actor || 'System'}</span>
-                                                       <span class="text-[9px] text-slate-400 font-bold">${h.time}</span>
+                                                   <div class="flex items-center justify-between gap-3">
+                                                       <div class="flex items-center gap-3">
+                                                           <span class="text-[10px] font-black text-slate-800 uppercase tracking-widest">${h.actor || 'System'}</span>
+                                                           <span class="text-[9px] text-slate-400 font-bold">${h.time}</span>
+                                                       </div>
+                                                       ${isAdminMode ? `<button onclick="window.adminDeleteHistoryNote('${o.id}', ${h.originalIndex})" class="text-rose-400 hover:text-rose-600 transition-colors p-1" title="নোট ডিলেট করুন"><i class="fas fa-trash-alt text-xs"></i></button>` : ''}
                                                    </div>
                                                    <div class="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm relative">
                                                        <div class="absolute left-[-6px] top-4 w-3 h-3 bg-white border-l border-b border-slate-100 rotate-45"></div>
-                                                       <p class="text-xs text-slate-600 leading-relaxed font-bold">${h.message}</p>
+                                                       <p class="text-xs text-slate-600 leading-relaxed font-bold whitespace-pre-wrap">${h.message}</p>
                                                    </div>
                                                </div>
                                            </div>
@@ -18743,7 +18737,27 @@
 
               let isAdminMode = false;
 
-              function adminAddHistoryNote(orderId, note) {
+              window.adminDeleteHistoryNote = function(orderId, noteIndex) {
+                  if (localStorage.getItem("bexo_is_admin") !== "true") { showToast("Unauthorized access!", "error"); return; }
+                  
+                  const idx = appOrders.findIndex(o => String(o.id) === String(orderId));
+                  if(idx === -1) return;
+
+                  if (appOrders[idx].history) {
+                      let hist = appOrders[idx].history;
+                      if (!Array.isArray(hist)) hist = Object.values(hist);
+
+                      if (hist[noteIndex]) {
+                          hist.splice(noteIndex, 1);
+                          appOrders[idx].history = hist;
+                          saveOrders(orderId);
+                          renderOrderDetail(orderId, true);
+                          showToast("নোট ডিলেট করা হয়েছে", "success");
+                      }
+                  }
+              }
+
+              window.adminAddHistoryNote = function(orderId, note) {
                   if (localStorage.getItem("bexo_is_admin") !== "true") { showToast("Unauthorized access!", "error"); return; }
                   if(!note.trim()) return;
                   const idx = appOrders.findIndex(o => String(o.id) === String(orderId));
@@ -18755,7 +18769,7 @@
                       actor: 'Admin',
                       message: note
                   });
-                  saveOrders();
+                  saveOrders(orderId);
                   renderOrderDetail(orderId, true);
                   showToast("নোট যুক্ত করা হয়েছে");
               }
@@ -18768,7 +18782,7 @@
                   const deliveryOrders = (appOrders || []).filter(o => 
                        (o.status === 'Delivered' || o.status === 'Completed' || o.status === 'Delivery Completed') && 
                        !o.isProfitDistributed &&
-                       (!searchFilter || (o.paymentCode && o.paymentCode.toLowerCase().includes(searchFilter.toLowerCase())) || (o.orderNo && o.orderNo.includes(searchFilter)))
+                       (!searchFilter || (o.paymentCode && o.paymentCode.toLowerCase().includes(searchFilter.toLowerCase())) || (o.secretToken && o.secretToken.toLowerCase().includes(searchFilter.toLowerCase())) || (o.orderNo && o.orderNo.includes(searchFilter)))
                   );
 
                   container.innerHTML = `
@@ -18969,7 +18983,7 @@
                       }
                   }
 
-                  // Add to history
+                  // Add to history (DISABLED AUTONOTE PER USER REQUEST)
                   appOrders[idx].history = appOrders[idx].history || [];
                   const statusMap = {
                       'Pending': 'পেন্ডিং',
@@ -18981,11 +18995,13 @@
                       'Completed': 'ডেলিভারি সম্পন্ন হয়েছে',
                       'Canceled': 'অর্ডার বাতিল করা হয়েছে'
                   };
+                  /*
                   appOrders[idx].history.push({
                       time: new Date().toLocaleString(),
                       actor: actor,
                       message: `${statusMap[newStatus] || newStatus} (${prevStatus} -> ${newStatus})`
                   });
+                  */
 
 
 
@@ -19094,24 +19110,6 @@
                       }
                       */
                   }
-
-                  // Add history entry
-                  const msg = {
-                      'Pending': 'অর্ডারটি পেন্ডিং আছে।',
-                      'Order Placed': 'অর্ডারটি সফলভাবে প্লেস করা হয়েছে।',
-                      'Order Booked': 'অর্ডারটি বুক করা হয়েছে।',
-                      'Product Packed & Shipped': 'প্রোডাক্ট প্যাক করা হয়েছে এবং শিপমেন্টের জন্য পাঠানো হয়েছে।',
-                      'Out for Delivery': 'অর্ডারটি ডেলিভারির জন্য বের হয়েছে।',
-                      'Delivery Completed': 'অর্ডারটি সফলভাবে ডেলিভারি কমপ্লিট হয়েছে। আপনার প্রফিট ব্যালেন্সে যোগ হয়েছে।',
-                      'Completed': 'অর্ডারটি সফলভাবে ডেলিভারি কমপ্লিট হয়েছে। আপনার প্রফিট ব্যালেন্সে যোগ হয়েছে।',
-                      'Canceled': 'দুঃখিত, অর্ডারটি ক্যানসেল করা হয়েছে।'
-                  };
-
-                  appOrders[idx].history.unshift({
-                      time: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' }),
-                      actor: 'Admin',
-                      message: msg[newStatus] || `অর্ডার স্ট্যাটাস আপডেট: ${newStatus}`
-                  });
 
                   saveOrders(orderId);
                   const isCurrentlyAdmin = (actor === 'Admin' || (document.getElementById('adminSection') && !document.getElementById('adminSection').classList.contains('hidden')));
@@ -19514,7 +19512,7 @@
                                     if ('settlementDeductions' in o) delete o.settlementDeductions;
                                     if ('settledProfitValue' in o) delete o.settledProfitValue;
                                     o.history = o.history || [];
-                                    o.history.unshift({
+                                    o.history.push({
                                         time: new Date().toLocaleString('en-GB'),
                                         actor: 'Super Admin',
                                         message: 'সেটেলমেন্ট অডিট লগ ডিলিট করার কারণে প্রফিট নিষ্পত্তি রিসেট করা হয়েছে।'
@@ -20244,7 +20242,7 @@ function verifySuperAdminPin() {
                        order.settledProfitValue = computedProfit;
                        order.status = 'Delivery Completed';
                        order.history = order.history || [];
-                       order.history.unshift({
+                       order.history.push({
                            time: timestamp,
                            actor: 'Super Admin',
                            message: `লভ্যাংশ নিষ্পত্তি করা হয়েছে: ৳${computedProfit} (কর্তন: ৳${deductions})`

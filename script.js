@@ -7391,15 +7391,7 @@
 
                function triggerProxyDownload(url, filename) {
                     const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
-                    const a = document.createElement('a');
-                    a.href = proxyUrl;
-                    a.target = '_blank';
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                    }, 1500);
+                    window.location.href = proxyUrl;
                 }
 
                function triggerLocalDownload(blob, filename) {

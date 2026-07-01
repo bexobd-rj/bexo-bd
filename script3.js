@@ -7391,15 +7391,7 @@
 
                function triggerProxyDownload(url, filename) {
                     const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
-                    const a = document.createElement('a');
-                    a.href = proxyUrl;
-                    a.target = '_blank';
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                    }, 1500);
+                    window.location.href = proxyUrl;
                 }
 
                function triggerLocalDownload(blob, filename) {
@@ -13228,8 +13220,7 @@
                                                                    <i class="fas fa-comment shadow-xs mr-1"></i> সেলার কমেন্ট: ${o.comment}
                                                                </div>
                                                                ` : ''}
-                                                               <p style="display:none"
-                                                              </p>
+                                                               <span style="display:none;">${o.secretToken || ''} ${o.paymentCode || ''}</span>
                                                           </div>
                                                       </td>
                                                       <td class="px-8 py-8">
@@ -13326,7 +13317,7 @@
                   const query = document.getElementById('adminOrderSearch').value.toLowerCase();
                   const rows = document.querySelectorAll('tbody tr');
                   rows.forEach(row => {
-                      const text = row.innerText.toLowerCase();
+                      const text = row.textContent.toLowerCase();
                       row.style.display = text.includes(query) ? '' : 'none';
                   });
               }
@@ -16453,7 +16444,7 @@
                   const deliveryOrders = (appOrders || []).filter(o => 
                        (o.status === 'Delivered' || o.status === 'Completed' || o.status === 'Delivery Completed') && 
                        !o.isProfitDistributed &&
-                       (!searchFilter || (o.paymentCode && o.paymentCode.toLowerCase().includes(searchFilter.toLowerCase())) || (o.orderNo && o.orderNo.includes(searchFilter)))
+                       (!searchFilter || (o.paymentCode && o.paymentCode.toLowerCase().includes(searchFilter.toLowerCase())) || (o.secretToken && o.secretToken.toLowerCase().includes(searchFilter.toLowerCase())) || (o.orderNo && o.orderNo.includes(searchFilter)))
                   );
 
                   container.innerHTML = `
@@ -16785,7 +16776,7 @@
                       'Canceled': 'দুঃখিত, অর্ডারটি ক্যানসেল করা হয়েছে।'
                   };
 
-                  appOrders[idx].history.unshift({
+                  appOrders[idx].history.push({
                       time: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' }),
                       actor: 'Admin',
                       message: msg[newStatus] || `অর্ডার স্ট্যাটাস আপডেট: ${newStatus}`
@@ -17192,7 +17183,7 @@
                                     if ('settlementDeductions' in o) delete o.settlementDeductions;
                                     if ('settledProfitValue' in o) delete o.settledProfitValue;
                                     o.history = o.history || [];
-                                    o.history.unshift({
+                                    o.history.push({
                                         time: new Date().toLocaleString('en-GB'),
                                         actor: 'Super Admin',
                                         message: 'সেটেলমেন্ট অডিট লগ ডিলিট করার কারণে প্রফিট নিষ্পত্তি রিসেট করা হয়েছে।'
@@ -17848,7 +17839,7 @@
                        order.settledProfitValue = computedProfit;
                        order.status = 'Delivery Completed';
                        order.history = order.history || [];
-                       order.history.unshift({
+                       order.history.push({
                            time: timestamp,
                            actor: 'Super Admin',
                            message: `লভ্যাংশ নিষ্পত্তি করা হয়েছে: ৳${computedProfit} (কর্তন: ৳${deductions})`
