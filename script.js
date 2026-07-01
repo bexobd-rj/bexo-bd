@@ -7382,7 +7382,7 @@
                        }
                        
                        // Fallback to proxy-download
-                       const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
+                       const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
                        const res = await fetch(proxyUrl);
                        if (res.ok) return await res.blob();
                        throw new Error("Unable to fetch image content via proxy");
@@ -7441,16 +7441,8 @@
                    showToast("ডাউনলোড শুরু হচ্ছে...", "success");
 
                    try {
-                       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth < 768);
-                       if (url.startsWith("data:") || url.startsWith("blob:")) {
-                           const blob = await getSafeBlob(url);
-                           triggerLocalDownload(blob, filename);
-                       } else if (isMobile) {
-                           triggerProxyDownload(url, filename);
-                       } else {
-                           const blob = await getSafeBlob(url);
-                           triggerLocalDownload(blob, filename);
-                       }
+                       const blob = await getSafeBlob(url);
+                       triggerLocalDownload(blob, filename);
                    } catch (error) {
                        console.error("Download failed:", error);
                        showToast("ডাউনলোড ব্যর্থ হয়েছে!", "error");
