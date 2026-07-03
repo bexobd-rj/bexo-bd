@@ -1954,6 +1954,15 @@
             <i class="fas fa-comment-dots w-5 text-lg"></i>
             <span class="ml-3">লাইভ চ্যাট</span>
           </div>
+          
+          <div
+            onclick="switchAdminSubView('guest-chats')"
+            class="admin-nav-item flex items-center px-6 py-4 cursor-pointer text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl mx-4 font-bold text-sm"
+            data-view="guest-chats"
+          >
+            <i class="fas fa-user-secret w-5 text-lg"></i>
+            <span class="ml-3">আননোন চ্যাট</span>
+          </div>
 
           <div
             onclick="switchAdminSubView('tickets')"
@@ -3539,13 +3548,15 @@
                           collection, 
                           doc, 
                           setDoc, 
-                          deleteDoc, 
+                          deleteDoc,
+                           updateDoc, 
                           getDocs, 
                           getDoc,
                           onSnapshot,
                           query,
                           orderBy,
-                          limit
+                          limit,
+                          runTransaction
                       } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
 
                       let app = initializeApp(firebaseConfig);
@@ -3557,6 +3568,35 @@
 
                       // Expose fully compliant compat wrapper on window.db supporting queries/get constraints
                       window.db = {
+
+                          runTransaction: (updateFunction) => {
+                              return runTransaction(rawDb, (transaction) => {
+                                  // Wrap the v9 transaction to support v8 compat calls
+                                  const compatTransaction = {
+                                      get: async (docRefCompat) => {
+                                          const snapshot = await transaction.get(docRefCompat._rawDocRef);
+                                          return {
+                                              exists: snapshot.exists(),
+                                              data: () => snapshot.data(),
+                                              id: snapshot.id
+                                          };
+                                      },
+                                      set: (docRefCompat, data) => {
+                                          transaction.set(docRefCompat._rawDocRef, data);
+                                          return compatTransaction;
+                                      },
+                                      update: (docRefCompat, data) => {
+                                          transaction.update(docRefCompat._rawDocRef, data);
+                                          return compatTransaction;
+                                      },
+                                      delete: (docRefCompat) => {
+                                          transaction.delete(docRefCompat._rawDocRef);
+                                          return compatTransaction;
+                                      }
+                                  };
+                                  return updateFunction(compatTransaction);
+                              });
+                          },
                           collection: (collectionName) => {
                               const colRef = collection(rawDb, collectionName);
                               
@@ -3565,7 +3605,10 @@
                                       doc: (docId) => {
                                           const docRef = doc(rawDb, collectionName, String(docId));
                                           return {
+                                              _rawDocRef: docRef,
                                               set: (data) => setDoc(docRef, data),
+                                              update: (data) => updateDoc(docRef, data),
+                                              update: (data) => updateDoc(docRef, data),
                                               delete: () => deleteDoc(docRef),
                                               get: async () => {
                                                   const snapshot = await getDoc(docRef);
@@ -5374,6 +5417,7 @@
                           'balances': 'ব্যালেন্স রিকোয়েস্ট',
                           'tickets': 'সাপোর্ট টিকিট',
                           'live-chats': 'লাইভ চ্যাট',
+                          'guest-chats': 'আননোন চ্যাট',
                           'transactions-log': 'ট্রানজেকশন হিস্ট্রি লগ',
                           'notice-slider': 'নোটিশ ও হোম স্লাইডার',
                           'settings': 'অ্যাপ সেটিংস',
@@ -5408,6 +5452,8 @@
                               case 'withdrawals': renderAdminWithdrawalList(); break;
                               case 'balances': renderAdminBalanceView(); break;
                               case 'tickets': renderAdminSupportTickets(); break;
+                              case 'live-chats': renderAdminLiveChats('live_chats'); break;
+                              case 'guest-chats': renderAdminLiveChats('guest_chats'); break;
                               case 'transactions-log': renderAdminTransactionsLog(); break;
                               case 'payment-delivery': renderAdminPaymentDelivery(); break;
                               case 'notice-slider': renderAdminNoticeSlider(); break;
@@ -20863,7 +20909,7 @@ function showServiceModal(serviceName) {
                         </a>
                         
                         <!-- Live Chat -->
-                        <a href="#" onclick="document.getElementById('supportModal').remove(); openLiveChat();" class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:shadow-md transition-all border border-transparent hover:border-slate-100 group">
+                        <a href="#" onclick="event.preventDefault(); const sm = document.getElementById('supportModal'); if(sm) sm.remove(); openLiveChat();" class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:shadow-md transition-all border border-transparent hover:border-slate-100 group">
                             <div class="flex items-center gap-4">
                                 <div class="w-12 h-12 bg-[#0084FF]/10 text-[#0084FF] rounded-full flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                                     <i class="fas fa-comment-dots"></i>
@@ -20899,10 +20945,23 @@ function showServiceModal(serviceName) {
 <script>
 // Open Live Chat UI
 window.openLiveChat = function() {
-    if (!window.userProfile || !window.userProfile.profileId) {
-        if(typeof showToast === 'function') showToast('অনুগ্রহ করে লগইন করুন', 'error');
-        return;
+    let profileId = window.userProfile && window.userProfile.profileId;
+    let userName = window.userProfile && window.userProfile.fullName ? window.userProfile.fullName : 'Guest User';
+    let phone = window.userProfile && window.userProfile.phone ? window.userProfile.phone : '';
+    let isGuest = false;
+
+    if (!profileId) {
+        // Look for existing guest ID
+        profileId = localStorage.getItem('bexo_guest_id');
+        if (!profileId) {
+            profileId = 'guest_' + Math.random().toString(36).substring(2, 12);
+            localStorage.setItem('bexo_guest_id', profileId);
+        }
+        isGuest = true;
     }
+    
+    // Set this globally for chat logic
+    window.currentChatSession = { profileId, userName, phone, isGuest };
     
     let chat = document.getElementById('liveChatModal');
     if (!chat) {
@@ -20954,7 +21013,7 @@ window.openLiveChat = function() {
     }
     
     // Subscribe to Firebase Live Chat
-    subscribeLiveChatUser();
+    window.subscribeLiveChatUser();
 };
 
 window.closeLiveChat = function() {
@@ -20967,16 +21026,18 @@ window.closeLiveChat = function() {
 };
 
 window.subscribeLiveChatUser = function() {
-    if (!window.db || !window.userProfile) return;
+    if (!window.db || !window.currentChatSession) return;
     
-    const userId = String(window.userProfile.profileId);
-    window.liveChatUnsubscribe = window.db.collection('live_chats').doc(userId).onSnapshot(doc => {
+    const userId = String(window.currentChatSession.profileId);
+    const collectionName = window.currentChatSession.isGuest ? 'guest_chats' : 'live_chats';
+    
+    window.liveChatUnsubscribe = window.db.collection(collectionName).doc(userId).onSnapshot(doc => {
         const data = doc.data() || { messages: [] };
         renderLiveChatMessagesUser(data.messages || []);
         
         // Reset unreadUser
         if (data.unreadUser > 0) {
-            window.db.collection('live_chats').doc(userId).update({ unreadUser: 0 }).catch(e => console.error(e));
+            window.db.collection(collectionName).doc(userId).update({ unreadUser: 0 }).catch(e => console.error(e));
         }
     });
 };
@@ -21051,14 +21112,16 @@ window.renderLiveChatMessagesUser = function(messages) {
 };
 
 window.sendLiveChatMessage = function() {
+    console.log("sendLiveChatMessage called");
     const input = document.getElementById('liveChatMessageInput');
     const text = input.value.trim();
-    if (!text || !window.db || !window.userProfile) return;
+    if (!text || !window.db || !window.currentChatSession) return;
     
     input.value = '';
     
-    const userId = String(window.userProfile.profileId);
-    const docRef = window.db.collection('live_chats').doc(userId);
+    const userId = String(window.currentChatSession.profileId);
+    const collectionName = window.currentChatSession.isGuest ? 'guest_chats' : 'live_chats';
+    const docRef = window.db.collection(collectionName).doc(userId);
     
     const newMsg = {
         text: text,
@@ -21066,13 +21129,15 @@ window.sendLiveChatMessage = function() {
         timestamp: Date.now()
     };
     
+    console.log("Starting transaction for:", userId);
     window.db.runTransaction(transaction => {
         return transaction.get(docRef).then(doc => {
             if (!doc.exists) {
                 transaction.set(docRef, {
                     userId: userId,
-                    userName: window.userProfile.fullName || 'Unknown',
-                    phone: window.userProfile.phone || '',
+                    userName: window.currentChatSession.userName,
+                    phone: window.currentChatSession.phone,
+                    isGuest: window.currentChatSession.isGuest,
                     lastMessage: text,
                     lastMessageTime: Date.now(),
                     unreadAdmin: 1,
@@ -21087,23 +21152,26 @@ window.sendLiveChatMessage = function() {
                     lastMessage: text,
                     lastMessageTime: Date.now(),
                     unreadAdmin: (data.unreadAdmin || 0) + 1,
-                    userName: window.userProfile.fullName || data.userName, // Update in case changed
+                    userName: window.currentChatSession.userName || data.userName, // Update in case changed
                     messages: messages
                 });
             }
         });
-    }).catch(e => console.error("Error sending message", e));
+    }).catch(e => { console.error("Error sending message", e); alert("Message failed to send: " + e.message); });
 };
 
-window.renderAdminLiveChats = function() {
+window.renderAdminLiveChats = function(collectionName = 'live_chats') {
+    window.adminCurrentLiveChatCollection = collectionName;
     const container = document.getElementById('adminViewContainer');
+    const title = collectionName === 'guest_chats' ? 'আননোন চ্যাট ম্যানেজমেন্ট' : 'লাইভ চ্যাট ম্যানেজমেন্ট';
+    const subtitle = collectionName === 'guest_chats' ? 'গেস্ট গ্রাহকদের লাইভ চ্যাট মেসেজ ও রিপ্লাই' : 'গ্রাহকদের লাইভ চ্যাট মেসেজ ও রিপ্লাই';
     
     container.innerHTML = `
         <div class="p-6">
             <div class="flex items-center justify-between mb-6">
                 <div>
-                    <h2 class="text-2xl font-black text-slate-800">লাইভ চ্যাট ম্যানেজমেন্ট</h2>
-                    <p class="text-sm font-bold text-slate-400 mt-1">গ্রাহকদের লাইভ চ্যাট মেসেজ ও রিপ্লাই</p>
+                    <h2 class="text-2xl font-black text-slate-800">${title}</h2>
+                    <p class="text-sm font-bold text-slate-400 mt-1">${subtitle}</p>
                 </div>
             </div>
             
@@ -21141,17 +21209,18 @@ window.renderAdminLiveChats = function() {
         </div>
     `;
     
-    adminSubscribeLiveChatsList();
+    adminSubscribeLiveChatsList(collectionName);
 };
 
 window.adminCurrentLiveChatUser = null;
+window.adminCurrentLiveChatCollection = 'live_chats';
 window.adminLiveChatsUnsubscribe = null;
 window.adminLiveChatDetailUnsubscribe = null;
 
-window.adminSubscribeLiveChatsList = function() {
+window.adminSubscribeLiveChatsList = function(collectionName) {
     if (window.adminLiveChatsUnsubscribe) window.adminLiveChatsUnsubscribe();
     
-    window.adminLiveChatsUnsubscribe = window.db.collection('live_chats').orderBy('lastMessageTime', 'desc').onSnapshot(snapshot => {
+    window.adminLiveChatsUnsubscribe = window.db.collection(collectionName).orderBy('lastMessageTime', 'desc').onSnapshot(snapshot => {
         const listArea = document.getElementById('adminLiveChatList');
         if (!listArea) return;
         
@@ -21185,6 +21254,7 @@ window.adminSubscribeLiveChatsList = function() {
 
 window.adminOpenLiveChatDetail = function(userId, userName) {
     window.adminCurrentLiveChatUser = userId;
+    const collectionName = window.adminCurrentLiveChatCollection;
     
     // Update Header
     document.getElementById('adminLiveChatHeader').innerHTML = `
@@ -21200,7 +21270,7 @@ window.adminOpenLiveChatDetail = function(userId, userName) {
     // Subscribe to details
     if (window.adminLiveChatDetailUnsubscribe) window.adminLiveChatDetailUnsubscribe();
     
-    window.adminLiveChatDetailUnsubscribe = window.db.collection('live_chats').doc(userId).onSnapshot(doc => {
+    window.adminLiveChatDetailUnsubscribe = window.db.collection(collectionName).doc(userId).onSnapshot(doc => {
         const messagesArea = document.getElementById('adminLiveChatMessages');
         if (!messagesArea) return;
         
@@ -21244,7 +21314,7 @@ window.adminOpenLiveChatDetail = function(userId, userName) {
         
         // Reset unreadAdmin
         if (data.unreadAdmin > 0) {
-            window.db.collection('live_chats').doc(userId).update({ unreadAdmin: 0 }).catch(e => console.error(e));
+            window.db.collection(collectionName).doc(userId).update({ unreadAdmin: 0 }).catch(e => console.error(e));
         }
     });
 };
@@ -21259,7 +21329,8 @@ window.adminSendLiveChatMessage = function() {
     input.value = '';
     
     const userId = window.adminCurrentLiveChatUser;
-    const docRef = window.db.collection('live_chats').doc(userId);
+    const collectionName = window.adminCurrentLiveChatCollection;
+    const docRef = window.db.collection(collectionName).doc(userId);
     
     const newMsg = {
         text: text,
@@ -21280,7 +21351,7 @@ window.adminSendLiveChatMessage = function() {
                 messages: messages
             });
         });
-    }).catch(e => console.error("Error sending admin reply", e));
+    }).catch(e => { console.error("Error sending admin reply", e); alert("Admin reply failed: " + e.message); });
 };
 </script>
 </body>
