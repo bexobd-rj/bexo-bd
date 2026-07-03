@@ -454,13 +454,13 @@
     <!-- === SECTION 0: LANDING PAGE === -->
     <section id="landingSection" class="min-h-screen bg-[#fdfbf0] flex flex-col font-sans">
       <!-- Navbar -->
-      <nav class="flex items-center justify-between px-5 sm:px-8 py-4 bg-[#ff6b00] text-white relative z-[150]">
+      <nav class="flex items-center justify-between px-3 sm:px-6 py-2 sm:py-3 bg-[#ff6b00] text-white relative z-[150]">
         <div class="flex items-center gap-2">
-          <h1 class="text-2xl font-bold leading-none tracking-tight">বেক্সো বিডি</h1>
+          <h1 class="text-lg sm:text-xl font-bold leading-none tracking-tight">বেক্সো বিডি</h1>
         </div>
         
         <!-- Desktop Nav -->
-        <div class="hidden lg:flex gap-6 font-medium">
+        <div class="hidden lg:flex gap-6 font-medium text-sm">
           <a href="#" class="hover:text-orange-200 transition-colors">হোম</a>
           <a href="#about" class="hover:text-orange-200 transition-colors">আমাদের সম্পর্কে</a>
           <a href="#products" class="hover:text-orange-200 transition-colors">প্রোডাক্টস</a>
@@ -468,34 +468,34 @@
           <a href="#contact" class="hover:text-orange-200 transition-colors">যোগাযোগ</a>
         </div>
         <div class="hidden lg:flex gap-3">
-          <button onclick="showAuth(false)" class="px-5 py-2 text-base rounded font-bold text-orange-600 bg-white hover:bg-slate-50 transition-colors shadow-sm">রেজিস্ট্রেশন</button>
-          <button onclick="showAuth(true)" class="px-5 py-2 text-base rounded font-bold text-orange-600 bg-white hover:bg-slate-50 transition-colors shadow-sm">লগইন</button>
+          <button onclick="showAuth(false)" class="px-3 py-1.5 text-sm rounded font-bold text-orange-600 bg-white hover:bg-slate-50 transition-colors shadow-sm">রেজিস্ট্রেশন</button>
+          <button onclick="showAuth(true)" class="px-3 py-1.5 text-sm rounded font-bold text-orange-600 bg-white hover:bg-slate-50 transition-colors shadow-sm">লগইন</button>
         </div>
 
         <!-- Mobile Nav Toggle -->
-        <button onclick="toggleMobileMenu()" class="lg:hidden p-2 text-white hover:text-orange-200 transition-colors">
-          <i class="fas fa-bars text-2xl"></i>
+        <button onclick="toggleMobileMenu()" class="lg:hidden p-1.5 text-white hover:text-orange-200 transition-colors">
+          <i class="fas fa-bars text-lg"></i>
         </button>
 
         <!-- Mobile Menu Overlay -->
-        <div id="mobileMenu" class="fixed inset-0 bg-orange-600 z-[200] flex flex-col hidden transform transition-transform duration-300">
-          <div class="flex items-center justify-between px-4 py-4 border-b border-orange-500/50">
-            <h1 class="text-2xl font-bold leading-none tracking-tight text-white">বেক্সো বিডি</h1>
-            <button onclick="toggleMobileMenu()" class="p-2 text-white hover:text-orange-200 transition-colors">
-              <i class="fas fa-times text-2xl"></i>
+        <div id="mobileMenu" class="absolute top-0 left-0 w-full bg-[#ff6b00] z-[200] flex flex-col hidden transform transition-transform duration-300 shadow-lg">
+          <div class="flex items-center justify-between px-3 py-2">
+            <h1 class="text-xl font-bold leading-none tracking-tight text-white">বেক্সো বিডি</h1>
+            <button onclick="toggleMobileMenu()" class="p-1.5 text-white hover:text-orange-200 transition-colors">
+              <i class="fas fa-times text-lg"></i>
             </button>
           </div>
           
-          <div class="flex flex-col p-4 space-y-4 font-medium text-white text-lg">
-            <a href="#" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-2">হোম</a>
-            <a href="#about" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-2">আমাদের সম্পর্কে</a>
-            <a href="#products" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-2">প্রোডাক্টস</a>
-            <a href="#services" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-2">সার্ভিস সমূহ</a>
-            <a href="#contact" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-2">যোগাযোগ</a>
+          <div class="flex flex-col px-3 pb-3 space-y-2 font-medium text-white text-sm">
+            <a href="#" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-1">হোম</a>
+            <a href="#about" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-1">আমাদের সম্পর্কে</a>
+            <a href="#products" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-1">প্রোডাক্টস</a>
+            <a href="#services" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-1">সার্ভিস সমূহ</a>
+            <a href="#contact" onclick="toggleMobileMenu()" class="hover:text-orange-200 transition-colors py-1">যোগাযোগ</a>
             
-            <div class="pt-4 space-y-3 flex flex-col">
-              <button onclick="toggleMobileMenu(); showAuth(false);" class="w-full py-3 bg-white text-orange-600 rounded font-bold text-center shadow-sm">রেজিস্ট্রেশন</button>
-              <button onclick="toggleMobileMenu(); showAuth(true);" class="w-full py-3 bg-white text-orange-600 rounded font-bold text-center shadow-sm">লগইন</button>
+            <div class="pt-2 space-y-2 flex flex-col">
+              <button onclick="toggleMobileMenu(); showAuth(false);" class="w-full py-1.5 bg-white text-[#ff6b00] rounded font-bold text-center shadow-sm">রেজিস্ট্রেশন</button>
+              <button onclick="toggleMobileMenu(); showAuth(true);" class="w-full py-1.5 bg-white text-[#ff6b00] rounded font-bold text-center shadow-sm">লগইন</button>
             </div>
           </div>
         </div>
