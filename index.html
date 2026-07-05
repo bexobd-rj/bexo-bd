@@ -8805,7 +8805,17 @@
                                               <i class="fab fa-youtube text-red-600"></i> প্রোডাক্ট ভিডিও
                                           </h3>
                                           <div class="aspect-video w-full rounded-2xl overflow-hidden bg-slate-900 shadow-xl border border-slate-200">
-                                              <iframe class="w-full h-full" src="https://www.youtube.com/embed/${p.videoUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                              <iframe 
+                                                class="w-full h-full" 
+                                                width="560" 
+                                                height="315" 
+                                                src="https://www.youtube.com/embed/${p.videoUrl}" 
+                                                title="YouTube video player" 
+                                                frameborder="0" 
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                                referrerpolicy="strict-origin-when-cross-origin" 
+                                                allowfullscreen>
+                                              </iframe>
                                           </div>
                                       </div>
                                       ` : ''}
@@ -12138,8 +12148,18 @@
                                                           <input type="text" id="apTitle" value="${p ? p.title : ''}" oninput="document.getElementById('titleCharCount').innerText = this.value.length + ' / 250'" class="w-full px-6 py-3.5 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-orange-500 font-bold text-sm transition-all" placeholder="প্রোডাক্টের নাম লিখুন...">
                                                       </div>
                                                       <div class="space-y-2">
-                                                          <label class="text-[10px] uppercase font-black text-slate-400 tracking-widest">ইউটিউব ভিডিও আইডি (ঐচ্ছিক)</label>
-                                                          <input type="text" id="apVideoUrl" value="${p ? (p.videoUrl || '') : ''}" class="w-full px-6 py-3.5 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-orange-500 font-bold text-sm transition-all" placeholder="YouTube Video ID (e.g. dQw4w9WgXcQ)">
+                                                          <label class="text-[10px] uppercase font-black text-slate-400 tracking-widest">ইউটিউব ভিডিও (Product Video URL)</label>
+                                                          <input type="text" id="apVideoUrl" value="${p ? (p.videoUrl || '') : ''}" oninput="handleVideoPreview(this.value)" class="w-full px-6 py-3.5 bg-slate-50 border border-transparent rounded-xl outline-none focus:border-orange-500 font-bold text-sm transition-all" placeholder="YouTube Link / Video ID / Embed Code">
+                                                          
+                                                          <div id="videoPreviewContainer" class="${p && p.videoUrl ? '' : 'hidden'} mt-4">
+                                                              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2"><i class="fas fa-eye text-emerald-500"></i> ভিডিও প্রিভিউ (Video Preview)</label>
+                                                              <div class="aspect-video w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shadow-sm relative">
+                                                                  <div id="videoLoadingState" class="hidden absolute inset-0 flex items-center justify-center bg-slate-900/80 z-10 text-white backdrop-blur-sm">
+                                                                      <i class="fas fa-spinner fa-spin text-2xl text-orange-500"></i>
+                                                                  </div>
+                                                                  <iframe id="videoPreviewIframe" class="w-full h-full" src="${p && p.videoUrl ? 'https://www.youtube.com/embed/' + p.videoUrl : ''}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                                                              </div>
+                                                          </div>
                                                       </div>
 
                                                       <!-- Dynamic Variant System Section -->
@@ -14879,6 +14899,53 @@
                   container.appendChild(div.firstElementChild);
               }
 
+              
+              function extractYouTubeId(urlOrId) {
+                  if (!urlOrId) return '';
+                  let str = urlOrId;
+                  const iframeMatch = str.match(/src="([^"]+)"/);
+                  if (iframeMatch) {
+                      str = iframeMatch[1];
+                  }
+                  const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+                  const match = str.match(regExp);
+                  if (match && match[1].length === 11) {
+                      return match[1];
+                  }
+                  if (str.trim().length === 11) {
+                      return str.trim();
+                  }
+                  return str.trim();
+              }
+
+              window.handleVideoPreview = function(val) {
+                  const container = document.getElementById('videoPreviewContainer');
+                  const iframe = document.getElementById('videoPreviewIframe');
+                  const loading = document.getElementById('videoLoadingState');
+                  
+                  if (!val || val.trim() === '') {
+                      container.classList.add('hidden');
+                      iframe.src = '';
+                      return;
+                  }
+                  
+                  const videoId = extractYouTubeId(val);
+                  
+                  if (videoId && videoId.length === 11) {
+                      container.classList.remove('hidden');
+                      loading.classList.remove('hidden');
+                      
+                      // Simulate short loading to show processing
+                      setTimeout(() => {
+                          iframe.src = 'https://www.youtube.com/embed/' + videoId;
+                          loading.classList.add('hidden');
+                      }, 400);
+                  } else {
+                      container.classList.add('hidden');
+                      iframe.src = '';
+                  }
+              };
+
               function createPostFromAdmin(pId = null) {
                   const title = document.getElementById('apTitle').value.trim();
                   const cat = document.getElementById('apCategory').value;
@@ -14968,7 +15035,7 @@
                               details: details,
                               images: [img],
                               imageCount: 1,
-                              videoUrl: document.getElementById('apVideoUrl') ? document.getElementById('apVideoUrl').value.trim() : '',
+                              videoUrl: document.getElementById('apVideoUrl') ? extractYouTubeId(document.getElementById('apVideoUrl').value.trim()) : '',
                               isStockOut: isStockOut,
                               sku: sku + (i > 0 ? '-' + i : ''),
                               isPublished: autoPost
@@ -14997,7 +15064,7 @@
                           details: details,
                           images: finalImages,
                           imageCount: finalImages.length,
-                          videoUrl: document.getElementById('apVideoUrl') ? document.getElementById('apVideoUrl').value.trim() : '',
+                          videoUrl: document.getElementById('apVideoUrl') ? extractYouTubeId(document.getElementById('apVideoUrl').value.trim()) : '',
                           isStockOut: isStockOut,
                           sku: sku,
                           isPublished: autoPost
