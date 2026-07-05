@@ -4,7 +4,6 @@ export interface Product {
   basePrice: number;
   imageUrl: string;
   description: string;
-  category?: string;
   stockStatus?: 'in_stock' | 'out_of_stock';
   stock?: number;
 }

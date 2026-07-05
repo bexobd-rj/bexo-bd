@@ -2212,9 +2212,9 @@
                   if (Date.now() - window._lT < 1200) { showToast("খুব দ্রুত রিকোয়েস্ট দিচ্ছেন, একটু অপেক্ষা করুন।", "warning"); return false; }
                   window._lT = Date.now(); return true;
               };
-              window.isUserBanned = (pid) => (safeParse('bexo_banned', [])).includes(pid);
+              window.isUserBanned = (pid) => (JSON.parse(localStorage.getItem('bexo_banned')) || []).includes(pid);
               window.adminToggleUserBan = (pid) => {
-                  let b = safeParse('bexo_banned', []);
+                  let b = JSON.parse(localStorage.getItem('bexo_banned')) || [];
                   if (b.includes(pid)) { b = b.filter(i => i !== pid); showToast("Unbanned", "info"); }
                   else { b.push(pid); showToast("Banned", "warning"); }
                   localStorage.setItem('bexo_banned', JSON.stringify(b));
@@ -3065,7 +3065,7 @@
                   }
               }
 
-              let appSettings = safeParse('bexo_settings', null) || {
+              let appSettings = JSON.parse(localStorage.getItem('bexo_settings')) || {
                   youtubeLink: '',
                   premiumGroupLink: '',
                   homeBannerUrl: '',
@@ -3091,7 +3091,7 @@
                   saveSettings();
               }
 
-              let appPremiumRequests = safeParse('bexo_premium_requests', []);
+              let appPremiumRequests = JSON.parse(localStorage.getItem('bexo_premium_requests')) || [];
               function savePremiumRequests() {
                   localStorage.setItem('bexo_premium_requests', JSON.stringify(appPremiumRequests));
                   if (window.db) {
@@ -3104,7 +3104,7 @@
                   }
               }
 
-              let appRechargeRequests = safeParse('bexo_recharge_requests', []);
+              let appRechargeRequests = JSON.parse(localStorage.getItem('bexo_recharge_requests')) || [];
               function saveRechargeRequests() {
                   localStorage.setItem('bexo_recharge_requests', JSON.stringify(appRechargeRequests));
                   if (window.db) {
@@ -3117,7 +3117,7 @@
                   }
               }
 
-              let appBalanceRequests = safeParse('bexo_balance_requests', []);
+              let appBalanceRequests = JSON.parse(localStorage.getItem('bexo_balance_requests')) || [];
               function saveBalanceRequests() {
                   localStorage.setItem('bexo_balance_requests', JSON.stringify(appBalanceRequests));
                   if (window.db) {
@@ -3130,7 +3130,7 @@
                   }
               }
 
-              let appBillRequests = safeParse('bexo_bill_requests', []);
+              let appBillRequests = JSON.parse(localStorage.getItem('bexo_bill_requests')) || [];
               function saveBillRequests() {
                   localStorage.setItem('bexo_bill_requests', JSON.stringify(appBillRequests));
                   if (window.db) {
@@ -3147,7 +3147,7 @@
                   localStorage.setItem('bexo_pending_profits', JSON.stringify(appPendingProfits));
               }
 
-              let appCustomerReports = safeParse('bexo_customer_reports', {});
+              let appCustomerReports = JSON.parse(localStorage.getItem('bexo_customer_reports')) || {};
               function saveCustomerReports() {
                   localStorage.setItem('bexo_customer_reports', JSON.stringify(appCustomerReports));
                   if (window.db) {
@@ -3156,7 +3156,7 @@
                   }
               }
 
-              let appCategories = safeParse('bexo_categories', INITIAL_CATEGORIES);
+              let appCategories = JSON.parse(localStorage.getItem('bexo_categories')) || INITIAL_CATEGORIES;
 
               function saveCategories() {
                   localStorage.setItem('bexo_categories', JSON.stringify(appCategories));
@@ -3170,7 +3170,7 @@
                   }
               }
 
-              let appTransactions = safeParse('bexo_transactions', []);
+              let appTransactions = JSON.parse(localStorage.getItem('bexo_transactions')) || [];
               if (appTransactions.length > 500) appTransactions = appTransactions.slice(0, 500); // Performance cap
 
               function saveTransactions() {
@@ -3186,7 +3186,7 @@
                   }
               }
 
-              let appAccounts = safeParse('bexo_accounts', []);
+              let appAccounts = JSON.parse(localStorage.getItem('bexo_accounts')) || [];
 
               function saveAccounts() {
                   localStorage.setItem('bexo_accounts', JSON.stringify(appAccounts));
@@ -3200,7 +3200,7 @@
                   }
               }
 
-              let appProfilePayments = safeParse('bexo_profile_payments', []);
+              let appProfilePayments = JSON.parse(localStorage.getItem('bexo_profile_payments')) || [];
 
               function saveProfilePayments() {
                   localStorage.setItem('bexo_profile_payments', JSON.stringify(appProfilePayments));
@@ -3223,7 +3223,7 @@
                   } catch(e) { console.error("Boot cleanup failed:", e); }
               }, 3000);
 
-              let appWithdrawals = safeParse('bexo_withdrawals', []);
+              let appWithdrawals = JSON.parse(localStorage.getItem('bexo_withdrawals')) || [];
 
               function saveWithdrawals() {
                   localStorage.setItem('bexo_withdrawals', JSON.stringify(appWithdrawals));
@@ -3237,7 +3237,7 @@
                   }
               }
 
-              let appSupportTickets = safeParse('bexo_support_tickets', []);
+              let appSupportTickets = JSON.parse(localStorage.getItem('bexo_support_tickets')) || [];
 
               function saveSupportTickets() {
                   localStorage.setItem('bexo_support_tickets', JSON.stringify(appSupportTickets));
@@ -3254,7 +3254,7 @@
               async function processPendingSyncs() {
                   if (!window.db) return;
                   try {
-                      let pending = safeParse('bexo_pending_user_syncs', []);
+                      let pending = JSON.parse(localStorage.getItem('bexo_pending_user_syncs') || '[]');
                       if (pending.length === 0) return;
                       
                       const remaining = [];
@@ -3279,7 +3279,7 @@
               async function executeStartupSettlementCleanSweep() {
                   console.log("[Clean Sweep] Checking if any Reseller Settlement audits/transactions need automatic purging...");
                   try {
-                      let localTx = safeParse('bexo_transactions', []);
+                      let localTx = JSON.parse(localStorage.getItem('bexo_transactions')) || [];
                       const settlements = localTx.filter(t => t.type === 'Reseller Settlement');
                       
                       if (settlements.length > 0) {
@@ -3306,7 +3306,7 @@
                       }
 
                       // Clean settled orders markers
-                      let localOrders = safeParse('bexo_orders', []);
+                      let localOrders = JSON.parse(localStorage.getItem('bexo_orders')) || [];
                       let resetOccurred = false;
                       localOrders.forEach(o => {
                           if (o.isProfitDistributed || o.settlementDeductions !== undefined || o.settledProfitValue !== undefined) {
@@ -3343,7 +3343,7 @@
               }
 
 
-              let userProfile = safeParse('bexo_profile', null);
+              let userProfile = JSON.parse(localStorage.getItem('bexo_profile'));
               if (!userProfile) {
                   userProfile = {
                       ...DEFAULT_PROFILE,
@@ -3386,7 +3386,7 @@
 
               ensureBexoPayFields();
 
-              let appPosts = safeParse('bexo_posts', []);
+              let appPosts = JSON.parse(localStorage.getItem('bexo_posts')) || [];
               
               // ONE-TIME FIX for corrupted image arrays
               let _needsSave = false;
@@ -3424,7 +3424,7 @@
 
               function queueUserForSync(profileId) {
                   try {
-                      let pending = safeParse('bexo_pending_user_syncs', []);
+                      let pending = JSON.parse(localStorage.getItem('bexo_pending_user_syncs') || '[]');
                       if (!pending.includes(profileId)) {
                           pending.push(profileId);
                           localStorage.setItem('bexo_pending_user_syncs', JSON.stringify(pending));
@@ -4369,40 +4369,17 @@
               let currentProduct = null;
               let mockProducts = [];
 
-              function isLoggedIn() {
-                  return userProfile && userProfile.phone && userProfile.password;
-              }
-
-              function getGuestBannerHtml() {
-                  if (isLoggedIn()) return '';
-                  return `
-                      <div class="mb-6 p-4 rounded-xl bg-orange-50 border border-orange-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in">
-                          <div class="flex items-center gap-3">
-                              <div class="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center shrink-0">
-                                  <i class="fas fa-lock"></i>
-                              </div>
-                              <div>
-                                  <h4 class="text-sm font-black text-slate-800">To view pricing details and unlock full access, please login or register an account.</h4>
-                                  <p class="text-xs font-medium text-slate-600">Join our B2B/Wholesale platform today.</p>
-                              </div>
-                          </div>
-                          <button onclick="showAuth(true)" class="whitespace-nowrap px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold transition-all shadow-md">Login / Register</button>
-                      </div>
-                  `;
-              }
-
               // --- Initialization ---
               window.addEventListener('load', () => {
-                  const auth = document.getElementById('authSection');
-                  const dash = document.getElementById('dashboardSection');
-                  var landing = document.getElementById('landingSection');
-                  
-                  if (auth && dash) {
-                      auth.classList.add('hidden');
-                      dash.classList.remove('hidden');
-                  }
-                  if (landing) {
-                      landing.classList.add('hidden');
+                  if (userProfile && userProfile.phone && userProfile.password) {
+                      const auth = document.getElementById('authSection');
+                      const dash = document.getElementById('dashboardSection');
+                      if (auth && dash) {
+                          auth.classList.add('hidden');
+                          dash.classList.remove('hidden');
+                          var landing = document.getElementById('landingSection');
+                          if(landing) landing.classList.add('hidden');
+                      }
                   }
                   renderHome();
                   updateCartCount();
@@ -4436,7 +4413,7 @@
                   document.body.insertAdjacentHTML('beforeend', html);
               }
 
-              let appBanners = safeParse('bexo_banners', null) || [
+              let appBanners = JSON.parse(localStorage.getItem('bexo_banners')) || [
                   'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=1200',
                   'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&q=80&w=1200',
                   'https://images.unsplash.com/photo-1557821552-17105176677c?auto=format&fit=crop&q=80&w=1200'
@@ -4517,7 +4494,6 @@
                               </div>
 
                               <!-- Top Selling Products Section (Conditional) -->
-                              <div id="homeCategoryGrids"></div>
                               
                               <!-- Mid Row: Additional Services -->
                               <div class="grid grid-cols-2 md:grid-cols-4 gap-6 px-5 sm:px-10">
@@ -4541,64 +4517,9 @@
                           </div>
                       </div>
                   `;
-setTimeout(() => { if (typeof renderHomeCategoryGrids === 'function') renderHomeCategoryGrids(); }, 50); }
+              }
 
-              
-function renderHomeCategoryGrids() {
-    const container = document.getElementById('homeCategoryGrids');
-    if (!container) return;
-
-    const isLoggedInUser = userProfile && userProfile.phone && userProfile.password;
-    let htmlStr = '';
-
-    if (!isLoggedInUser) {
-        htmlStr += `
-        <div class="mb-8 bg-gradient-to-r from-slate-900 to-slate-800 p-6 rounded-2xl shadow-xl flex items-center justify-between border border-slate-700">
-            <div>
-                <h3 class="text-white text-lg font-black tracking-tight flex items-center gap-2"><i class="fas fa-lock text-rose-500"></i> Wholesale Access Required</h3>
-                <p class="text-slate-300 text-xs font-medium mt-1">To view pricing details and unlock full access, please login or register an account.</p>
-            </div>
-            <button onclick="showAuth(true)" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all flex items-center gap-2">
-                লগইন করুন <i class="fas fa-arrow-right"></i>
-            </button>
-        </div>
-        `;
-    }
-
-    if (typeof appCategories !== 'undefined' && appCategories.length > 0) {
-        const sortedCats = [...appCategories].sort((a,b) => (a.order || 0) - (b.order || 0));
-        
-        sortedCats.forEach(cat => {
-            const catPosts = appPosts.filter(p => p.category === cat.name);
-            if (catPosts.length > 0) {
-                const displayPosts = catPosts.slice(0, 12); // Show up to 12 products per category on home
-                
-                htmlStr += `
-                <div class="mb-12">
-                    <div class="flex items-center justify-between mb-5">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-lg shadow-sm">
-                                <i class="${cat.icon || 'fas fa-box'}"></i>
-                            </div>
-                            <h2 class="text-xl font-black text-slate-800 tracking-tight">${cat.name}</h2>
-                        </div>
-                        <button onclick="renderProductList('${cat.name}', null)" class="text-sm font-bold text-orange-600 hover:text-orange-700 bg-orange-50 px-4 py-1.5 rounded-lg transition-colors">
-                            সবগুলো দেখুন <i class="fas fa-chevron-right text-[10px] ml-1"></i>
-                        </button>
-                    </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-                        ${displayPosts.map(p => renderPostCard(p, 0)).join('')}
-                    </div>
-                </div>
-                `;
-            }
-        });
-    }
-
-    container.innerHTML = htmlStr;
-}
-
-function moveSlider(dir) {
+              function moveSlider(dir) {
                   currentBannerIndex = (currentBannerIndex + dir + appBanners.length) % appBanners.length;
                   updateSliderUI();
               }
@@ -4957,7 +4878,7 @@ function moveSlider(dir) {
 
                       // REFERRAL COMMISSION Logic
                       if (referredBy) {
-                          const refs = safeParse('bexo_referrals', []);
+                          const refs = JSON.parse(localStorage.getItem('bexo_referrals')) || [];
                           refs.push({
                               referredBy: refCode,
                               name: shop,
@@ -7945,11 +7866,11 @@ function moveSlider(dir) {
                                           <i class="fas fa-phone-alt text-[#ea4c89]"></i> ${accountStr}
                                       </p>
                                   </td>
-                                  <td class="px-4 sm:px-8 py-6 font-black text-orange-600 font-mono">৳ ${(Number(w.amount) || 0).toLocaleString()}</td>
+                                  <td class="px-4 sm:px-8 py-6 font-black text-orange-600">৳ ${(Number(w.amount) || 0).toLocaleString()}</td>
                                   <td class="px-4 sm:px-8 py-6">
                                       <span class="px-3 py-1 rounded-full text-[10px] font-bold ${
                                           w.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                          w.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-orange-50 text-orange-600 border border-orange-100'
+                                          w.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-orange-50 text-orange-600 border border-orange-100'
                                       }">${(w.status || 'PENDING').toUpperCase()}</span>
                                   </td>
                                   <td class="px-4 sm:px-8 py-6 text-right font-bold">
@@ -8272,7 +8193,7 @@ function moveSlider(dir) {
                                       </div>
                                       <span class="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
                                           req.status === 'Successful' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                          req.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-orange-50 text-orange-600 border border-orange-100'
+                                          req.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-orange-50 text-orange-600 border border-orange-100'
                                       }">${req.status || 'PENDING'}</span>
                                   </div>
 
@@ -8595,39 +8516,7 @@ function moveSlider(dir) {
               }
 
               function renderPostCard(p, imgIdx = 0, isStockOutPage = false) {
-                  const isFav = (userProfile && userProfile.favorites && userProfile.favorites.includes(`${p.id}-${imgIdx}`));
-                  const mainImg = (p.images && p.images.length > 0) ? (p.images[imgIdx] || p.images[0]) : 'https://picsum.photos/seed/placeholder/400/400';
-                  const productStockOut = p.isStockOut || (p.stockCount !== undefined && p.stockCount <= 0);
-
-                  const isLoggedInUser = userProfile && userProfile.phone && userProfile.password;
-                  
-                  const priceHtml = isLoggedInUser 
-                      ? `<div class="flex items-center gap-1.5"><span class="text-[10px] font-bold text-slate-400">প্রাইস</span><span class="text-[11px] font-black text-pink-600">৳${p.price}</span></div>` 
-                      : `<div class="flex items-center gap-1.5"><span class="text-[10px] font-bold text-slate-400">প্রাইস: </span><span class="text-[10px] font-bold text-rose-500"><i class="fas fa-lock text-[9px] mr-1"></i>লগইন করুন</span></div>`;
-                  
-                  const clickAction = isLoggedInUser ? `renderPostDetail('${p.id}', ${imgIdx})` : `showAuth(true)`;
-
-                  return `
-                  <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden p-3 group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col font-bold">
-                      <div class="relative w-full aspect-square rounded-lg overflow-hidden mb-3 bg-white cursor-pointer" onclick="${clickAction}">
-                          <img src="${mainImg}" alt="${p.title}" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700">
-                          ${(isStockOutPage || productStockOut) ? '<div class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center"><span class="text-[9px] font-black text-white uppercase tracking-widest border-2 border-white/60 px-4 py-1.5 rounded-full">স্টক আউট</span></div>' : ''}
-                      </div>
-                      <div class="space-y-1 mb-4 flex-grow px-1">
-                          <h3 class="text-[11px] font-bold text-slate-500 truncate cursor-pointer" onclick="${clickAction}">${p.title}</h3>
-                          ${priceHtml}
-                      </div>
-                      <div class="grid grid-cols-2 gap-2">
-                          <button onclick="${isLoggedInUser ? `downloadImage('${mainImg}')` : `showAuth(true)`}" class="bg-slate-50 text-emerald-600 py-2 rounded-lg border border-slate-100 transition-all flex items-center justify-center hover:bg-emerald-500 hover:text-white hover:border-emerald-500 group/btn">
-                              <i class="fas fa-download text-xs transition-transform group-hover/btn:scale-110"></i>
-                          </button>
-                          <button onclick="${isLoggedInUser ? `toggleFavorite('${p.id}', ${imgIdx})` : `showAuth(true)`}" class="py-2 rounded-lg border transition-all flex items-center justify-center group/btn ${isFav ? 'bg-rose-50 text-rose-500 border-rose-100' : 'bg-slate-50 text-slate-400 border-slate-100 font-medium'} hover:bg-rose-500 hover:text-white hover:border-rose-500">
-                              <i class="${isFav ? 'fas animate-bounce-short' : 'far'} fa-heart text-xs transition-transform group-hover/btn:scale-110"></i>
-                          </button>
-                      </div>
-                  </div>
-                  `;
-              /* DUPLICATE BLOCK START
+                  const isFav = (userProfile.favorites || []).includes(`${p.id}-${imgIdx}`);
                   const mainImg = (p.images && p.images.length > 0) ? (p.images[imgIdx] || p.images[0]) : 'https://picsum.photos/seed/placeholder/400/400';
                   const productStockOut = p.isStockOut || (p.stockCount !== undefined && p.stockCount <= 0);
 
@@ -10801,7 +10690,7 @@ function moveSlider(dir) {
                           // Add to admin list
                           const adminReq = Object.assign({}, transaction, { profileId: userProfile.profileId || 'N/A' });
                           if (!Array.isArray(appBillRequests)) {
-                              appBillRequests = safeParse('bexo_bill_requests', []);
+                              appBillRequests = JSON.parse(localStorage.getItem('bexo_bill_requests')) || [];
                           }
                           appBillRequests.push(adminReq);
                           saveBillRequests();
@@ -11091,19 +10980,7 @@ function moveSlider(dir) {
 
                               </div>
 
-                              
-                    ${!(userProfile && userProfile.phone && userProfile.password) ? `
-                    <div class="mb-6 bg-gradient-to-r from-slate-900 to-slate-800 p-6 rounded-2xl shadow-xl flex items-center justify-between border border-slate-700">
-                        <div>
-                            <h3 class="text-white text-lg font-black tracking-tight flex items-center gap-2"><i class="fas fa-lock text-rose-500"></i> Wholesale Access Required</h3>
-                            <p class="text-slate-300 text-xs font-medium mt-1">To view pricing details and unlock full access, please login or register an account.</p>
-                        </div>
-                        <button onclick="showAuth(true)" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all flex items-center gap-2">
-                            লগইন করুন <i class="fas fa-arrow-right"></i>
-                        </button>
-                    </div>
-                    ` : ''}
-                          <div id="productGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 lg:gap-3">
+                              <div id="productGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 lg:gap-3">
                                   ${paginated.map(p => {
                                       const postObj = appPosts.find(item => String(item.id) === String(p.postId));
                                       return postObj ? renderPostCard(postObj, p.imgIdx, false) : '';
@@ -12041,7 +11918,7 @@ function moveSlider(dir) {
 
                   // Referral Commission Bonus logic
                   if (referredBy) {
-                      const refs = safeParse('bexo_referrals', []);
+                      const refs = JSON.parse(localStorage.getItem('bexo_referrals')) || [];
                       refs.push({
                           referredBy: refCode,
                           name: shop,
@@ -13210,7 +13087,7 @@ function moveSlider(dir) {
 
                function renderAdminDiagnostics() {
                    const container = document.getElementById('adminViewContainer');
-                   const pendingSyncs = safeParse('bexo_pending_user_syncs', []);
+                   const pendingSyncs = JSON.parse(localStorage.getItem('bexo_pending_user_syncs') || '[]');
                    
                    container.innerHTML = `
                        <div class="p-4 sm:p-8 space-y-6 animate-fade-in text-slate-700 flex-1 overflow-y-auto no-scrollbar">
@@ -18552,19 +18429,7 @@ function updateUserTicketStatus(id, newStatus) {
                                           </div>
                                       </div>
 
-                                      
-                    ${!(userProfile && userProfile.phone && userProfile.password) ? `
-                    <div class="mb-6 bg-gradient-to-r from-slate-900 to-slate-800 p-6 rounded-2xl shadow-xl flex items-center justify-between border border-slate-700">
-                        <div>
-                            <h3 class="text-white text-lg font-black tracking-tight flex items-center gap-2"><i class="fas fa-lock text-rose-500"></i> Wholesale Access Required</h3>
-                            <p class="text-slate-300 text-xs font-medium mt-1">To view pricing details and unlock full access, please login or register an account.</p>
-                        </div>
-                        <button onclick="showAuth(true)" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all flex items-center gap-2">
-                            লগইন করুন <i class="fas fa-arrow-right"></i>
-                        </button>
-                    </div>
-                    ` : ''}
-                          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px] mb-3">
+                                      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px] mb-3">
                                           <div class="space-y-0.5">
                                               <span class="text-slate-400 font-bold uppercase text-[9px] tracking-wider block">শপের নাম</span>
                                               <span class="text-slate-800 font-extrabold flex items-center gap-1">
