@@ -670,10 +670,10 @@
           <p class="text-slate-500 mb-6">আমাদের রয়েছে অসংখ্য ক্যাটাগরির প্রোডাক্ট, যেগুলো আপনি সহজেই সেল করতে পারবেন।</p>
           
           <!-- Landing Categories Tabs -->
-          <div id="landingCategoriesContainer" class="flex flex-wrap justify-center gap-2 mb-10"></div>
+          <div id="landingCategoriesContainer" class="grid grid-cols-3 gap-2 mb-10"></div>
           
           <!-- Landing Products Container -->
-          <div id="landingProductsContainer" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div id="landingProductsContainer" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-4">
              <div class="col-span-full py-12 text-slate-500 font-bold bg-white/60 rounded-2xl border border-dashed border-slate-200 flex flex-col items-center justify-center gap-3">
                 <i class="fas fa-th-large text-slate-400 text-3xl"></i>
                 <span>পণ্য দেখতে অনুগ্রহ করে একটি ক্যাটাগরি নির্বাচন করুন</span>
@@ -8159,48 +8159,11 @@
                               <tr class="border-b border-slate-50 hover:bg-slate-50 transition-all font-sans">
                                   <td class="px-4 sm:px-8 py-6 font-mono text-xs font-bold text-slate-800">${req.profileId}</td>
                                   <td class="px-4 sm:px-8 py-6 text-sm font-bold text-slate-700">
-                                      <span class="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 mb-1">
-                                          <i class="fas fa-mobile-alt"></i> ${req.operator || 'Mobile'}
-                                      </span>
-                                      <p class="text-slate-800 font-mono font-bold text-xs">${req.mobile || req.phone}</p>
-                                  </td>
-                                  <td class="px-4 sm:px-8 py-6 font-black text-blue-600">৳ ${(Number(req.amount) || 0).toLocaleString()}</td>
-                                  <td class="px-4 sm:px-8 py-6">
-                                      <span class="px-3 py-1 rounded-full text-[10px] font-bold ${
-                                          req.status === 'Successful' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                          req.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-orange-50 text-orange-600 border border-orange-100'
-                                      }">${(req.status || 'Pending').toUpperCase()}</span>
-                                  </td>
-                                  <td class="px-4 sm:px-8 py-6 text-right font-bold">
-                                      ${(req.status === 'Pending' || !req.status || req.status === '') ? `
-                                          <button onclick="openFinanceProcessModal('${req.id}', 'recharges', '${req.profileId}', 'Mobile Recharge', '${req.mobile || req.phone}', '${req.amount}', 'অপারেটর: ${req.operator || 'N/A'}')" class="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-orange-600 transition-all shadow-md active:scale-95 cursor-pointer">
-                                              <i class="fas fa-tasks mr-1"></i> প্রসেস করুন
-                                          </button>
-                                      ` : `
-                                          <div class="text-right">
-                                              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">প্রসেসড</span>
-                                              ${req.trxId ? `<span class="text-[9px] font-bold text-emerald-600 font-mono block mt-0.5">Trx: ${req.trxId}</span>` : ''}
-                                              ${req.adminNote ? `<span class="text-[9px] font-medium text-slate-400 block mt-0.5">${req.adminNote}</span>` : ''}
-                                          </div>
-                                      `}
+                                      <span class="px-2 py-0.5 bg-blue-50 text-blue">${req.operator}</span>
                                   </td>
                               </tr>
-                          `).reverse().join('');
-
-                          mobileHtml = filtered.map(req => `
-                              <div class="p-5 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-3 font-sans relative">
-                                  <div class="flex justify-between items-start">
-                                      <div>
-                                          <span class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">অপারেটর</span>
-                                          <span class="px-2.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-bold inline-flex items-center gap-1.5 mt-1">
-                                              <i class="fas fa-mobile-alt"></i> ${req.operator || 'Mobile'}
-                                          </span>
-                                      </div>
-                                      <span class="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                          req.status === 'Successful' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                          req.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-orange-50 text-orange-600 border border-orange-100'
-                                      }">${req.status || 'PENDING'}</span>
-                                  </div>
+                          }).join('');
+                      }
 
                                   <div class="grid grid-cols-2 gap-3 pt-2 text-[11px] border-t border-slate-50">
                                       <div>

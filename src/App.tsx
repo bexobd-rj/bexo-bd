@@ -740,7 +740,7 @@ function ProductGrid({ products, onAdd }: { products: Product[], onAdd: (p: Prod
       </div>
 
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-4 gap-6">
           {filtered.map((product, i) => {
             const isStockOut = product.stockStatus === 'out_of_stock' || (product.stock !== undefined && product.stock <= 0);
             return (
