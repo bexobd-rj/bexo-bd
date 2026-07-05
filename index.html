@@ -667,14 +667,16 @@
       <div id="products" class="bg-yellow-100/50 px-4 sm:px-8 py-16">
         <div class="max-w-6xl mx-auto text-center px-4 sm:px-0">
           <h3 class="text-3xl font-bold text-slate-800 mb-2">আমাদের প্রোডাক্ট সমূহ</h3>
-          <p class="text-slate-500 mb-10">আমাদের রয়েছে অসংখ্য ক্যাটাগরির প্রোডাক্ট, যেগুলো আপনি সহজেই সেল করতে পারবেন।</p>
+          <p class="text-slate-500 mb-6">আমাদের রয়েছে অসংখ্য ক্যাটাগরির প্রোডাক্ট, যেগুলো আপনি সহজেই সেল করতে পারবেন।</p>
+          
+          <!-- Landing Categories Tabs -->
+          <div id="landingCategoriesContainer" class="flex flex-wrap justify-center gap-2 mb-10"></div>
           
           <!-- Landing Products Container -->
           <div id="landingProductsContainer" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-             <!-- Products will be injected here via JS -->
-             <div class="col-span-full py-5 sm:py-10 text-slate-400">
-                <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
-                <p>প্রোডাক্ট লোড হচ্ছে...</p>
+             <div class="col-span-full py-12 text-slate-500 font-bold bg-white/60 rounded-2xl border border-dashed border-slate-200 flex flex-col items-center justify-center gap-3">
+                <i class="fas fa-th-large text-slate-400 text-3xl"></i>
+                <span>পণ্য দেখতে অনুগ্রহ করে একটি ক্যাটাগরি নির্বাচন করুন</span>
              </div>
           </div>
         </div>
@@ -3752,6 +3754,9 @@
                           appPosts = firebasePosts;
                           localStorage.setItem('bexo_posts', JSON.stringify(appPosts));
                           triggerViewRendering('posts');
+                          if (typeof loadLandingProducts === 'function') {
+                              loadLandingProducts();
+                          }
                           if (typeof updateAdminStats === 'function') {
                               updateAdminStats();
                           }
@@ -20858,57 +20863,163 @@ window.showAuth = function(isLogin) {
     }
 };
 
+let selectedLandingCategory = null;
+
+function selectLandingCategory(category) {
+    selectedLandingCategory = category;
+    loadLandingProducts();
+}
+
 async function loadLandingProducts() {
     const container = document.getElementById('landingProductsContainer');
     if (!container) return;
     
+    const catContainer = document.getElementById('landingCategoriesContainer');
+    if (catContainer) {
+        catContainer.innerHTML = '';
+        catContainer.style.display = 'none';
+    }
+    
     try {
-        const snapshot = await window.db.collection('bexo_categories').get();
+        let products = [];
         
-        if (snapshot.empty) {
-            container.innerHTML = '<div class="col-span-full py-5 sm:py-10 text-slate-400">কোন প্রোডাক্ট পাওয়া যায়নি।</div>';
-            return;
+        // Attempt to fetch from window.db first if it's initialized
+        if (window.db && typeof window.db.collection === 'function') {
+            try {
+                const snapshot = await window.db.collection('bexo_posts').get();
+                if (snapshot && !snapshot.empty) {
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data) {
+                            products.push(data);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to fetch landing products from firestore directly:", err);
+            }
         }
         
-        let allItems = [];
-        snapshot.forEach(doc => {
-            const cat = doc.data();
-            if (cat.subCategories && Array.isArray(cat.subCategories)) {
-                cat.subCategories.forEach(sub => {
-                    if (sub.image) {
-                        allItems.push({
-                            name: sub.name || cat.name,
-                            image: sub.image,
-                            order: sub.order || 999
-                        });
-                    }
-                });
-            } else if (cat.image) {
-                allItems.push({
-                    name: cat.name,
-                    image: cat.image,
-                    order: cat.order || 999
-                });
-            }
+        // Fallback to local appPosts if database fetch returned nothing (or database is not ready/failed)
+        if (products.length === 0 && typeof appPosts !== 'undefined' && Array.isArray(appPosts) && appPosts.length > 0) {
+            products = [...appPosts];
+        }
+        
+        // Filter published and in-stock products
+        let activeProducts = products.filter(p => {
+            const isPublished = p.isPublished !== false;
+            const isStockOut = p.isStockOut === true || (p.stockCount !== undefined && p.stockCount <= 0);
+            return isPublished && !isStockOut;
         });
         
-        allItems.sort((a,b) => a.order - b.order);
-        allItems = allItems.slice(0, 24);
+        // Extract unique, non-empty category names from active products
+        const catSet = new Set();
+        activeProducts.forEach(p => {
+            if (p.category && typeof p.category === 'string' && p.category.trim()) {
+                catSet.add(p.category.trim());
+            }
+        });
+        const uniqueCategories = Array.from(catSet).sort();
         
-        if (allItems.length === 0) {
-            container.innerHTML = '<div class="col-span-full py-5 sm:py-10 text-slate-400">কোন প্রোডাক্ট পাওয়া যায়নি।</div>';
+        // If no category is selected, render the Visual Category Grid
+        if (!selectedLandingCategory) {
+            if (uniqueCategories.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full py-12 text-slate-500 font-bold bg-white/60 rounded-2xl border border-dashed border-slate-200 flex flex-col items-center justify-center gap-3">
+                        <i class="fas fa-th-large text-slate-400 text-3xl"></i>
+                        <span>কোন ক্যাটাগরি পাওয়া যায়নি।</span>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Build category thumbnail mapping from first active product of each category or bexo_categories
+            const catImageMap = {};
+            activeProducts.forEach(p => {
+                if (p.category && typeof p.category === 'string' && p.category.trim()) {
+                    const catName = p.category.trim();
+                    if (!catImageMap[catName] && p.images && p.images.length > 0) {
+                        catImageMap[catName] = p.images[0];
+                    }
+                }
+            });
+            
+            const findCatImg = (catName) => {
+                if (catImageMap[catName]) return catImageMap[catName];
+                if (typeof appCategories !== 'undefined' && Array.isArray(appCategories)) {
+                    const found = appCategories.find(c => c && c.name && c.name.trim() === catName);
+                    if (found && found.image) return found.image;
+                }
+                return 'https://via.placeholder.com/150';
+            };
+            
+            let categoriesHtml = uniqueCategories.map(cat => {
+                const imageUrl = findCatImg(cat);
+                const count = activeProducts.filter(p => p.category && p.category.trim() === cat).length;
+                return `
+                  <div onclick="selectLandingCategory('${cat}')" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center text-center group">
+                    <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-slate-50 border border-slate-100 mb-4 flex items-center justify-center relative shadow-inner">
+                      <img src="${imageUrl}" alt="${cat}" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" onerror="this.src='https://via.placeholder.com/150'">
+                    </div>
+                    <h4 class="text-sm font-bold text-slate-700 group-hover:text-orange-600 transition-colors leading-tight line-clamp-2">${cat}</h4>
+                    <span class="text-[10px] text-slate-400 mt-2 font-bold bg-slate-100 px-2.5 py-1 rounded-full group-hover:bg-orange-50 group-hover:text-orange-600 transition-all">
+                       ${count} টি প্রোডাক্ট
+                    </span>
+                  </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = categoriesHtml;
             return;
         }
         
-        let htmlStr = '';
-        allItems.forEach(item => {
-            const imageUrl = item.image || 'https://via.placeholder.com/150';
-            const name = item.name || 'Unknown';
+        // Filter products belonging to selected category
+        let categoryProducts = activeProducts.filter(p => p.category && p.category.trim() === selectedLandingCategory);
+        
+        // Sort by ID descending (newest first)
+        categoryProducts.sort((a, b) => Number(b.id) - Number(a.id));
+        
+        // Slice to max 24 products
+        categoryProducts = categoryProducts.slice(0, 24);
+        
+        let htmlStr = `
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 w-full col-span-full text-left">
+              <button onclick="selectLandingCategory(null)" class="flex items-center justify-center gap-2 px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-sm hover:text-orange-600 hover:bg-orange-50 hover:border-orange-200 transition-all cursor-pointer w-fit">
+                <i class="fas fa-arrow-left"></i> ব্যাক (সব ক্যাটাগরি)
+              </button>
+              <div class="flex items-center gap-2 bg-orange-50 border border-orange-100 px-4 py-2 rounded-xl w-fit">
+                <span class="text-xs font-bold text-slate-500">নির্বাচিত ক্যাটাগরি:</span>
+                <span class="text-xs font-black text-orange-600">${selectedLandingCategory}</span>
+              </div>
+            </div>
+        `;
+        
+        if (categoryProducts.length === 0) {
+            htmlStr += '<div class="col-span-full py-12 text-slate-400 text-center font-bold bg-white/60 rounded-2xl border border-dashed border-slate-200">এই ক্যাটাগরিতে কোন প্রোডাক্ট পাওয়া যায়নি।</div>';
+            container.innerHTML = htmlStr;
+            return;
+        }
+        
+        categoryProducts.forEach(p => {
+            const mainImg = (p.images && p.images.length > 0) ? p.images[0] : 'https://via.placeholder.com/150';
+            const title = p.title || 'Unknown Product';
+            const price = p.price || 0;
             
             htmlStr += `
-              <div class="bg-white rounded-lg shadow-sm border border-slate-100 overflow-hidden flex flex-col items-center justify-center p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="showAuth(false)">
-                <img src="${imageUrl}" alt="${name}" class="w-full h-32 object-contain mb-3" onerror="this.src='https://via.placeholder.com/150'" />
-                <h4 class="text-slate-700 font-medium text-sm text-center">${name}</h4>
+              <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden p-3 group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col font-bold cursor-pointer" onclick="showAuth(false)">
+                <div class="relative w-full aspect-square rounded-lg overflow-hidden mb-3 bg-white">
+                  <img src="${mainImg}" alt="${title}" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700" onerror="this.src='https://via.placeholder.com/150'">
+                </div>
+                <div class="space-y-1 mb-2 flex-grow px-1 text-left">
+                  <h3 class="text-[12px] font-bold text-slate-600 line-clamp-2 leading-snug">${title}</h3>
+                  <div class="flex items-center gap-1.5 mt-1">
+                    <span class="text-[10px] font-bold text-slate-400">প্রাইস</span>
+                    <span class="text-[12px] font-black text-pink-600">৳${price}</span>
+                  </div>
+                </div>
+                <button class="w-full py-1.5 bg-orange-50 hover:bg-orange-500 hover:text-white text-orange-600 rounded-lg text-[11px] font-bold transition-all border border-orange-100 mt-1">
+                  বিস্তারিত দেখুন
+                </button>
               </div>
             `;
         });
@@ -20922,6 +21033,9 @@ async function loadLandingProducts() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Render immediately using local posts cache if available
+    loadLandingProducts();
+    
     if (window.db !== null && typeof window.db !== 'undefined') {
         loadLandingProducts();
     } else {
