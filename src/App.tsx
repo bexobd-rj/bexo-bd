@@ -27,7 +27,8 @@ import {
   TrendingUp,
   Users,
   Key,
-  ShieldAlert
+  ShieldAlert,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from './firebase';
@@ -52,7 +53,7 @@ import { AdminTransferPanel } from './components/AdminTransferPanel';
 import { InvoiceViewer } from './components/InvoiceViewer';
 
 // --- Types & Constants ---
-type View = 'dashboard' | 'profile' | 'products' | 'orders' | 'admin-orders' | 'admin-payouts' | 'admin-products' | 'admin-users' | 'admin-panel' | 'cart' | 'sales' | 'balance' | 'support';
+type View = 'dashboard' | 'profile' | 'products' | 'orders' | 'admin-orders' | 'admin-payouts' | 'admin-products' | 'admin-users' | 'admin-panel' | 'cart' | 'sales' | 'balance' | 'support' | 'login';
 
 interface AdminWorkspaceProps {
   allUsers: UserProfile[];
@@ -137,6 +138,18 @@ function AdminWorkspace({ allUsers, transactions, products, orders }: AdminWorks
   );
 }
 
+const getProductCategory = (product: Product): string => {
+  if (product.category && product.category.trim() !== '') {
+    return product.category;
+  }
+  const title = product.title.toLowerCase();
+  if (title.includes('panjabi')) return 'Clothing (পাঞ্জাবি)';
+  if (title.includes('jeans') || title.includes('denim')) return 'Clothing (জিন্স)';
+  if (title.includes('polo') || title.includes('shirt')) return 'Clothing (শার্ট/পোলো)';
+  if (title.includes('earbuds') || title.includes('wireless') || title.includes('sound') || title.includes('audio')) return 'Electronics (ইলেকট্রনিক্স)';
+  return 'General (অন্যান্য)';
+};
+
 const DELIVERY_CHARGES = {
   inside: 60,
   outside: 120
@@ -144,10 +157,10 @@ const DELIVERY_CHARGES = {
 
 // --- Mock Data for Initial Load (if no DB products) ---
 const INITIAL_PRODUCTS: Partial<Product>[] = [
-  { title: "Cotton Panjabi - White", basePrice: 850, imageUrl: "https://picsum.photos/seed/panjabi/400/400", description: "Premium quality cotton panjabi for regular use." },
-  { title: "Blue Denim Jeans", basePrice: 1200, imageUrl: "https://picsum.photos/seed/jeans/400/400", description: "Stretchable denim jeans with slim fit." },
-  { title: "Casual Polo Shirt", basePrice: 450, imageUrl: "https://picsum.photos/seed/polo/400/400", description: "Comfortable polo shirt in multiple colors." },
-  { title: "Wireless Earbuds G2", basePrice: 1500, imageUrl: "https://picsum.photos/seed/audio/400/400", description: "High-quality sound with long battery life." },
+  { title: "Cotton Panjabi - White", basePrice: 850, imageUrl: "https://picsum.photos/seed/panjabi/400/400", description: "Premium quality cotton panjabi for regular use.", category: "Clothing (পাঞ্জাবি)" },
+  { title: "Blue Denim Jeans", basePrice: 1200, imageUrl: "https://picsum.photos/seed/jeans/400/400", description: "Stretchable denim jeans with slim fit.", category: "Clothing (জিন্স)" },
+  { title: "Casual Polo Shirt", basePrice: 450, imageUrl: "https://picsum.photos/seed/polo/400/400", description: "Comfortable polo shirt in multiple colors.", category: "Clothing (শার্ট/পোলো)" },
+  { title: "Wireless Earbuds G2", basePrice: 1500, imageUrl: "https://picsum.photos/seed/audio/400/400", description: "High-quality sound with long battery life.", category: "Electronics (ইলেকট্রনিক্স)" },
 ];
 
 export default function App() {
@@ -155,7 +168,14 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [activeView, setActiveView] = useState<View>('dashboard');
+  const [activeView, setActiveView] = useState<View>(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const redirectParam = searchParams.get('redirect');
+    if (redirectParam && redirectParam.startsWith('/product/')) {
+      return 'login';
+    }
+    return 'dashboard';
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -163,6 +183,44 @@ export default function App() {
   const [cart, setCart] = useState<Product | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [redirectProductId, setRedirectProductId] = useState<string | null>(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const redirectParam = searchParams.get('redirect');
+    if (redirectParam && redirectParam.startsWith('/product/')) {
+      return redirectParam.replace('/product/', '');
+    }
+    return null;
+  });
+
+  // Adjust activeView based on auth state completion
+  useEffect(() => {
+    if (!isLoadingAuth) {
+      if (!user) {
+        if (activeView !== 'products' && activeView !== 'login') {
+          setActiveView('products');
+        }
+      } else {
+        if (activeView === 'login') {
+          setActiveView('dashboard');
+        }
+      }
+    }
+  }, [isLoadingAuth, user]);
+
+  // Handle deep-linking redirect after login and products are loaded
+  useEffect(() => {
+    if (user && redirectProductId && products.length > 0) {
+      const foundProduct = products.find(p => p.id === redirectProductId);
+      if (foundProduct) {
+        setCart(foundProduct);
+        setIsCheckoutOpen(true);
+        setRedirectProductId(null);
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+        setActiveView('products');
+      }
+    }
+  }, [user, redirectProductId, products]);
 
   // --- Auth & Profile ---
   useEffect(() => {
@@ -261,19 +319,6 @@ export default function App() {
       }
     );
 
-    // Listen for products
-    const qProducts = query(collection(db, 'products'));
-    const unsubProducts = onSnapshot(
-      qProducts, 
-      (snap) => {
-        const p = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-        setProducts(p);
-      },
-      (err) => {
-        console.error("Products onSnapshot error:", err);
-      }
-    );
-
     // Listen for orders
     console.log("Setting up orders listener for", user.uid, "Role:", profile.role);
     let qOrders;
@@ -333,12 +378,27 @@ export default function App() {
 
     return () => {
       unsubProfile();
-      unsubProducts();
       unsubOrders();
       unsubTrans();
       unsubUsers();
     };
   }, [user?.uid, profile?.role]);
+
+  // Listen for products unconditionally so guests can see B2B catalog
+  useEffect(() => {
+    const qProducts = query(collection(db, 'products'));
+    const unsubProducts = onSnapshot(
+      qProducts, 
+      (snap) => {
+        const p = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+        setProducts(p);
+      },
+      (err) => {
+        console.error("Products onSnapshot error:", err);
+      }
+    );
+    return () => unsubProducts();
+  }, []);
 
   if (isLoadingAuth) {
     return (
@@ -351,7 +411,7 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  if (!user && activeView === 'login') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 bg-gradient-to-br from-orange-50 to-white">
         <motion.div 
@@ -377,6 +437,17 @@ export default function App() {
               className="w-full py-5 bg-primary hover:bg-primary-dark text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-xl shadow-orange-100 transition-all transform active:scale-95 flex items-center justify-center gap-3"
             >
               SIGN IN WITH GOOGLE <ChevronRight size={18} />
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveView('products');
+                const cleanUrl = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, '', cleanUrl);
+              }}
+              className="w-full py-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-600 rounded-2xl font-black uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2"
+            >
+              Browse Catalog as Guest
             </button>
             
             <p className="text-[10px] text-center font-bold text-slate-300 uppercase tracking-widest mt-6">
@@ -420,30 +491,135 @@ export default function App() {
         </div>
 
         <nav className="p-3 space-y-1 overflow-y-auto flex-1">
-          <NavItem icon={<LayoutDashboard size={20} />} label="Dashboard" active={activeView === 'dashboard'} onClick={() => { setActiveView('dashboard'); setIsSidebarOpen(false); }} />
-          <NavItem icon={<User size={20} />} label="Profile" active={activeView === 'profile'} onClick={() => { setActiveView('profile'); setIsSidebarOpen(false); }} />
-          <NavItem icon={<Package size={20} />} label="All Products" active={activeView === 'products'} onClick={() => { setActiveView('products'); setIsSidebarOpen(false); }} />
-          <NavItem icon={<ClipboardList size={20} />} label="Order List" active={activeView === 'orders'} onClick={() => { setActiveView('orders'); setIsSidebarOpen(false); }} />
+          <NavItem 
+            icon={<LayoutDashboard size={20} />} 
+            label="Dashboard" 
+            active={activeView === 'dashboard'} 
+            onClick={() => {
+              if (!user) {
+                setActiveView('login');
+              } else {
+                setActiveView('dashboard');
+                setIsSidebarOpen(false);
+              }
+            }} 
+            locked={!user}
+          />
+          <NavItem 
+            icon={<User size={20} />} 
+            label="Profile" 
+            active={activeView === 'profile'} 
+            onClick={() => {
+              if (!user) {
+                setActiveView('login');
+              } else {
+                setActiveView('profile');
+                setIsSidebarOpen(false);
+              }
+            }} 
+            locked={!user}
+          />
+          <NavItem 
+            icon={<Package size={20} />} 
+            label="All Products" 
+            active={activeView === 'products'} 
+            onClick={() => { setActiveView('products'); setIsSidebarOpen(false); }} 
+          />
+          <NavItem 
+            icon={<ClipboardList size={20} />} 
+            label="Order List" 
+            active={activeView === 'orders'} 
+            onClick={() => {
+              if (!user) {
+                setActiveView('login');
+              } else {
+                setActiveView('orders');
+                setIsSidebarOpen(false);
+              }
+            }} 
+            locked={!user}
+          />
           {profile?.role === 'admin' && (
             <NavItem icon={<Key size={20} />} label="🔑 Admin Panel" active={activeView === 'admin-panel'} onClick={() => { setActiveView('admin-panel'); setIsSidebarOpen(false); }} />
           )}
-          <NavItem icon={<ShoppingCart size={20} />} label="Cart List" active={activeView === 'cart'} onClick={() => { setActiveView('cart'); setIsSidebarOpen(false); }} />
+          <NavItem 
+            icon={<ShoppingCart size={20} />} 
+            label="Cart List" 
+            active={activeView === 'cart'} 
+            onClick={() => {
+              if (!user) {
+                setActiveView('login');
+              } else {
+                setActiveView('cart');
+                setIsSidebarOpen(false);
+              }
+            }} 
+            locked={!user}
+          />
           <div className="pt-4 pb-2 px-3">
             <span className="micro-label">Finance & Support</span>
           </div>
-          <NavItem icon={<BarChart3 size={20} />} label="Sales & Profit" active={activeView === 'sales'} onClick={() => { setActiveView('sales'); setIsSidebarOpen(false); }} />
-          <NavItem icon={<FileText size={20} />} label="Balance Statement" active={activeView === 'balance'} onClick={() => { setActiveView('balance'); setIsSidebarOpen(false); }} />
-          <NavItem icon={<MessageSquare size={20} />} label="Support Ticket" active={activeView === 'support'} onClick={() => { setActiveView('support'); setIsSidebarOpen(false); }} />
+          <NavItem 
+            icon={<BarChart3 size={20} />} 
+            label="Sales & Profit" 
+            active={activeView === 'sales'} 
+            onClick={() => {
+              if (!user) {
+                setActiveView('login');
+              } else {
+                setActiveView('sales');
+                setIsSidebarOpen(false);
+              }
+            }} 
+            locked={!user}
+          />
+          <NavItem 
+            icon={<FileText size={20} />} 
+            label="Balance Statement" 
+            active={activeView === 'balance'} 
+            onClick={() => {
+              if (!user) {
+                setActiveView('login');
+              } else {
+                setActiveView('balance');
+                setIsSidebarOpen(false);
+              }
+            }} 
+            locked={!user}
+          />
+          <NavItem 
+            icon={<MessageSquare size={20} />} 
+            label="Support Ticket" 
+            active={activeView === 'support'} 
+            onClick={() => {
+              if (!user) {
+                setActiveView('login');
+              } else {
+                setActiveView('support');
+                setIsSidebarOpen(false);
+              }
+            }} 
+            locked={!user}
+          />
         </nav>
 
         <div className="p-3 border-t border-border space-y-1">
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-text-muted hover:text-primary hover:bg-[#FFF5EE] rounded-lg font-semibold transition-all"
-          >
-            <LogOut size={20} />
-            <span>Logout</span>
-          </button>
+          {user ? (
+            <button 
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 text-text-muted hover:text-primary hover:bg-[#FFF5EE] rounded-lg font-semibold transition-all"
+            >
+              <LogOut size={20} />
+              <span>Logout</span>
+            </button>
+          ) : (
+            <button 
+              onClick={() => setActiveView('login')}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold transition-all shadow-sm"
+            >
+              <span>Sign In / Register</span>
+            </button>
+          )}
         </div>
       </aside>
 
@@ -462,16 +638,34 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="hidden sm:flex flex-col items-end bg-[#FFF0E6] border border-primary px-4 py-2 rounded-full min-w-[120px]">
-              <span className="text-[10px] uppercase font-bold text-primary tracking-widest leading-none mb-1">Current Balance</span>
-              <span className="text-base font-extrabold text-text-main leading-none">৳ {profile?.balance.toLocaleString()}</span>
-            </div>
+            {user ? (
+              <div className="hidden sm:flex flex-col items-end bg-[#FFF0E6] border border-primary px-4 py-2 rounded-full min-w-[120px]">
+                <span className="text-[10px] uppercase font-bold text-primary tracking-widest leading-none mb-1">Current Balance</span>
+                <span className="text-base font-extrabold text-text-main leading-none">৳ {profile?.balance?.toLocaleString() || '0'}</span>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2 bg-slate-100 border border-slate-200 px-4 py-2 rounded-full">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest leading-none">🔒 B2B Portal Guest</span>
+              </div>
+            )}
             
             <button 
-              onClick={() => setActiveView('profile')}
+              onClick={() => {
+                if (!user) {
+                  setActiveView('login');
+                } else {
+                  setActiveView('profile');
+                }
+              }}
               className="user-avatar w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm shadow-sm overflow-hidden border-2 border-white ring-1 ring-border"
             >
-              <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt="Avatar" referrerPolicy="no-referrer" />
+              {user ? (
+                <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt="Avatar" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-500">
+                  <User size={18} />
+                </div>
+              )}
             </button>
           </div>
         </header>
@@ -490,6 +684,9 @@ export default function App() {
               {activeView === 'products' && (
                 <ProductGrid 
                   products={products} 
+                  user={user}
+                  setActiveView={setActiveView}
+                  setRedirectProductId={setRedirectProductId}
                   onAdd={(p) => {
                     setCart(p);
                     setIsCheckoutOpen(true);
@@ -555,23 +752,27 @@ export default function App() {
 
 // --- Sub-components ---
 
-function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void }) {
+function NavItem({ icon, label, active, onClick, locked }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, locked?: boolean }) {
   return (
     <button 
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-[14px] transition-all duration-200 group relative",
+        "w-full flex items-center justify-between px-4 py-3 rounded-lg font-semibold text-[14px] transition-all duration-200 group relative",
         active 
           ? "bg-[#FFF5EE] text-primary" 
           : "text-text-muted hover:text-primary hover:bg-[#FFF5EE]"
       )}
     >
-      <span className={cn(
-        "transition-transform",
-        active ? "scale-110" : "group-hover:scale-110"
-      )}>{icon}</span>
-      <span className="whitespace-nowrap">{label}</span>
-      {active && (
+      <div className="flex items-center gap-3">
+        <span className={cn(
+          "transition-transform",
+          active ? "scale-110" : "group-hover:scale-110"
+        )}>{icon}</span>
+        <span className="whitespace-nowrap">{label}</span>
+      </div>
+      {locked ? (
+        <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-black tracking-wider uppercase">🔒 B2B</span>
+      ) : active && (
         <div className="absolute right-3 w-1.5 h-1.5 bg-primary rounded-full shadow-sm" />
       )}
     </button>
@@ -657,7 +858,19 @@ function Dashboard({ orders, products, profile }: { orders: Order[], products: P
   );
 }
 
-function ProductGrid({ products, onAdd }: { products: Product[], onAdd: (p: Product) => void }) {
+function ProductGrid({ 
+  products, 
+  onAdd, 
+  user, 
+  setActiveView, 
+  setRedirectProductId 
+}: { 
+  products: Product[], 
+  onAdd: (p: Product) => void, 
+  user: any, 
+  setActiveView: (view: View) => void, 
+  setRedirectProductId: (id: string | null) => void 
+}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'available' | 'stockout' | 'all'>('available');
   
@@ -676,6 +889,31 @@ function ProductGrid({ products, onAdd }: { products: Product[], onAdd: (p: Prod
       return true;
     });
   }, [products, searchTerm, filter]);
+
+  // Group the filtered products by their category
+  const groupedProducts = useMemo(() => {
+    const groups: Record<string, Product[]> = {};
+    filtered.forEach(p => {
+      const cat = getProductCategory(p);
+      if (!groups[cat]) {
+        groups[cat] = [];
+      }
+      groups[cat].push(p);
+    });
+    return groups;
+  }, [filtered]);
+
+  const handleProductClick = (product: Product) => {
+    if (!user) {
+      // Setup the deep-linking redirection parameters
+      setRedirectProductId(product.id);
+      const newUrl = `${window.location.origin}${window.location.pathname}?redirect=/product/${product.id}`;
+      window.history.pushState({}, '', newUrl);
+      setActiveView('login');
+    } else {
+      onAdd(product);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -740,72 +978,120 @@ function ProductGrid({ products, onAdd }: { products: Product[], onAdd: (p: Prod
       </div>
 
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-          {filtered.map((product, i) => {
-            const isStockOut = product.stockStatus === 'out_of_stock' || (product.stock !== undefined && product.stock <= 0);
-            return (
-              <motion.div 
-                key={product.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: i * 0.05 }}
-                className={cn(
-                  "bg-surface rounded-xl border overflow-hidden p-3 transition-all hover:shadow-md group relative flex flex-col justify-between h-auto min-h-[300px] border-border",
-                  isStockOut && "opacity-85 border-red-100"
-                )}
-              >
-                <div>
-                  <div className="w-full h-[140px] bg-[#f0f0f0] rounded-lg mb-3 flex items-center justify-center overflow-hidden relative">
-                    <img 
-                      src={product.imageUrl} 
-                      className={cn(
-                        "w-full h-full object-cover transition-transform duration-500 group-hover:scale-105",
-                        isStockOut && "grayscale-[30%]"
-                      )} 
-                      alt={product.title} 
-                      referrerPolicy="no-referrer"
-                    />
-                    
-                    {/* Stock status indicator badge */}
-                    {isStockOut ? (
-                      <div className="absolute top-2 left-2 bg-red-600/90 text-white text-[10px] uppercase font-black tracking-widest px-2.5 py-1 rounded shadow-sm">
-                        🔴 Stock Out
-                      </div>
-                    ) : (
-                      product.stock !== undefined && (
-                        <div className={cn(
-                          "absolute top-2 left-2 text-[10px] uppercase font-black tracking-widest px-2.5 py-1 rounded shadow-sm bg-black/75 text-white"
-                        )}>
-                          ⚡ Stock: {product.stock} left
-                        </div>
-                      )
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1 mb-3">
-                    <h4 className="text-[14px] font-bold text-text-main line-clamp-1">{product.title}</h4>
-                    <div className="text-[18px] font-extrabold text-primary">৳ {product.basePrice.toLocaleString()}</div>
-                    <p className="text-xs text-text-muted line-clamp-2 h-8">{product.description}</p>
-                  </div>
-                </div>
+        <div className="space-y-12">
+          {Object.entries(groupedProducts).map(([categoryName, categoryProducts]) => (
+            <div key={categoryName} className="space-y-6">
+              {/* Category Header */}
+              <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
+                <h3 className="text-xl font-extrabold text-slate-800 tracking-tight">{categoryName}</h3>
+                <span className="text-xs bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-full font-bold">
+                  {categoryProducts.length} items
+                </span>
+              </div>
 
-                <div className="mt-2 shrink-0">
-                  <button 
-                    onClick={() => !isStockOut && onAdd(product)}
-                    disabled={isStockOut}
-                    className={cn(
-                      "w-full py-2.5 rounded-lg font-bold text-[14px] transition-all flex items-center justify-center gap-2 cursor-pointer",
-                      isStockOut 
-                        ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed" 
-                        : "bg-primary hover:bg-primary-dark text-white shadow-sm"
-                    )}
-                  >
-                    {isStockOut ? 'Stock Out' : 'Add to Order'}
-                  </button>
-                </div>
-              </motion.div>
-            );
-          })}
+              {/* Product Grid inside this Category */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+                {categoryProducts.map((product, i) => {
+                  const isStockOut = product.stockStatus === 'out_of_stock' || (product.stock !== undefined && product.stock <= 0);
+                  return (
+                    <motion.div 
+                      key={product.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      onClick={() => handleProductClick(product)}
+                      className={cn(
+                        "bg-surface rounded-xl border overflow-hidden p-3 transition-all hover:shadow-md group relative flex flex-col justify-between h-auto min-h-[320px] border-border cursor-pointer",
+                        isStockOut && "opacity-85 border-red-100"
+                      )}
+                    >
+                      <div>
+                        <div className="w-full h-[140px] bg-[#f0f0f0] rounded-lg mb-3 flex items-center justify-center overflow-hidden relative">
+                          <img 
+                            src={product.imageUrl} 
+                            className={cn(
+                              "w-full h-full object-cover transition-transform duration-500 group-hover:scale-105",
+                              isStockOut && "grayscale-[30%]"
+                            )} 
+                            alt={product.title} 
+                            referrerPolicy="no-referrer"
+                          />
+                          
+                          {/* Stock status indicator badge */}
+                          {isStockOut ? (
+                            <div className="absolute top-2 left-2 bg-red-600/90 text-white text-[10px] uppercase font-black tracking-widest px-2.5 py-1 rounded shadow-sm">
+                              🔴 Stock Out
+                            </div>
+                          ) : (
+                            product.stock !== undefined && (
+                              <div className={cn(
+                                "absolute top-2 left-2 text-[10px] uppercase font-black tracking-widest px-2.5 py-1 rounded shadow-sm bg-black/75 text-white"
+                              )}>
+                                ⚡ Stock: {product.stock} left
+                              </div>
+                            )
+                          )}
+                        </div>
+                        
+                        <div className="space-y-1 mb-3">
+                          <h4 className="text-[14px] font-bold text-text-main line-clamp-1">{product.title}</h4>
+                          
+                          {/* Guest Price Protection Gate */}
+                          {!user ? (
+                            <div className="mt-2 bg-[#FDFBF7] border border-orange-100 rounded-xl p-3 text-center flex flex-col items-center gap-1.5 shadow-xs transition-all group-hover:bg-orange-50/20">
+                              <div className="w-7 h-7 rounded-full bg-orange-50 flex items-center justify-center text-primary shrink-0">
+                                <Lock size={12} className="stroke-[2.5]" />
+                              </div>
+                              <p className="text-[10px] font-bold text-slate-600 leading-relaxed max-w-[190px]">
+                                To view pricing details and unlock full access, please login or register an account.
+                              </p>
+                              <span className="text-[9px] font-black uppercase text-primary tracking-wider mt-0.5">
+                                Sign In / Register ➔
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-[18px] font-extrabold text-primary">৳ {product.basePrice.toLocaleString()}</div>
+                          )}
+                          
+                          <p className="text-xs text-text-muted line-clamp-2 h-8 mt-1">{product.description}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 shrink-0">
+                        {!user ? (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleProductClick(product);
+                            }}
+                            className="w-full py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold text-[14px] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                          >
+                            <Lock size={14} /> Login to Access
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isStockOut) onAdd(product);
+                            }}
+                            disabled={isStockOut}
+                            className={cn(
+                              "w-full py-2.5 rounded-lg font-bold text-[14px] transition-all flex items-center justify-center gap-2 cursor-pointer",
+                              isStockOut 
+                                ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed" 
+                                : "bg-primary hover:bg-primary-dark text-white shadow-sm"
+                            )}
+                          >
+                            {isStockOut ? 'Stock Out' : 'Add to Order'}
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="p-16 border rounded-2xl bg-[#FAF9F8] text-center flex flex-col items-center justify-center">
