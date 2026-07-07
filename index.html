@@ -18605,6 +18605,8 @@ function updateUserTicketStatus(id, newStatus) {
                           html2canvas:  { 
                               scale: 2,
                               useCORS: true,
+                              allowTaint: true,
+                              imageTimeout: 15000,
                               logging: false 
                           },
                           jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }

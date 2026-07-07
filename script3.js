@@ -9085,18 +9085,16 @@
                           <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between">
                               <div class="flex items-center gap-4">
                                   <div onclick="triggerAvatarUpload()" class="w-14 h-14 bg-purple-100 rounded-full border border-purple-200 overflow-hidden relative cursor-pointer group flex items-center justify-center shrink-0 shadow-inner">
-                                      ${userProfile.avatar ? `
-                                          <img src="${userProfile.avatar}" class="w-full h-full object-cover">
-                                      ` : `
-                                          <i class="fas fa-user-edit text-purple-600 text-lg"></i>
-                                      `}
+                                       <img id="avatarPreview" src="${userProfile.avatar || ''}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.name || 'User')}&background=random'" class="w-full h-full object-cover ${userProfile.avatar ? '' : 'hidden'}">
+                                       <i id="avatarPlaceholder" class="fas fa-user-edit text-purple-600 text-lg ${userProfile.avatar ? 'hidden' : ''}"></i>
                                       <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                                           <i class="fas fa-camera text-white text-xs"></i>
                                       </div>
                                   </div>
+                                       <button onclick="triggerAvatarUpload()" class="mt-2 text-[9px] bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100 hover:bg-purple-600 hover:text-white transition-all font-bold whitespace-nowrap">পরিবর্তন</button>
                                   <div>
                                       <h2 class="text-xl font-bold text-slate-800">পার্সোনাল প্রোফাইল</h2>
-                                      <p class="text-[10px] text-slate-400 font-bold cursor-pointer hover:text-orange-600 transition-colors" onclick="triggerAvatarUpload()">ছবি পরিবর্তন করতে ট্যাপ করুন</p>
+                                      <p class="text-[10px] text-slate-400 font-bold cursor-pointer hover:text-orange-600 transition-colors" onclick="triggerAvatarUpload()">ছবি পরিবর্তন করুন</p>
                                   </div>
                                   <input type="file" id="avatarInput" accept="image/*" class="hidden" onchange="handleAvatarFileSelect(event)">
                               </div>
@@ -9152,47 +9150,47 @@
 
                                   <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                       <div class="space-y-2">
-                                          <label class="block text-sm font-bold text-slate-700">প্রোফাইল আইডি (Profile ID)</label>
+                                          <label class="block text-sm font-bold text-slate-700">প্রোফাইল আইডি</label>
                                           <input type="text" value="${userProfile.profileId || 'N/A'}" readonly class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 font-bold font-mono">
                                       </div>
                                       <div class="space-y-2">
-                                          <label class="block text-sm font-bold text-slate-700">মোবাইল নং <span class="text-red-500">*</span></label>
+                                          <label class="block text-sm font-bold text-slate-700"><i class="fas fa-phone mr-2 text-orange-500"></i> মোবাইল নং <span class="text-red-500">*</span></label>
                                           <input type="tel" id="profilePhone" value="${userProfile.phone}" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-600 font-medium">
                                       </div>
                                   </div>
 
                                   <div class="space-y-2">
-                                      <label class="block text-sm font-bold text-slate-700">ব্যক্তিগত নাম <span class="text-red-500">*</span></label>
+                                      <label class="block text-sm font-bold text-slate-700"><i class="fas fa-user mr-2 text-slate-400"></i> ব্যক্তিগত নাম <span class="text-red-500">*</span></label>
                                       <input type="text" id="profileName" value="${userProfile.fullName}" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-600 font-medium" placeholder="আপনার নাম লিখুন">
                                   </div>
 
                                   <div class="space-y-2">
-                                      <label class="block text-sm font-bold text-slate-700">শপ নাম / ফেসবুক পেইজ নাম <span class="text-red-500">*</span></label>
+                                      <label class="block text-sm font-bold text-slate-700"><i class="fas fa-store mr-2 text-slate-400"></i> শপ নাম / ফেসবুক পেইজ নাম <span class="text-red-500">*</span></label>
                                       <input type="text" id="profileShop" value="${userProfile.shopName}" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-600 font-medium" placeholder="আপনার শপের নাম">
                                   </div>
 
                                   <div class="space-y-2">
-                                      <label class="block text-sm font-bold text-slate-700">জিমেইল / ইমেইল (ঐচ্ছিক)</label>
+                                      <label class="block text-sm font-bold text-slate-700"><i class="fas fa-envelope mr-2 text-slate-400"></i> জিমেইল / ইমেইল (ঐচ্ছিক)</label>
                                       <input type="email" id="profileEmail" value="${userProfile.email || ''}" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-600 font-medium" placeholder="আপনার ইমেইল আইডি লিখুন">
                                   </div>
 
                                   <div class="space-y-2">
-                                      <label class="block text-sm font-bold text-slate-700">ফেসবুক পেইজ লিংক/ইউজারনেম (ঐচ্ছিক)</label>
+                                      <label class="block text-sm font-bold text-slate-700"><i class="fab fa-facebook mr-2 text-slate-400"></i> ফেসবুক পেইজ লিংক/ইউজারনেম (ঐচ্ছিক)</label>
                                       <input type="text" id="profileFbPage" value="${userProfile.fbPage || ''}" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-600 font-medium" placeholder="facebook.com/yourpage">
                                   </div>
 
                                   <div class="space-y-2">
-                                      <label class="block text-sm font-bold text-slate-700">ওয়েবসাইট লিংক (ঐচ্ছিক)</label>
+                                      <label class="block text-sm font-bold text-slate-700"><i class="fas fa-globe mr-2 text-slate-400"></i> ওয়েবসাইট লিংক (ঐচ্ছিক)</label>
                                       <input type="url" id="profileWebsite" value="${userProfile.website || ''}" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-600 font-medium" placeholder="https://yourwebsite.com">
                                   </div>
 
                                   <div class="space-y-2">
-                                      <label class="block text-sm font-bold text-slate-700">জেলা <span class="text-red-500">*</span></label>
+                                      <label class="block text-sm font-bold text-slate-700"><i class="fas fa-map-marker-alt mr-2 text-slate-400"></i> জেলা <span class="text-red-500">*</span></label>
                                       <input type="text" id="profileDistrict" value="${userProfile.district || ''}" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-600 font-medium" placeholder="আপনার জেলার নাম লিখুন">
                                   </div>
 
                                   <div class="space-y-2">
-                                      <label class="block text-sm font-bold text-slate-700">ঠিকানা <span class="text-red-500">*</span></label>
+                                      <label class="block text-sm font-bold text-slate-700"><i class="fas fa-map-marked-alt mr-2 text-slate-400"></i> ঠিকানা <span class="text-red-500">*</span></label>
                                       <textarea id="profileAddress" rows="4" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-600 font-medium" placeholder="আপনার সম্পূর্ণ ঠিকানা লিখুন">${userProfile.address || ''}</textarea>
                                   </div>
 
@@ -9296,6 +9294,13 @@
                       img.onload = function() {
                           const canvas = document.createElement('canvas');
                           const MAX_WIDTH = 250;
+                  const preview = document.getElementById('avatarPreview');
+                  const placeholder = document.getElementById('avatarPlaceholder');
+                  if (preview && placeholder) {
+                      preview.src = URL.createObjectURL(file);
+                      preview.classList.remove('hidden');
+                      placeholder.classList.add('hidden');
+                  }
                           const MAX_HEIGHT = 250;
                           let width = img.width;
                           let height = img.height;

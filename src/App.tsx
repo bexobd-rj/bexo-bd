@@ -1701,6 +1701,33 @@ function PriceCard({ label, value, highlight = false, variant = 'slate' }: { lab
 }
 
 function ProfileView({ user, profile, transactions, orders }: { user: any, profile: UserProfile | null, transactions: Transaction[], orders: Order[] }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    phone: profile?.phone || '',
+    shopName: profile?.shopName || '',
+    website: profile?.website || ''
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleUpdateProfile = async () => {
+    if (!profile) return;
+    setIsSaving(true);
+    try {
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, {
+        phone: editForm.phone,
+        shopName: editForm.shopName,
+        website: editForm.website
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      alert("Failed to update profile.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const totalEarnings = transactions
     .filter(t => t.type === 'income' && t.status === 'completed')
     .reduce((sum, t) => sum + t.amount, 0);
@@ -1717,13 +1744,43 @@ function ProfileView({ user, profile, transactions, orders }: { user: any, profi
         </div>
 
         <div className="flex-1 space-y-2 text-center md:text-left">
-          <h3 className="text-3xl font-black text-text-main tracking-tight">{user.displayName}</h3>
-          <p className="micro-label">{profile?.role || 'Reseller'} Partner</p>
-          <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-4">
-            <div className="px-4 py-2 bg-background rounded-lg border border-border text-xs font-bold text-text-muted">
-              {user.email}
+          {isEditing ? (
+            <div className="space-y-4">
+              <input 
+                className="w-full p-2 border rounded"
+                value={editForm.shopName}
+                onChange={(e) => setEditForm({...editForm, shopName: e.target.value})}
+                placeholder="Shop Name"
+              />
+              <input 
+                className="w-full p-2 border rounded"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                placeholder="Phone Number"
+              />
+              <input 
+                className="w-full p-2 border rounded"
+                value={editForm.website}
+                onChange={(e) => setEditForm({...editForm, website: e.target.value})}
+                placeholder="Website"
+              />
+              <div className="flex gap-2">
+                <button className="px-4 py-2 bg-primary text-white rounded" onClick={handleUpdateProfile} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>
+                <button className="px-4 py-2 bg-gray-200 rounded" onClick={() => setIsEditing(false)}>Cancel</button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <h3 className="text-3xl font-black text-text-main tracking-tight">{user.displayName}</h3>
+              <p className="micro-label">{profile?.role || 'Reseller'} Partner</p>
+              <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-4">
+                <div className="px-4 py-2 bg-background rounded-lg border border-border text-xs font-bold text-text-muted">
+                  {user.email}
+                </div>
+                <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-primary/10 text-primary rounded-lg text-xs font-bold">Edit Profile</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
