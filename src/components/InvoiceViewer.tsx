@@ -670,7 +670,7 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
 
         {/* SECTION 3: ORDER ITEMS DETAILS TABLE (EXACT AS SCREENSHOT) */}
         <div className="px-4 sm:px-6 md:px-8 pb-6 md:pb-8 overflow-x-auto">
-          <table className="w-full border-collapse border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+          <table className="w-full border-collapse min-w-[600px] border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             <thead>
               <tr className="bg-[#0E46A3] text-white text-xs font-black uppercase text-center border-b border-slate-200">
                 <th className="px-4 py-4 w-[8%] border-r border-[#1e58b8]">#</th>

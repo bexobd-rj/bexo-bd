@@ -622,9 +622,9 @@ function Dashboard({ orders, products, profile }: { orders: Order[], products: P
 
       <div className="space-y-6">
         <h3 className="text-lg font-extrabold text-text-main">Quick Overview</h3>
-        <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden overflow-x-auto">
           {orders.length > 0 ? (
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse min-w-[600px]">
               <thead>
                 <tr className="bg-[#FAF9F8] border-b border-border">
                   <th className="px-6 py-4 text-left micro-label">Order ID</th>
@@ -740,7 +740,7 @@ function ProductGrid({ products, onAdd }: { products: Product[], onAdd: (p: Prod
       </div>
 
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {filtered.map((product, i) => {
             const isStockOut = product.stockStatus === 'out_of_stock' || (product.stock !== undefined && product.stock <= 0);
             return (
@@ -1745,28 +1745,28 @@ function ProfileView({ user, profile, transactions, orders }: { user: any, profi
 
         <div className="flex-1 space-y-2 text-center md:text-left">
           {isEditing ? (
-            <div className="space-y-4">
+            <div className="space-y-4 w-full max-w-sm mx-auto">
               <input 
-                className="w-full p-2 border rounded"
+                className="w-full p-3 border border-border rounded-lg"
                 value={editForm.shopName}
                 onChange={(e) => setEditForm({...editForm, shopName: e.target.value})}
                 placeholder="Shop Name"
               />
               <input 
-                className="w-full p-2 border rounded"
+                className="w-full p-3 border border-border rounded-lg"
                 value={editForm.phone}
                 onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
                 placeholder="Phone Number"
               />
               <input 
-                className="w-full p-2 border rounded"
+                className="w-full p-3 border border-border rounded-lg"
                 value={editForm.website}
                 onChange={(e) => setEditForm({...editForm, website: e.target.value})}
                 placeholder="Website"
               />
               <div className="flex gap-2">
-                <button className="px-4 py-2 bg-primary text-white rounded" onClick={handleUpdateProfile} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>
-                <button className="px-4 py-2 bg-gray-200 rounded" onClick={() => setIsEditing(false)}>Cancel</button>
+                <button className="flex-1 px-4 py-3 bg-primary text-white rounded-lg font-bold" onClick={handleUpdateProfile} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>
+                <button className="flex-1 px-4 py-3 bg-gray-200 rounded-lg font-bold" onClick={() => setIsEditing(false)}>Cancel</button>
               </div>
             </div>
           ) : (
