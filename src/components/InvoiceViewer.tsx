@@ -11,25 +11,38 @@ import {
   FileText,
   ShieldCheck,
   Receipt,
-  Tag,
-  BadgeAlert,
-  HelpCircle,
-  Clock,
-  Heart,
+  Download,
+  X,
   Send,
   Loader2,
-  Check,
-  X
+  Heart
 } from 'lucide-react';
 import { Order, UserProfile } from '../types';
+import html2pdf from 'html2pdf.js';
 
 interface InvoiceViewerProps {
   order: Order;
   profile?: UserProfile | null;
   currentUser?: any;
+  isAdmin?: boolean;
 }
 
-export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProps) {
+export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdmin = false }: InvoiceViewerProps) {
+  const [order, setOrder] = useState<any>(initialOrder);
+
+  useEffect(() => {
+    if (initialOrder?.id) {
+      import('../firebase').then(({ db }) => {
+        import('firebase/firestore').then(({ doc, getDoc }) => {
+          getDoc(doc(db, 'orders', initialOrder.id)).then(snap => {
+            if (snap.exists()) {
+              setOrder({ id: snap.id, ...snap.data() });
+            }
+          }).catch(err => console.error("Error fetching latest order:", err));
+        });
+      });
+    }
+  }, [initialOrder?.id]);
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   // Robust helper to parse any Date or custom/Bengali formatted date safely
@@ -100,6 +113,29 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
       return dateStr;
     }
   };
+
+  const [resellerProfile, setResellerProfile] = useState<any>(profile || null);
+
+  useEffect(() => {
+    if (profile) {
+      setResellerProfile(profile);
+      return;
+    }
+    
+    if (!profile && order.userId) {
+      import('../firebase').then(({ db }) => {
+        import('firebase/firestore').then(({ doc, getDoc }) => {
+          getDoc(doc(db, 'users', order.userId)).then(snap => {
+            if (snap.exists()) {
+              setResellerProfile(snap.data());
+            }
+          }).catch(err => {
+            console.error("Error loading reseller profile: ", err);
+          });
+        });
+      });
+    }
+  }, [profile, order.userId]);
 
   // Generate a mock but consistent Invoice number based on date and order ID
   const generateInvoiceNo = () => {
@@ -184,13 +220,13 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
   };
 
   // Beautiful profile photo selection
-  const userPhoto = (profile as any)?.avatar || (profile as any)?.photoURL || currentUser?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(order.resellerShopName || order.resellerName || 'Bexo')}&background=10B981&color=ffffff&size=128&bold=true`;
+  const userPhoto = (resellerProfile as any)?.avatar || (resellerProfile as any)?.photoURL || (currentUser?.uid === order.userId ? currentUser?.photoURL : null) || `https://ui-avatars.com/api/?name=${encodeURIComponent((resellerProfile as any)?.shopName || order.resellerShopName || order.resellerName || 'Bexo')}&background=10B981&color=ffffff&size=128&bold=true`;
 
   // Reseller dynamic contact details - fallback to "Not Available" as per requirements
-  const resellerAddress = (profile as any)?.address || (order as any).resellerAddress || 'Not Available';
-  const resellerPhone = (profile as any)?.phone || (order as any).resellerPhone || 'Not Available';
-  const resellerEmail = (profile as any)?.email || order.resellerEmail || 'Not Available';
-  const resellerWebsite = (profile as any)?.website || (order as any).resellerWebsite || 'www.bexo.com.bd';
+  const resellerAddress = (resellerProfile as any)?.address || (order as any).resellerAddress || 'Not Available';
+  const resellerPhone = (resellerProfile as any)?.phone || (order as any).resellerPhone || 'Not Available';
+  const resellerEmail = (resellerProfile as any)?.email || order.resellerEmail || 'Not Available';
+  const resellerWebsite = (resellerProfile as any)?.website || (order as any).resellerWebsite || 'www.bexo.com.bd';
 
   // Dynamic Email Setup States
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -232,7 +268,6 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
 
   const handlePrint = () => {
     const printContent = invoiceRef.current?.innerHTML;
-    const originalContent = document.body.innerHTML;
     if (printContent) {
       // Simple print framework
       const printWindow = window.open('', '', 'width=900,height=900');
@@ -242,12 +277,12 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
             <head>
               <title>Invoice - ${order.id.slice(-6).toUpperCase()}</title>
               <script src="https://cdn.tailwindcss.com"></script>
-              <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
               <style>
+                @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap');
                 body {
                   font-family: 'Hind Siliguri', 'Inter', sans-serif;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
                 }
               </style>
             </head>
@@ -271,6 +306,25 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
     }
   };
 
+  const handleDownload = () => {
+    if (invoiceRef.current) {
+      const element = invoiceRef.current;
+      const opt = {
+        margin: 5,
+        filename: `Invoice-${order.id.slice(-6).toUpperCase()}.pdf`,
+        image: { type: 'jpeg' as const, quality: 1.0 },
+        html2canvas: {
+          scale: 3,
+          useCORS: true,
+          letterRendering: true,
+          windowWidth: 1200
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+      };
+      html2pdf().from(element).set(opt).save();
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Action panel */}
@@ -278,11 +332,10 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <p className="text-xs font-extrabold text-slate-700">Premium Invoice Controls v2.2</p>
+            <p className="text-xs font-extrabold text-slate-700">Premium Invoice Controls v2.3</p>
           </div>
           
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            {/* Recommendation 1: Mail Trigger Button */}
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
             <button
               onClick={() => {
                 setIsEmailModalOpen(true);
@@ -291,16 +344,58 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-wider border border-indigo-200 transition-all cursor-pointer"
             >
               <Mail size={15} />
-              <span>ইমেইলে পাঠান (Email)</span>
+              <span>ইমেইলে পাঠান</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
             >
               <Printer size={15} />
-              <span>প্রিন্ট / ডাউনলোড (Print)</span>
+              <span>প্রিন্ট</span>
             </button>
+
+            <button
+              onClick={handleDownload}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
+            >
+              <Download size={15} />
+              <span>ডাউনলোড পিডিএফ</span>
+            </button>
+            
+            {/* Custom Share Button */}
+            {typeof navigator.share !== 'undefined' && (
+              <button
+                onClick={async () => {
+                  if (invoiceRef.current) {
+                    try {
+                      const html2canvas = (await import('html2canvas')).default;
+                      const canvas = await html2canvas(invoiceRef.current!, {
+                        scale: 2, useCORS: true, backgroundColor: '#ffffff'
+                      });
+                      const dataUrl = canvas.toDataURL('image/png');
+                      const response = await fetch(dataUrl);
+                      const blob = await response.blob();
+                      const file = new File([blob], `Invoice-${order.id.slice(-6).toUpperCase()}.png`, { type: 'image/png' });
+                      if (navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                          files: [file],
+                          title: 'Invoice',
+                          text: 'আপনার ইনভয়েস'
+                        });
+                      }
+                    } catch (err) {
+                      console.error('Share failed', err);
+                      handleDownload(); // Fallback
+                    }
+                  }
+                }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
+              >
+                <Send size={15} />
+                <span>শেয়ার করুন</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -423,20 +518,20 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
         {/* SECTION 1: HEADER BANNER (LAYOUT DESIGN IDENTICAL TO SCREENSHOT) */}
         <div className="relative border-b-2 border-slate-100 bg-white grid grid-cols-1 md:grid-cols-12 overflow-hidden h-auto py-3 md:py-8 px-4 md:pl-10 md:pr-6 gap-3 md:gap-0">
           
-          {/* Wave background container for desktop overlay */}
-          <div className="absolute inset-0 hidden md:block select-none pointer-events-none z-0">
+          {/* Background container for header */}
+          <div className="absolute inset-0 select-none pointer-events-none z-0">
             {/* Right part: solid blue */}
             <div className="absolute top-0 right-0 bottom-0 w-1/2 bg-[#0E46A3]" />
             {/* Wave connector: transitions smoothly into the solid blue block */}
             <div className="absolute top-0 right-1/2 bottom-0 w-48 font-sans">
-              <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <path d="M 100 0 L 20 0 C 45 40, 15 75, 40 100 L 100 100 Z" fill="#0E46A3" />
               </svg>
             </div>
           </div>
 
           {/* Left Column: Seller Brand Details (40% on desktop) */}
-          <div className="md:col-span-5 flex flex-col justify-between z-10 text-left">
+          <div className="col-span-12 md:col-span-5 flex flex-col justify-between z-10 text-left">
             <div>
               {/* Brand Row with Rounded Logged-in User Profile Photo */}
               <div className="flex items-center gap-4 mb-4">
@@ -453,7 +548,7 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
                 </div>
                 <div>
                   <h1 className="text-2xl font-black text-[#0D3B66] tracking-tight leading-tight">
-                    {order.resellerShopName || (profile as any)?.shopName || 'Not Available'}
+                    {(resellerProfile as any)?.shopName || order.resellerShopName || 'Not Available'}
                   </h1>
                   <p className="text-xs text-slate-500 font-bold mt-0.5 animate-pulse">
                     স্মার্টলি পণ্যের বিক্রয়ের ঠিকানা
@@ -462,32 +557,29 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
               </div>
 
               {/* Corporate Contact list */}
-              <div className="space-y-2 text-xs font-semibold text-slate-600 pl-1 mt-6 max-w-[240px] overflow-hidden">
+              <div className="space-y-2 text-xs font-semibold text-slate-600 pl-1 mt-6 overflow-hidden">
                 <div className="flex items-start gap-2.5">
                   <MapPin size={13} className="text-blue-600 mt-0.5 shrink-0" />
-                  <span className="break-words line-clamp-2" title={resellerAddress}>{resellerAddress}</span>
+                  <span className="break-words" title={resellerAddress}>{resellerAddress}</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Phone size={13} className="text-blue-600 shrink-0" />
-                  <span className="font-mono tracking-wide break-all truncate" title={resellerPhone}>{resellerPhone}</span>
+                  <span className="font-mono tracking-wide break-all" title={resellerPhone}>{resellerPhone}</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Mail size={13} className="text-blue-600 shrink-0" />
-                  <span className="break-all truncate max-w-[180px]" title={resellerEmail}>{resellerEmail}</span>
+                  <span className="break-all" title={resellerEmail}>{resellerEmail}</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Globe size={13} className="text-[#0E46A3] shrink-0" />
-                  <span className="break-all truncate max-w-[180px] hover:underline cursor-pointer" title={resellerWebsite || 'www.bexo.com.bd'}>{resellerWebsite || 'www.bexo.com.bd'}</span>
+                  <span className="break-all hover:underline cursor-pointer" title={resellerWebsite || 'www.bexo.com.bd'}>{resellerWebsite || 'www.bexo.com.bd'}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Middle Column: Blue slanted center box containing 'INVOICE' + stamp circle (30% on desktop) */}
-          <div className="md:col-span-3 flex flex-col items-center justify-center relative py-4 md:py-0 min-h-[100px] md:min-h-[140px] z-10 md:text-white">
-            {/* Mobile-only background block for slanted center box */}
-            <div className="absolute inset-0 bg-[#0E46A3] rounded-2xl sm:rounded-3xl -z-10 md:hidden" />
-            
+          <div className="col-span-12 md:col-span-3 flex flex-col items-center justify-center relative py-4 md:py-0 min-h-[100px] md:min-h-[140px] z-10 text-white">
             <div className="text-center text-white space-y-2.5 md:space-y-4">
               <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-wider md:tracking-widest block font-serif">INVOICE</span>
               
@@ -501,36 +593,33 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
           </div>
 
           {/* Right Column: Order Meta Fields (30% on desktop) */}
-          <div className="md:col-span-4 flex flex-col justify-center items-stretch pl-0 md:pl-8 text-xs font-bold text-slate-700 md:text-white z-10 text-left">
+          <div id="order-meta-container" className="col-span-12 md:col-span-4 flex flex-col justify-center items-stretch pl-0 md:pl-8 text-xs font-bold text-slate-800 md:text-white z-10 text-left">
             {/* List with proper key-value layouts */}
-            <div className="space-y-2 md:space-y-3 bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-2xl md:rounded-none border border-slate-100 md:border-none">
+            <div className="space-y-2 md:space-y-3 bg-transparent p-3 md:p-0 rounded-2xl md:rounded-none border-none">
               
-              <div className="flex flex-row items-center justify-between gap-2 py-1 md:grid md:grid-cols-12 md:gap-1 md:items-center border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
-                <span className="md:col-span-5 text-slate-500 md:text-blue-100 font-bold shrink-0">📄 Invoice No</span>
-                <span className="hidden md:inline md:col-span-1 text-center font-bold">:</span>
-                <span className="md:col-span-6 font-mono tracking-tight font-extrabold text-[#334155] md:text-white break-all text-right md:text-left">{generateInvoiceNo()}</span>
+              <div className="flex items-center justify-between gap-1 py-1 font-sans">
+                <span className="text-slate-700 md:text-blue-100 font-bold shrink-0">📄 Invoice No</span>
+                <span className="font-mono tracking-tight font-extrabold text-slate-800 md:text-white break-all text-right">{generateInvoiceNo() || 'N/A'}</span>
               </div>
 
-              <div className="flex flex-row items-center justify-between gap-2 py-1 md:grid md:grid-cols-12 md:gap-1 md:items-center border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
-                <span className="md:col-span-5 text-slate-500 md:text-blue-100 font-bold shrink-0">🆔 Order ID</span>
-                <span className="hidden md:inline md:col-span-1 text-center font-bold">:</span>
-                <span className="md:col-span-6 font-mono tracking-tight font-extrabold text-[#334155] md:text-white break-all text-right md:text-left">#{(order as any).orderNo || order.id}</span>
+              <div className="flex items-center justify-between gap-1 py-1 font-sans">
+                <span className="text-slate-700 md:text-blue-100 font-bold shrink-0">🆔 Order ID</span>
+                <span className="font-mono tracking-tight font-extrabold text-slate-800 md:text-white break-all text-right">#{(order as any).orderNo || order.id || 'N/A'}</span>
               </div>
 
-              <div className="flex flex-row items-center justify-between gap-2 py-1 md:grid md:grid-cols-12 md:gap-1 md:items-center border-b border-dashed border-slate-200/40 md:border-none last:border-0 font-sans">
-                <span className="md:col-span-5 text-slate-500 md:text-blue-100 font-bold shrink-0">📅 Order Date</span>
-                <span className="hidden md:inline md:col-span-1 text-center font-bold">:</span>
-                <span className="md:col-span-6 font-sans font-extrabold text-[#334155] md:text-white break-all text-right md:text-left">{formatDate(order.date)}</span>
+              <div className="flex items-center justify-between gap-1 py-1 font-sans">
+                <span className="text-slate-700 md:text-blue-100 font-bold shrink-0">📅 Order Date</span>
+                <span className="font-sans font-extrabold text-slate-800 md:text-white break-all text-right">{order.date ? formatDate(order.date) : 'N/A'}</span>
               </div>
 
-              <div className="flex flex-row items-center justify-between gap-2 py-1 md:grid md:grid-cols-12 md:gap-1 md:items-center last:border-0 md:border-none font-sans">
-                <span className="md:col-span-5 text-slate-500 md:text-blue-100 font-bold shrink-0">💳 Payment Method</span>
-                <span className="hidden md:inline md:col-span-1 text-center font-bold">:</span>
-                <span className="md:col-span-6 font-sans font-extrabold text-slate-800 md:text-slate-100 break-words text-right md:text-left">Cash on Delivery (COD)</span>
+              <div className="flex items-center justify-between gap-1 py-1 font-sans">
+                <span className="text-slate-700 md:text-blue-100 font-bold shrink-0">💳 Payment Method</span>
+                <span className="font-sans font-extrabold text-slate-800 md:text-white break-words text-right">{(order as any).paymentMethod || 'Cash on Delivery (COD)'}</span>
               </div>
 
             </div>
           </div>
+
 
         </div>
 
@@ -622,9 +711,11 @@ export function InvoiceViewer({ order, profile, currentUser }: InvoiceViewerProp
                         </div>
                         <div className="space-y-1 text-left">
                           <span className="text-sm font-black text-slate-900 leading-tight block font-sans">{item.productTitle || 'Premium Product'}</span>
-                          <p className="text-[10px] font-bold text-blue-600 block">
-                            Code: <span className="font-mono">{item.productId ? String(item.productId).slice(-8).toUpperCase() : '554004'}</span>
-                          </p>
+                          {isAdmin && (
+                            <p className="text-[10px] font-bold text-blue-600 block">
+                              Code: <span className="font-mono">{item.productId ? String(item.productId).slice(-8).toUpperCase() : '554004'}</span>
+                            </p>
+                          )}
                           {itemSize && (
                             <p className="text-[10px] text-slate-500 font-bold block font-sans">
                               Size: {itemSize}

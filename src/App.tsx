@@ -1251,7 +1251,7 @@ function ResellerOrderDetailsModal({ order, onClose, profile, user }: { order: O
             
             {/* Left Main Pane: Invoice matching mockup screenshot */}
             <div className="lg:col-span-8 bg-white rounded-3xl shadow-sm">
-              <InvoiceViewer order={order} profile={profile} currentUser={user} />
+              <InvoiceViewer order={order} profile={profile} currentUser={user} isAdmin={false} />
             </div>
 
             {/* Right Side Pane: Parcel tracking and status updates */}
@@ -1557,7 +1557,7 @@ function OrderDetailsModal({
             
             {/* Left Column: Full-featured Invoice Sheet matching Mockup */}
             <div className="lg:col-span-8 bg-white rounded-3xl shadow-sm">
-              <InvoiceViewer order={order} />
+              <InvoiceViewer order={order} isAdmin={true} />
             </div>
 
             {/* Right Column: Administrative Controls Panel (Preserving all original actions) */}
