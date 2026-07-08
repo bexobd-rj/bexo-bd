@@ -31,7 +31,16 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from './firebase';
-import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  sendEmailVerification, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut,
+  onAuthStateChanged
+} from "firebase/auth";
 import { 
   collection, 
   addDoc, 
@@ -176,10 +185,10 @@ export default function App() {
   // --- Auth & Profile ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
       setIsLoadingAuth(true);
       try {
-        if (currentUser) {
+        if (currentUser && currentUser.emailVerified) {
+          setUser(currentUser);
           // Ensure profile exists
           const userRef = doc(db, 'users', currentUser.uid);
           let snap = null;
@@ -227,6 +236,7 @@ export default function App() {
             }
           }
         } else {
+          setUser(null);
           setProfile(null);
         }
       } catch (err) {
@@ -243,16 +253,30 @@ export default function App() {
     try {
       setAuthError('');
       const provider = new GoogleAuthProvider();
-      // Ensure custom parameters or hints can be added here if needed
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
       const result = await signInWithPopup(auth, provider);
-      console.log("Successfully logged in:", result.user.email);
+      const loggedInUser = result.user;
+      console.log("Successfully logged in:", loggedInUser.email);
+      
+      // Sync Google user with the local admin panel database so they appear there.
+      const userRef = doc(db, 'users', loggedInUser.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        const isSuperAdminEmail = loggedInUser.email === 'bexobd@gmail.com';
+        const newProfile: UserProfile = {
+          uid: loggedInUser.uid,
+          displayName: loggedInUser.displayName || 'Reseller',
+          email: loggedInUser.email || '',
+          balance: 0,
+          role: isSuperAdminEmail ? 'admin' : 'user',
+          shopName: 'My Bexo Shop',
+          phone: ''
+        };
+        await setDoc(userRef, newProfile);
+        setProfile(newProfile);
+      }
     } catch (err: any) {
-      console.error("Login failed with error code:", err.code);
-      console.error("Login failed with error message:", err.message);
-      setAuthError(`Login failed: ${err.message}. If this happens on the live site, ensure the domain is added to Firebase Authorized Domains.`);
+      console.error("Login failed:", err.message);
+      setAuthError(`Login failed: ${err.message}`);
     }
   };
 
@@ -265,27 +289,19 @@ export default function App() {
       if (isLoginMode) {
         // Login
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const loggedInUser = userCredential.user;
-        
-        // Required Email Verification check
-        if (!loggedInUser.emailVerified) {
+        if (!userCredential.user.emailVerified) {
           await signOut(auth);
-          setAuthError('Please check your inbox and verify your email before logging in.');
-        } else {
-          console.log("Successfully logged in:", loggedInUser.email);
+          alert("Your email is not verified yet. Please check your inbox.");
+          return;
         }
+        // If verified, they proceed normally (handled by onAuthStateChanged)
+        console.log("Successfully logged in:", userCredential.user.email);
       } else {
         // Sign-Up
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const newUser = userCredential.user;
-        
-        // Immediately trigger sendEmailVerification
-        await sendEmailVerification(newUser);
-        
-        // Sign them out so they must verify first
+        await sendEmailVerification(userCredential.user);
         await signOut(auth);
-        
-        setAuthError('Sign-up successful! Please check your inbox and verify your email before logging in.');
+        alert("Registration successful! A verification link has been sent to your email. Please verify it before logging in.");
         setIsLoginMode(true);
       }
     } catch (err: any) {

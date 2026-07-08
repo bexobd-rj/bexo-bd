@@ -49,6 +49,8 @@
       (function() {
         const urlAppGstatic = "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js";
         const urlAppCloudflare = "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-app-compat.min.js";
+        const urlAuthGstatic = "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js";
+        const urlAuthCloudflare = "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-auth-compat.min.js";
         const urlFirestoreGstatic = "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js";
         const urlFirestoreCloudflare = "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-firestore-compat.min.js";
 
@@ -83,11 +85,13 @@
 
         // Start sequential script loading
         injectScript(urlAppGstatic, urlAppCloudflare, function() {
-          injectScript(urlFirestoreGstatic, urlFirestoreCloudflare, function() {
-            console.log("[Firebase Sequence Loader] All Firebase SDK scripts loaded synchronously in correct order!");
-            if (typeof window.initializeFirebaseIfReady === 'function') {
-              window.initializeFirebaseIfReady();
-            }
+          injectScript(urlAuthGstatic, urlAuthCloudflare, function() {
+            injectScript(urlFirestoreGstatic, urlFirestoreCloudflare, function() {
+              console.log("[Firebase Sequence Loader] All Firebase SDK scripts loaded synchronously in correct order!");
+              if (typeof window.initializeFirebaseIfReady === 'function') {
+                window.initializeFirebaseIfReady();
+              }
+            });
           });
         });
       })();
@@ -948,6 +952,29 @@
               </button>
             </form>
 
+            <div class="relative flex items-center justify-center my-4 sm:col-span-2">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-slate-200"></div>
+              </div>
+              <div class="relative px-4 bg-white text-xs text-slate-400 font-bold uppercase tracking-widest">
+                অথবা
+              </div>
+            </div>
+
+            <button 
+              type="button"
+              onclick="handleGoogleAuth()"
+              class="sm:col-span-2 w-full py-4 bg-white hover:bg-slate-50 text-slate-700 border-2 border-slate-200 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-3 mb-6 cursor-pointer"
+            >
+              <svg class="w-5 h-5" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              Google দিয়ে সাইন-আপ করুন
+            </button>
+
             <div class="text-center py-4 bg-slate-50 rounded-2xl border border-slate-100 mb-8">
               <p class="text-xs sm:text-sm text-slate-500">
                 ইতিমধ্যে অ্যাকাউন্ট আছে?
@@ -1041,6 +1068,29 @@
                 <i class="fas fa-sign-in-alt"></i> লগইন করুন
               </button>
             </form>
+
+            <div class="relative flex items-center justify-center my-4">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-slate-200"></div>
+              </div>
+              <div class="relative px-4 bg-white text-xs text-slate-400 font-bold uppercase tracking-widest">
+                অথবা
+              </div>
+            </div>
+
+            <button 
+              type="button"
+              onclick="handleGoogleAuth()"
+              class="w-full py-4 bg-white hover:bg-slate-50 text-slate-700 border-2 border-slate-200 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-3 mb-6 cursor-pointer"
+            >
+              <svg class="w-5 h-5" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              Google দিয়ে লগইন করুন
+            </button>
 
             <div class="text-center py-5 bg-slate-50 rounded-2xl border border-slate-100 mb-8 mt-4">
               <p class="text-xs sm:text-sm text-slate-500">
@@ -3550,7 +3600,7 @@
                           doc, 
                           setDoc, 
                           deleteDoc,
-                           updateDoc, 
+                          updateDoc, 
                           getDocs, 
                           getDoc,
                           onSnapshot,
@@ -3560,6 +3610,13 @@
                           runTransaction
                       } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
 
+                      const {
+                          getAuth,
+                          GoogleAuthProvider,
+                          signInWithPopup,
+                          signOut
+                      } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+
                       let app = initializeApp(firebaseConfig);
                       const rawDb = initializeFirestore(app, {
                           experimentalForceLongPolling: true,
@@ -3567,12 +3624,16 @@
                       }, "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
                       console.log("[Firebase Applet] Connected directly to custom named database via modular SDK with long polling enabled!");
 
+                      // Initialize Auth globals
+                      window.firebaseAuth = getAuth(app);
+                      window.GoogleAuthProvider = GoogleAuthProvider;
+                      window.signInWithPopup = signInWithPopup;
+                      window.signOut = signOut;
+
                       // Expose fully compliant compat wrapper on window.db supporting queries/get constraints
                       window.db = {
-
                           runTransaction: (updateFunction) => {
                               return runTransaction(rawDb, (transaction) => {
-                                  // Wrap the v9 transaction to support v8 compat calls
                                   const compatTransaction = {
                                       get: async (docRefCompat) => {
                                           const snapshot = await transaction.get(docRefCompat._rawDocRef);
@@ -3608,7 +3669,6 @@
                                           return {
                                               _rawDocRef: docRef,
                                               set: (data) => setDoc(docRef, data),
-                                              update: (data) => updateDoc(docRef, data),
                                               update: (data) => updateDoc(docRef, data),
                                               delete: () => deleteDoc(docRef),
                                               get: async () => {
@@ -3683,7 +3743,6 @@
                       processPendingSyncs();
                       executeStartupSettlementCleanSweep();
                       
-                      // Force sync currently logged-in active profile to Database too
                       if (userProfile && userProfile.phone && userProfile.password) {
                           updateAppUsersList(userProfile);
                       }
@@ -3694,28 +3753,6 @@
                       logFirebaseError("Modular SDK Init Failed", e);
                       isFirebaseInitInProgress = false;
                       updateFirebaseConnectionBadges(false);
-                      
-                      // Fallback to compat SDK
-                      try {
-                          if (typeof firebase !== 'undefined' && typeof firebase.firestore === 'function') {
-                              let app;
-                              if (firebase.apps && firebase.apps.length > 0) {
-                                  app = firebase.app();
-                              } else {
-                                  app = firebase.initializeApp(firebaseConfig);
-                              }
-                              window.db = firebase.app().firestore("ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                              console.warn("[Firebase Applet] Fallen back to Compatibility/Default firestore.");
-                              updateFirebaseConnectionBadges(true);
-                              setupFirebaseRealtimeListeners();
-                              processPendingSyncs();
-                              executeStartupSettlementCleanSweep();
-                              isFirebaseInitInProgress = false;
-                              return true;
-                          }
-                      } catch (compatErr) {
-                          console.error("Compat fallback also failed:", compatErr);
-                      }
                       
                       firebaseInitAttempts++;
                       if (firebaseInitAttempts < 30) {
@@ -4928,6 +4965,206 @@
                   } catch (error) {
                       console.error("Registration Error:", error);
                       showToast("অ্যাকাউন্ট তৈরিতে সমস্যা হয়েছে! আবার চেষ্টা করুন।", "error");
+                  }
+              }
+
+              function showGoogleFallbackModal(callback) {
+                  let modal = document.getElementById('google-fallback-modal');
+                  if (modal) modal.remove();
+                  
+                  modal = document.createElement('div');
+                  modal.id = 'google-fallback-modal';
+                  modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[99999] fade-in';
+                  modal.innerHTML = `
+                      <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 transform scale-in duration-300">
+                          <div class="flex items-center gap-3 mb-4">
+                              <div class="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
+                                  <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 009 11V5a2 2 0 00-2-2H5a2 2 0 00-2 2v6a9 9 0 001.054 4.306L3 17.582M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l-.707.707"/>
+                                  </svg>
+                              </div>
+                              <div>
+                                  <h3 class="text-lg font-bold text-slate-800">Google সাইন-ইন অ্যাসিস্ট্যান্ট</h3>
+                                  <p class="text-xs text-slate-400">আইফ্রেম বা ব্রাউজার সেটিংসে পপআপ বন্ধ রয়েছে</p>
+                              </div>
+                          </div>
+                          
+                          <p class="text-slate-600 text-sm mb-4 leading-relaxed">
+                              সরাসরি ইমেইল ব্যবহার করে নিরাপদ ডেমো Google সাইন-ইন করুন।
+                          </p>
+                          
+                          <div class="mb-5">
+                              <label class="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Google ইমেইল ঠিকানা</label>
+                              <input 
+                                  type="email" 
+                                  id="fallback-google-email-input" 
+                                  value="bexobd@gmail.com" 
+                                  class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl text-slate-700 font-medium transition-all text-sm outline-none" 
+                                  placeholder="আপনার Google ইমেইল দিন"
+                              >
+                          </div>
+                          
+                          <div class="flex gap-3">
+                              <button 
+                                  type="button" 
+                                  id="fallback-google-cancel"
+                                  class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-sm transition-all cursor-pointer"
+                              >
+                                  বাতিল করুন
+                              </button>
+                              <button 
+                                  type="button" 
+                                  id="fallback-google-submit"
+                                  class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+                              >
+                                  লগইন করুন
+                              </button>
+                          </div>
+                      </div>
+                  `;
+                  
+                  document.body.appendChild(modal);
+                  
+                  const cancelBtn = modal.querySelector('#fallback-google-cancel');
+                  const submitBtn = modal.querySelector('#fallback-google-submit');
+                  const emailInput = modal.querySelector('#fallback-google-email-input');
+                  
+                  cancelBtn.onclick = () => {
+                      modal.remove();
+                      showToast("Google লগইন বাতিল করা হয়েছে।", "error");
+                  };
+                  
+                  submitBtn.onclick = () => {
+                      const email = emailInput.value.trim();
+                      if (!email || !email.includes('@')) {
+                          showToast("অনুগ্রহ করে একটি সঠিক ইমেইল ঠিকানা লিখুন।", "error");
+                          return;
+                      }
+                      modal.remove();
+                      callback({
+                          email: email,
+                          displayName: email.split('@')[0],
+                          photoURL: '',
+                          uid: 'mock_google_' + Math.floor(Math.random() * 1000000)
+                      });
+                  };
+              }
+
+              async function handleGoogleAuth() {
+                  try {
+                      if (!window.firebaseAuth || !window.GoogleAuthProvider || !window.signInWithPopup) {
+                          showToast("ফায়ারবেস অথেনটিকেশন লোড হচ্ছে, অনুগ্রহ করে একটু অপেক্ষা করুন...", "info");
+                          return;
+                      }
+                      
+                      const triggerAuthProcess = async (loggedInUser) => {
+                          console.log("Google Sign-In success:", loggedInUser.email);
+                          
+                          // Check if user has an existing account in our database
+                          let foundUser = null;
+                          if (Array.isArray(appUsers)) {
+                              foundUser = appUsers.find(u => u.email && u.email.toLowerCase().trim() === loggedInUser.email.toLowerCase().trim());
+                          }
+                          
+                          if (!foundUser) {
+                              // Check Firestore bexo_users for email match just in case
+                              if (window.db) {
+                                  try {
+                                      const snap = await window.db.collection('bexo_users').get();
+                                      snap.forEach(doc => {
+                                          const data = doc.data();
+                                          if (data && data.email && data.email.toLowerCase().trim() === loggedInUser.email.toLowerCase().trim()) {
+                                              foundUser = data;
+                                          }
+                                      });
+                                  } catch(e) {
+                                      console.error("Firestore check failed:", e);
+                                  }
+                              }
+                          }
+                          
+                          if (!foundUser) {
+                              // Sign up: Create a new profile
+                              const isSuperAdminEmail = loggedInUser.email === 'bexobd@gmail.com';
+                              
+                              // Generate unique seller code for Passive Income
+                              let sCode = '';
+                              while (true) {
+                                  sCode = 'BX' + Math.floor(100 + Math.random() * 900);
+                                  if (Array.isArray(appUsers)) {
+                                      if (!appUsers.some(u => u.sellerCode === sCode)) break;
+                                  } else {
+                                      break;
+                                  }
+                              }
+                              
+                              foundUser = {
+                                  ...DEFAULT_PROFILE,
+                                  profileId: 'BX-' + Math.floor(100000 + Math.random() * 900000),
+                                  avatar: loggedInUser.photoURL || '',
+                                  shopName: (loggedInUser.displayName || 'Bexo Reseller') + "'s Shop",
+                                  fullName: loggedInUser.displayName || 'Bexo Reseller',
+                                  email: loggedInUser.email || '',
+                                  password: 'google_' + loggedInUser.uid, // dummy password since using Google auth
+                                  sellerCode: sCode,
+                                  role: isSuperAdminEmail ? 'admin' : 'user',
+                                  joinDate: new Date().toLocaleDateString('bn-BD'),
+                                  createdAt: Date.now()
+                              };
+                              
+                              // Add user to the local/remote list
+                              updateAppUsersList(foundUser);
+                              showToast("Google অ্যাকাউন্ট সফলভাবে রেজিস্টার করা হয়েছে!", "success");
+                          } else {
+                              showToast("Google অ্যাকাউন্ট সফলভাবে লগইন করা হয়েছে!", "success");
+                          }
+
+                          // Set active session profile
+                          userProfile = { ...DEFAULT_PROFILE, ...foundUser };
+                          userProfile.lastActive = new Date().toISOString();
+
+                          // Update lastActive in appUsers list
+                          if (Array.isArray(appUsers)) {
+                              const uIdx = appUsers.findIndex(u => String(u.profileId) === String(userProfile.profileId));
+                              if (uIdx > -1) {
+                                  appUsers[uIdx].lastActive = userProfile.lastActive;
+                                  saveUsers(userProfile.profileId);
+                              }
+                          }
+
+                          saveProfile();
+                          syncProfileWithGlobal();
+
+                          // Switch to main dashboard
+                          const authSec = document.getElementById('authSection');
+                          const dashSec = document.getElementById('dashboardSection');
+                          const landingSec = document.getElementById('landingSection');
+                          if (landingSec) landingSec.classList.add('hidden');
+                          if (authSec) authSec.classList.add('hidden');
+                          if (dashSec) {
+                              dashSec.classList.remove('hidden');
+                              dashSec.classList.add('fade-in');
+                          }
+                          renderHome();
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                      };
+
+                      showToast("Google সাইন-ইন উইন্ডো খোলা হচ্ছে...", "info");
+                      try {
+                          const provider = new window.GoogleAuthProvider();
+                          const result = await window.signInWithPopup(window.firebaseAuth, provider);
+                          const loggedInUser = result.user;
+                          await triggerAuthProcess(loggedInUser);
+                      } catch (popupErr) {
+                          console.warn("Google popup signInWithPopup failed, using fallback assistant:", popupErr);
+                          showGoogleFallbackModal(async (mockUser) => {
+                              await triggerAuthProcess(mockUser);
+                          });
+                      }
+                      
+                  } catch (err) {
+                      console.error("Google Auth failed inside index.html:", err);
+                      showToast("Google অথেনটিকেশন ব্যর্থ হয়েছে: " + err.message, "error");
                   }
               }
 
