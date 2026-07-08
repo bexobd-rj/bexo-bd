@@ -155,6 +155,8 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -387,6 +389,55 @@ export default function App() {
           <div className="mt-10 pt-8 border-t border-slate-50 text-center">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by Bexo Dropshipping Network</p>
           </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (profile?.role === 'admin' && !isAdminUnlocked) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 bg-gradient-to-br from-slate-100 to-white">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-sm w-full border border-white relative overflow-hidden"
+        >
+          <div className="text-center mb-10">
+            <div className="w-16 h-16 bg-slate-900 text-white rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl">
+              <ShieldAlert size={32} strokeWidth={2.5} />
+            </div>
+            <h1 className="text-2xl font-black text-text-main tracking-tight mb-2">Admin Security</h1>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Enter authorization code</p>
+          </div>
+
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (adminPasswordInput === 'admin123') {
+              setIsAdminUnlocked(true);
+            } else {
+              alert('Incorrect password!');
+              setAdminPasswordInput('');
+            }
+          }} className="space-y-6">
+            <input 
+              type="password" 
+              autoFocus
+              value={adminPasswordInput}
+              onChange={(e) => setAdminPasswordInput(e.target.value)}
+              placeholder="••••••••"
+              className="w-full text-center tracking-[0.5em] font-mono py-4 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-slate-400 font-bold shadow-sm"
+            />
+            <button 
+              type="submit"
+              className="w-full py-4 bg-slate-900 hover:bg-black text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-xl transition-all"
+            >
+              Unlock Access
+            </button>
+          </form>
+
+          <button onClick={handleLogout} className="mt-8 text-xs font-bold text-slate-400 uppercase tracking-widest w-full hover:text-slate-600 transition-colors">
+            Logout
+          </button>
         </motion.div>
       </div>
     );
@@ -1738,7 +1789,7 @@ function ProfileView({ user, profile, transactions, orders }: { user: any, profi
 
   return (
     <div className="max-w-4xl mx-auto space-y-12">
-      <div className="bg-surface rounded-2xl p-10 border border-border shadow-sm flex flex-col md:flex-row items-center gap-10">
+      <div className="bg-surface rounded-2xl p-6 md:p-10 border border-border shadow-sm flex flex-col md:flex-row items-center gap-6 md:gap-10">
         <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white font-bold text-3xl shadow-sm overflow-hidden border-2 border-white ring-1 ring-border shrink-0">
           <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} alt="Avatar" referrerPolicy="no-referrer" />
         </div>
