@@ -902,8 +902,8 @@
                 <label>মোবাইল নম্বর</label>
               </div>
               <div class="floating-label-group sm:col-span-2">
-                <input type="email" id="regEmail" placeholder=" " />
-                <label>জিমেইল / ইমেইল (ঐচ্ছিক)</label>
+                <input type="email" id="regEmail" placeholder=" " required />
+                <label>জিমেইল / ইমেইল</label>
               </div>
               <div class="floating-label-group sm:col-span-2">
                 <input type="text" id="regReferral" placeholder=" " />
@@ -4778,6 +4778,227 @@
                   return appUsers.find(u => u.sellerCode === code);
               }
 
+              function showDualVerificationModal(email, phone, onEmailVerify, onPhoneVerify, onEmailResend, onPhoneResend, initialEmailCode = null, initialPhoneCode = null) {
+                  let modal = document.getElementById('email-verification-modal');
+                  if (modal) modal.remove();
+
+                  modal = document.createElement('div');
+                  modal.id = 'email-verification-modal';
+                  modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[99999] fade-in';
+                  
+                  let currentStep = 1; // 1: Email, 2: Phone
+                  let emailCodeLocal = initialEmailCode;
+                  let phoneCodeLocal = initialPhoneCode;
+
+                  const renderStepContent = () => {
+                      let title = '';
+                      let subtitle = '';
+                      let description = '';
+                      let inputLabel = '';
+                      let placeholder = '';
+                      let demoAlert = '';
+                      let inputVal = '';
+
+                      if (currentStep === 1) {
+                          title = 'ইমেইল ভেরিফিকেশন কোড';
+                          subtitle = 'কোডটি আপনার ইমেইলে পাঠানো হয়েছে';
+                          description = `আপনার দেওয়া ইমেইল ঠিকানা <strong class="text-slate-800">${email}</strong>-এ একটি ভেরিফিকেশন কোড পাঠানো হয়েছে। অ্যাকাউন্ট তৈরি সম্পন্ন করতে কোডটি নিচে দিন।`;
+                          inputLabel = '৬-ডিজিটের ইমেইল ভেরিফিকেশন কোড';
+                          placeholder = '------';
+                          inputVal = emailCodeLocal || '';
+                          if (emailCodeLocal) {
+                              demoAlert = `
+                                  <div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-700 text-xs font-medium leading-relaxed">
+                                      <div class="flex items-center gap-1.5 font-bold mb-1">
+                                          <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                          </svg>
+                                          <span>ইমেইল ডেমো মোড সক্রিয়! (SMTP কনফিগার করা নেই)</span>
+                                      </div>
+                                      আপনার টেস্ট করার সুবিধার্থে কোডটি দেওয়া হলো: <strong class="text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-200">${emailCodeLocal}</strong>
+                                  </div>
+                              `;
+                          }
+                      } else {
+                          title = 'মোবাইল ওটিপি (OTP) ভেরিফিকেশন';
+                          subtitle = 'কোডটি আপনার মোবাইল নম্বরে পাঠানো হয়েছে';
+                          description = `আপনার দেওয়া মোবাইল নম্বর <strong class="text-slate-800">${phone}</strong>-এ একটি ৬-ডিজিটের ওটিপি পাঠানো হয়েছে। রেজিস্ট্রেশন সম্পন্ন করতে ওটিপি-টি নিচে দিন।`;
+                          inputLabel = '৬-ডিজিটের ওটিপি (OTP) কোড';
+                          placeholder = '------';
+                          inputVal = phoneCodeLocal || '';
+                          if (phoneCodeLocal) {
+                              demoAlert = `
+                                  <div class="mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-medium leading-relaxed">
+                                      <div class="flex items-center gap-1.5 font-bold mb-1">
+                                          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                          </svg>
+                                          <span>মোবাইল ওটিপি ডেমো মোড সক্রিয়! (SMS Gateway কনফিগার করা নেই)</span>
+                                      </div>
+                                      আপনার টেস্ট করার সুবিধার্থে ওটিপি কোডটি হলো: <strong class="text-emerald-600 bg-white px-2 py-0.5 rounded border border-emerald-200">${phoneCodeLocal}</strong>
+                                  </div>
+                              `;
+                          }
+                      }
+
+                      return `
+                          <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 transform scale-in duration-300">
+                              <div class="flex justify-between items-center mb-5 pb-2 border-b border-slate-100">
+                                  <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">ধাপ ${currentStep} of 2</span>
+                                  <div class="flex gap-1">
+                                      <span class="w-8 h-1.5 rounded-full ${currentStep >= 1 ? 'bg-indigo-600' : 'bg-slate-200'}"></span>
+                                      <span class="w-8 h-1.5 rounded-full ${currentStep >= 2 ? 'bg-indigo-600' : 'bg-slate-200'}"></span>
+                                  </div>
+                              </div>
+
+                              <div class="flex items-center gap-3 mb-4">
+                                  <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
+                                      ${currentStep === 1 ? `
+                                          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19v-8.93a2 2 0 01.89-1.664l8-4a2 2 0 012.22 0l8 4A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-2.25-1.5a2 2 0 00-2.22 0l-2.25 1.5" />
+                                          </svg>
+                                      ` : `
+                                          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                          </svg>
+                                      `}
+                                  </div>
+                                  <div>
+                                      <h3 class="text-lg font-bold text-slate-800">${title}</h3>
+                                      <p class="text-xs text-slate-400">${subtitle}</p>
+                                  </div>
+                              </div>
+                              
+                              <p class="text-slate-600 text-sm mb-4 leading-relaxed">
+                                  ${description}
+                              </p>
+
+                              ${demoAlert}
+
+                              <div class="mb-5">
+                                  <label class="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">${inputLabel}</label>
+                                  <input 
+                                      type="text" 
+                                      id="verification-code-input" 
+                                      maxlength="6"
+                                      class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl text-slate-800 font-extrabold text-center tracking-[10px] text-lg transition-all outline-none" 
+                                      placeholder="------"
+                                      value="${inputVal}"
+                                  >
+                              </div>
+
+                              <div class="flex flex-col gap-3">
+                                  <button 
+                                      type="button" 
+                                      id="verification-submit-btn"
+                                      class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-600/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+                                  >
+                                      ${currentStep === 1 ? 'ইমেইল ভেরিফাই করুন (পরবর্তী ধাপ)' : 'ওটিপি ভেরিফাই ও অ্যাকাউন্ট তৈরি করুন'}
+                                  </button>
+                                  <div class="flex justify-between items-center text-xs mt-1">
+                                      <button 
+                                          type="button" 
+                                          id="verification-resend-btn"
+                                          class="text-indigo-600 hover:text-indigo-800 font-bold transition-all cursor-pointer"
+                                      >
+                                          কোড আবার পাঠান (Resend)
+                                      </button>
+                                      <button 
+                                          type="button" 
+                                          id="verification-cancel-btn"
+                                          class="text-slate-400 hover:text-slate-600 font-semibold transition-all cursor-pointer"
+                                      >
+                                          বাতিল করুন
+                                      </button>
+                                  </div>
+                              </div>
+                          </div>
+                      `;
+                  };
+
+                  const attachEvents = () => {
+                      const codeInput = modal.querySelector('#verification-code-input');
+                      const submitBtn = modal.querySelector('#verification-submit-btn');
+                      const resendBtn = modal.querySelector('#verification-resend-btn');
+                      const cancelBtn = modal.querySelector('#verification-cancel-btn');
+
+                      cancelBtn.onclick = () => {
+                          modal.remove();
+                          showToast("ভেরিফিকেশন বাতিল করা হয়েছে।", "error");
+                      };
+
+                      resendBtn.onclick = async () => {
+                          resendBtn.disabled = true;
+                          resendBtn.innerText = "পাঠানো হচ্ছে...";
+                          try {
+                              if (currentStep === 1) {
+                                  const response = await onEmailResend();
+                                  if (response && response.verificationCode) {
+                                      emailCodeLocal = response.verificationCode;
+                                  }
+                              } else {
+                                  const response = await onPhoneResend();
+                                  if (response && response.otpCode) {
+                                      phoneCodeLocal = response.otpCode;
+                                  }
+                              }
+                              modal.innerHTML = renderStepContent();
+                              attachEvents();
+                              showToast("নতুন কোড পাঠানো হয়েছে!", "success");
+                          } catch(e) {
+                              console.error(e);
+                              showToast("কোড পুনরায় পাঠাতে সমস্যা হয়েছে।", "error");
+                          } finally {
+                              resendBtn.disabled = false;
+                              resendBtn.innerText = "কোড আবার পাঠান (Resend)";
+                          }
+                      };
+
+                      submitBtn.onclick = async () => {
+                          const code = codeInput.value.trim();
+                          if (code.length !== 6) {
+                              showToast("অনুগ্রহ করে সঠিক ৬-ডিজিটের কোড দিন!", "error");
+                              return;
+                          }
+                          submitBtn.disabled = true;
+                          const originalText = submitBtn.innerHTML;
+                          submitBtn.innerHTML = `ভেরিফাই করা হচ্ছে...`;
+                          
+                          try {
+                              if (currentStep === 1) {
+                                  const verified = await onEmailVerify(code);
+                                  if (verified) {
+                                      // Email verified successfully! Transition to Step 2
+                                      currentStep = 2;
+                                      submitBtn.innerHTML = `ওটিপি পাঠানো হচ্ছে...`;
+                                      const res = await onPhoneResend();
+                                      if (res && res.otpCode) {
+                                          phoneCodeLocal = res.otpCode;
+                                      }
+                                      modal.innerHTML = renderStepContent();
+                                      attachEvents();
+                                  }
+                              } else {
+                                  const verified = await onPhoneVerify(code);
+                                  if (verified) {
+                                      modal.remove();
+                                  }
+                              }
+                          } catch(e) {
+                              console.error(e);
+                              showToast("ভেরিফিকেশন সম্পূর্ণ করা সম্ভব হয়নি।", "error");
+                          } finally {
+                              submitBtn.disabled = false;
+                              submitBtn.innerHTML = originalText;
+                          }
+                      };
+                  };
+
+                  modal.innerHTML = renderStepContent();
+                  document.body.appendChild(modal);
+                  attachEvents();
+              }
+
               function handleRegister() {
                   try {
                       const shopField = document.getElementById('regShop');
@@ -4819,8 +5040,8 @@
                           return;
                       }
 
-                      if(!shop || !name || !phone || !addr || !pass) {
-                          showToast("সবগুলো তথ্য সঠিকভাবে পূরণ করুন!", "error");
+                      if(!shop || !name || !phone || !addr || !pass || !email) {
+                          showToast("সবগুলো তথ্য সঠিকভাবে পূরণ করুন এবং অবশ্যই ইমেইল প্রদান করুন!", "error");
                           return;
                       }
 
@@ -4847,6 +5068,13 @@
                           return;
                       }
 
+                      // Check for existing user with this email address
+                      const existingEmail = appUsers.find(u => u.email && u.email.toLowerCase().trim() === email.toLowerCase().trim());
+                      if (existingEmail) {
+                          showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error");
+                          return;
+                      }
+
                       // Passive Income: Referral Logic
                       let referredBy = null;
                       if (refCode) {
@@ -4861,7 +5089,7 @@
 
                       const oldProfileId = userProfile ? userProfile.profileId : null;
 
-                      // Create Profile
+                      // Create Profile (Staged/Prepared)
                       const newProfile = {
                           ...DEFAULT_PROFILE,
                           shopName: shop,
@@ -4876,91 +5104,188 @@
                           createdAt: Date.now()
                       };
 
-                      // Migrate guest session resources to new registered profileId
-                      if (oldProfileId && oldProfileId !== newProfile.profileId) {
-                          // 1. Migrate appAccounts (Bank / wallet accounts)
-                          let migratedAccCount = 0;
-                          appAccounts.forEach(acc => {
-                              if (acc.profileId === oldProfileId) {
-                                  acc.profileId = newProfile.profileId;
-                                  migratedAccCount++;
+                      // Define actual creation and database integration function
+                      const completeRegistration = (profile) => {
+                          // Migrate guest session resources to new registered profileId
+                          if (oldProfileId && oldProfileId !== profile.profileId) {
+                              // 1. Migrate appAccounts (Bank / wallet accounts)
+                              let migratedAccCount = 0;
+                              appAccounts.forEach(acc => {
+                                  if (acc.profileId === oldProfileId) {
+                                      acc.profileId = profile.profileId;
+                                      migratedAccCount++;
+                                  }
+                              });
+                              if (migratedAccCount > 0) saveAccounts();
+
+                              // 2. Migrate balance requests
+                              let migratedBalCount = 0;
+                              appBalanceRequests.forEach(req => {
+                                  if (req.profileId === oldProfileId) {
+                                      req.profileId = profile.profileId;
+                                      migratedBalCount++;
+                                  }
+                              });
+                              if (migratedBalCount > 0) saveBalanceRequests();
+
+                              // 3. Migrate withdrawals
+                              let migratedWdrCount = 0;
+                              appWithdrawals.forEach(w => {
+                                  if (w.profileId === oldProfileId) {
+                                      w.profileId = profile.profileId;
+                                      migratedWdrCount++;
+                                  }
+                              });
+                              if (migratedWdrCount > 0) saveWithdrawals();
+
+                              // 4. Migrate orders
+                              let migratedOrdCount = 0;
+                              appOrders.forEach(o => {
+                                  if (o.profileId === oldProfileId) {
+                                      o.profileId = profile.profileId;
+                                      migratedOrdCount++;
+                                  }
+                              });
+                              if (migratedOrdCount > 0) saveOrders();
+                          }
+
+                          // REFERRAL COMMISSION Logic
+                          if (referredBy) {
+                              const refs = JSON.parse(localStorage.getItem('bexo_referrals')) || [];
+                              refs.push({
+                                  referredBy: refCode,
+                                  name: shop,
+                                  commission: 50,
+                                  date: new Date().toLocaleString()
+                              });
+                              localStorage.setItem('bexo_referrals', JSON.stringify(refs));
+                              showToast("রেফারেল বোনাস ৫০ টাকা সফলভাবে যোগ হয়েছে।", "success");
+                          }
+
+                          // Update Global and Local State
+                          userProfile = profile;
+                          saveProfile();
+                          updateAppUsersList(userProfile);
+
+                          // Set login fields for visuals (optional but good for consistency)
+                          const loginPhone = document.getElementById('loginPhone');
+                          const loginPass = document.getElementById('loginPass');
+                          if(loginPhone) loginPhone.value = phone;
+                          if(loginPass) loginPass.value = pass;
+
+                          showToast("অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে তৈরি এবং ভেরিফাই হয়েছে।", "success");
+
+                          // Direct Login UI Switch
+                          const auth = document.getElementById('authSection');
+                          const dash = document.getElementById('dashboardSection');
+
+                          if(auth && dash) {
+                              auth.classList.add('hidden');
+                              dash.classList.remove('hidden');
+                              dash.classList.add('fade-in');
+                              var landing = document.getElementById('landingSection');
+                              if(landing) landing.classList.add('hidden');
+                              renderHome();
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
+                      };
+
+                      // Trigger dual verification flow
+                      const initiateDualVerification = async () => {
+                          showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হচ্ছে...", "info");
+                          try {
+                              const res = await fetch("/api/send-verification-email", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ email: email })
+                              });
+                              const data = await res.json();
+                              if (!res.ok) {
+                                  throw new Error(data.error || "ভেরিফিকেশন ইমেইল পাঠাতে ব্যর্থ হয়েছে।");
                               }
-                          });
-                          if (migratedAccCount > 0) saveAccounts();
+                              
+                              showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
+                              
+                              // Open the dual verification modal
+                              showDualVerificationModal(
+                                  email,
+                                  phone,
+                                  async (code) => {
+                                      // onEmailVerify Callback
+                                      try {
+                                          const verifyRes = await fetch("/api/verify-email-code", {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ email: email, code: code })
+                                          });
+                                          const verifyData = await verifyRes.json();
+                                          if (!verifyRes.ok) {
+                                              showToast(verifyData.error || "ইমেইল ভেরিফিকেশন ব্যর্থ হয়েছে!", "error");
+                                              return false;
+                                          }
+                                          return true;
+                                      } catch(verifyErr) {
+                                          showToast(verifyErr.message || "ইমেইল ভেরিফিকেশন সম্পন্ন করতে সমস্যা হয়েছে।", "error");
+                                          return false;
+                                      }
+                                  },
+                                  async (code) => {
+                                      // onPhoneVerify Callback
+                                      try {
+                                          const verifyRes = await fetch("/api/verify-phone-otp", {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ phone: phone, code: code })
+                                          });
+                                          const verifyData = await verifyRes.json();
+                                          if (!verifyRes.ok) {
+                                              showToast(verifyData.error || "মোবাইল ওটিপি ভেরিফিকেশন ব্যর্থ হয়েছে!", "error");
+                                              return false;
+                                          }
+                                          
+                                          // Both verified! complete registration
+                                          completeRegistration(newProfile);
+                                          return true;
+                                      } catch(verifyErr) {
+                                          showToast(verifyErr.message || "মোবাইল ওটিপি ভেরিফিকেশন সম্পন্ন করতে সমস্যা হয়েছে।", "error");
+                                          return false;
+                                      }
+                                  },
+                                  async () => {
+                                      // onEmailResend Callback
+                                      const resendRes = await fetch("/api/send-verification-email", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ email: email })
+                                      });
+                                      return await resendRes.json();
+                                  },
+                                  async () => {
+                                      // onPhoneResend Callback
+                                      showToast("মোবাইল ওটিপি পাঠানো হচ্ছে...", "info");
+                                      const resendRes = await fetch("/api/send-phone-otp", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ phone: phone })
+                                      });
+                                      const phoneData = await resendRes.json();
+                                      if (!resendRes.ok) {
+                                          showToast(phoneData.error || "মোবাইল ওটিপি পাঠাতে ব্যর্থ হয়েছে।", "error");
+                                      } else {
+                                          showToast(phoneData.message || "মোবাইল ওটিপি পাঠানো হয়েছে!", "success");
+                                      }
+                                      return phoneData;
+                                  },
+                                  data.verificationCode || null,
+                                  null
+                              );
+                          } catch(err) {
+                              showToast(err.message || "ভেরিফিকেশন ইমেইল পাঠাতে কোনো সমস্যা হয়েছে।", "error");
+                          }
+                      };
 
-                          // 2. Migrate balance requests
-                          let migratedBalCount = 0;
-                          appBalanceRequests.forEach(req => {
-                              if (req.profileId === oldProfileId) {
-                                  req.profileId = newProfile.profileId;
-                                  migratedBalCount++;
-                              }
-                          });
-                          if (migratedBalCount > 0) saveBalanceRequests();
-
-                          // 3. Migrate withdrawals
-                          let migratedWdrCount = 0;
-                          appWithdrawals.forEach(w => {
-                              if (w.profileId === oldProfileId) {
-                                  w.profileId = newProfile.profileId;
-                                  migratedWdrCount++;
-                              }
-                          });
-                          if (migratedWdrCount > 0) saveWithdrawals();
-
-                          // 4. Migrate orders
-                          let migratedOrdCount = 0;
-                          appOrders.forEach(o => {
-                              if (o.profileId === oldProfileId) {
-                                  o.profileId = newProfile.profileId;
-                                  migratedOrdCount++;
-                              }
-                          });
-                          if (migratedOrdCount > 0) saveOrders();
-                      }
-
-                      // REFERRAL COMMISSION Logic
-                      if (referredBy) {
-                          const refs = JSON.parse(localStorage.getItem('bexo_referrals')) || [];
-                          refs.push({
-                              referredBy: refCode,
-                              name: shop,
-                              commission: 50,
-                              date: new Date().toLocaleString()
-                          });
-                          localStorage.setItem('bexo_referrals', JSON.stringify(refs));
-                          showToast("রেফারেল বোনাস ৫০ টাকা সফলভাবে যোগ হয়েছে।", "success");
-                      }
-
-                      // Update Global and Local State
-                      userProfile = newProfile;
-                      saveProfile();
-                      updateAppUsersList(userProfile);
-
-                      // Set login fields for visuals (optional but good for consistency)
-                      const loginPhone = document.getElementById('loginPhone');
-                      const loginPass = document.getElementById('loginPass');
-                      if(loginPhone) loginPhone.value = phone;
-                      if(loginPass) loginPass.value = pass;
-
-                      showToast("অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে।");
-
-                      // Direct Login UI Switch
-                      const auth = document.getElementById('authSection');
-                      const dash = document.getElementById('dashboardSection');
-
-                      if(auth && dash) {
-                          auth.classList.add('hidden');
-                          dash.classList.remove('hidden');
-                          dash.classList.add('fade-in');
-                          var landing = document.getElementById('landingSection');
-                          if(landing) landing.classList.add('hidden');
-                          renderHome();
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                      } else {
-                          // Fallback to existing login logic if elements not found (unlikely)
-                          loginSession();
-                      }
+                      // Initiate the dual verification process
+                      initiateDualVerification();
 
                   } catch (error) {
                       console.error("Registration Error:", error);
