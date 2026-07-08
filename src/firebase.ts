@@ -4,13 +4,13 @@ import { initializeFirestore, getFirestore } from "firebase/firestore";
 
 // PASTE YOUR NEW FIREBASE CONFIGURATION HERE:
 const firebaseConfig = {
-  apiKey: "AIzaSyBXXJMr0ghw8XBpfKKsz0jViSUjL49g0z8",
-  authDomain: "bexobdjsr.firebaseapp.com",
-  projectId: "bexobdjsr",
-  storageBucket: "bexobdjsr.firebasestorage.app",
-  messagingSenderId: "16308813008",
-  appId: "1:16308813008:web:9be2f77d03643b2bbef2d5",
-  measurementId: "G-YLZEG611MY"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBXXJMr0ghw8XBpfKKsz0jViSUjL49g0z8",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "bexobdjsr.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "bexobdjsr",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "bexobdjsr.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "16308813008",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:16308813008:web:9be2f77d03643b2bbef2d5",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-YLZEG611MY"
 };
 
 const app = initializeApp(firebaseConfig);
