@@ -281,19 +281,20 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
       </AnimatePresence>
 
       {/* INVOICE SHEET */}
-      <div ref={invoiceRef} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden text-slate-800 relative">
+      <div className="overflow-x-auto w-full pb-4 custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div ref={invoiceRef} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden text-slate-800 relative min-w-[800px] mx-auto">
         {isPaidOrDelivered && (
-          <div className="absolute top-[28%] md:top-[30%] right-[5%] md:right-[10%] rotate-[-15deg] border-4 border-emerald-500 text-emerald-500 font-black text-xl md:text-3xl px-4 py-2 md:px-6 md:py-3 rounded-lg md:rounded-2xl opacity-70 pointer-events-none z-50 shadow-sm bg-white/50 backdrop-blur-sm">
+          <div className="absolute top-[28%] top-[30%] right-[5%] right-[10%] rotate-[-15deg] border-4 border-emerald-500 text-emerald-500 font-black text-xl md:text-3xl px-4 py-2 px-6 py-3 rounded-lg rounded-2xl opacity-70 pointer-events-none z-50 shadow-sm bg-white/50 backdrop-blur-sm">
             PAID / DELIVERED
           </div>
         )}
 
         {/* Invoice Header Section (Responsive Grid) */}
-        <div className="bg-white grid grid-cols-1 md:grid-cols-12 overflow-hidden border-b border-slate-100 relative">
+        <div className="bg-white grid grid-cols-1 grid-cols-12 overflow-hidden border-b border-slate-100 relative">
           
           {/* Left Column (Brand Details) */}
-          <div className="col-span-1 md:col-span-6 p-6 md:p-8 z-10 bg-white order-2 md:order-1">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
+          <div className="col-span-1 col-span-6 p-6 p-8 z-10 bg-white order-2 order-1">
+            <div className="flex flex-col flex-row items-center gap-4 mb-6">
               <img src={userPhoto} alt="Shop" className="w-16 h-16 rounded-xl border border-slate-200 object-cover shadow-sm shrink-0" />
               <div>
                 <h1 className="text-2xl font-black text-[#0D3B66] tracking-tight">{resellerProfile?.shopName || order.resellerShopName || 'Not Available'}</h1>
@@ -308,24 +309,24 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
           </div>
 
           {/* Right Column (Invoice Details) */}
-          <div className="col-span-1 md:col-span-6 flex flex-col justify-center p-6 md:p-8 z-10 bg-[#0E46A3] text-white order-1 md:order-2">
-            <div className="md:ml-auto w-full md:w-auto text-center md:text-right space-y-3">
-              <h2 className="text-3xl md:text-4xl font-black tracking-widest mb-2 md:mb-4">INVOICE</h2>
-              <div className="space-y-1.5 text-sm md:text-xs">
-                <div className="flex justify-between md:justify-end md:gap-8 items-center border-b border-blue-800/50 md:border-transparent pb-2 md:pb-0">
-                  <span className="text-blue-200 font-bold uppercase tracking-wider text-[10px] md:text-xs">Invoice No:</span>
+          <div className="col-span-1 col-span-6 flex flex-col justify-center p-6 p-8 z-10 bg-[#0E46A3] text-white order-1 order-2">
+            <div className="ml-auto w-full w-auto text-center text-right space-y-3">
+              <h2 className="text-3xl text-4xl font-black tracking-widest mb-2 mb-4">INVOICE</h2>
+              <div className="space-y-1.5 text-sm text-xs">
+                <div className="flex justify-between justify-end gap-8 items-center border-b border-blue-800/50 border-transparent pb-2 pb-0">
+                  <span className="text-blue-200 font-bold uppercase tracking-wider text-[10px] text-xs">Invoice No:</span>
                   <span className="font-mono font-bold">{generateInvoiceNo()}</span>
                 </div>
-                <div className="flex justify-between md:justify-end md:gap-8 items-center border-b border-blue-800/50 md:border-transparent pb-2 md:pb-0">
-                  <span className="text-blue-200 font-bold uppercase tracking-wider text-[10px] md:text-xs">Order ID:</span>
+                <div className="flex justify-between justify-end gap-8 items-center border-b border-blue-800/50 border-transparent pb-2 pb-0">
+                  <span className="text-blue-200 font-bold uppercase tracking-wider text-[10px] text-xs">Order ID:</span>
                   <span className="font-mono font-bold">#{order.orderNo || order.id}</span>
                 </div>
-                <div className="flex justify-between md:justify-end md:gap-8 items-center border-b border-blue-800/50 md:border-transparent pb-2 md:pb-0">
-                  <span className="text-blue-200 font-bold uppercase tracking-wider text-[10px] md:text-xs">Date:</span>
+                <div className="flex justify-between justify-end gap-8 items-center border-b border-blue-800/50 border-transparent pb-2 pb-0">
+                  <span className="text-blue-200 font-bold uppercase tracking-wider text-[10px] text-xs">Date:</span>
                   <span className="font-bold">{formatDate(order.date)}</span>
                 </div>
-                <div className="flex justify-between md:justify-end md:gap-8 items-center">
-                  <span className="text-blue-200 font-bold uppercase tracking-wider text-[10px] md:text-xs">Payment:</span>
+                <div className="flex justify-between justify-end gap-8 items-center">
+                  <span className="text-blue-200 font-bold uppercase tracking-wider text-[10px] text-xs">Payment:</span>
                   <span className="font-bold">{order.paymentMethod || 'Cash on Delivery'}</span>
                 </div>
               </div>
@@ -334,8 +335,8 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
         </div>
 
         {/* Buyer Info block */}
-        <div className="p-4 md:p-8">
-          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 md:p-6 shadow-sm">
+        <div className="p-4 p-8">
+          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4 border-b border-slate-200 pb-3">
               <div className="p-1.5 bg-blue-100 rounded-lg text-blue-700">
                 <User size={16} />
@@ -356,10 +357,10 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
         </div>
 
         {/* Responsive Items Structure */}
-        <div className="px-4 md:px-8 pb-8">
+        <div className="px-4 px-8 pb-8">
           
           {/* Mobile Items View (Stacked Cards) */}
-          <div className="block md:hidden space-y-4">
+          <div className="hidden space-y-4">
             <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 border-b pb-2">Order Items</h3>
             {items.map((item: any, idx: number) => {
               const itemPrice = Number(item.sellingPrice) || Number(item.basePrice) || (subtotal / (items.length || 1));
@@ -388,7 +389,7 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
           </div>
 
           {/* Desktop Items View (Table Layout) */}
-          <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+          <div className="block overflow-hidden rounded-xl border border-slate-200 shadow-sm">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#0E46A3] text-white text-xs uppercase tracking-wider">
@@ -433,9 +434,9 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
         </div>
 
         {/* Calculations / Summary Structure */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 px-4 md:px-8 pb-8">
+        <div className="grid grid-cols-1 grid-cols-2 gap-4 gap-8 px-4 px-8 pb-8">
           
-          <div className="bg-white rounded-xl p-4 md:p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div className="bg-white rounded-xl p-4 p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
             <div className="flex items-center gap-2 text-slate-800 font-black text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">
               <Receipt size={16} className="text-blue-600" /> Price Breakdown
             </div>
@@ -461,7 +462,7 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
             </div>
           </div>
           
-          <div className="bg-white rounded-xl p-4 md:p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div className="bg-white rounded-xl p-4 p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
             <div className="flex items-center gap-2 text-slate-800 font-black text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">
               <ShieldCheck size={16} className="text-emerald-600" /> Payment & Collection
             </div>
@@ -478,7 +479,7 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
               <div className="mt-auto pt-2">
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex justify-between items-center text-orange-900 shadow-sm">
                   <span className="font-black text-xs uppercase tracking-wide">🚚 To Collect (COD)</span>
-                  <span className="font-mono font-black text-xl md:text-2xl">{formatTaka(deliveryManCollect)}</span>
+                  <span className="font-mono font-black text-xl text-2xl">{formatTaka(deliveryManCollect)}</span>
                 </div>
               </div>
             </div>
@@ -488,7 +489,7 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
 
         {/* Note / Comments section */}
         {(order.comment || deliveryManCollect > 0) && (
-          <div className="px-4 md:px-8 pb-8 space-y-3">
+          <div className="px-4 px-8 pb-8 space-y-3">
             {deliveryManCollect > 0 && (
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs font-bold text-blue-900 flex items-start gap-3">
                 <div className="p-1.5 bg-blue-100 text-blue-700 rounded-md shrink-0"><FileText size={14} /></div>
@@ -515,6 +516,7 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
           </p>
           <p className="text-blue-200 text-xs mt-1.5 font-semibold tracking-wide">Your trust is our inspiration.</p>
         </div>
+      </div>
       </div>
     </div>
   );

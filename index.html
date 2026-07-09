@@ -122,57 +122,42 @@
       window.sortByNewestFirst = function(arr) {
         if (!Array.isArray(arr)) return [];
         return arr.slice().sort((a, b) => {
-          // 1. Check timestamp
-          const tA = Number(a.timestamp) || 0;
-          const tB = Number(b.timestamp) || 0;
-          if (tA && tB && tA !== tB) {
-            return tB - tA;
+          function getEffectiveTime(item) {
+            if (item.timestamp) return Number(item.timestamp);
+            
+            const dateStr = item.time || item.date || '';
+            if (dateStr) {
+               let parsed = Date.parse(dateStr);
+               if (!isNaN(parsed)) return parsed;
+               
+               const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+               if (match) {
+                 const day = parseInt(match[1]);
+                 const month = parseInt(match[2]) - 1;
+                 const year = parseInt(match[3]);
+                 let hour = 0, min = 0, sec = 0;
+                 const timeMatch = dateStr.match(/(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+                 if (timeMatch) {
+                   hour = parseInt(timeMatch[1]);
+                   min = parseInt(timeMatch[2]);
+                   sec = parseInt(timeMatch[3]);
+                 }
+                 if (dateStr.toLowerCase().includes('pm') && hour < 12) hour += 12;
+                 if (dateStr.toLowerCase().includes('am') && hour === 12) hour = 0;
+                 return new Date(year, month, day, hour, min, sec).getTime();
+               }
+            }
+            return 0;
           }
 
-          // 2. Fallback to parsing dates/times
-          const dateStrA = a.time || a.date || '';
-          const dateStrB = b.time || b.date || '';
-          if (dateStrA && dateStrB && dateStrA !== dateStrB) {
-            let parsedA = Date.parse(dateStrA);
-            let parsedB = Date.parse(dateStrB);
-
-            if (isNaN(parsedA) && typeof dateStrA === 'string') {
-              const match = dateStrA.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-              if (match) {
-                const day = parseInt(match[1]);
-                const month = parseInt(match[2]) - 1;
-                const year = parseInt(match[3]);
-                let hour = 0, min = 0, sec = 0;
-                const timeMatch = dateStrA.match(/(\d{1,2}):(\d{1,2}):(\d{1,2})/);
-                if (timeMatch) {
-                  hour = parseInt(timeMatch[1]);
-                  min = parseInt(timeMatch[2]);
-                  sec = parseInt(timeMatch[3]);
-                }
-                parsedA = new Date(year, month, day, hour, min, sec).getTime();
-              }
-            }
-            if (isNaN(parsedB) && typeof dateStrB === 'string') {
-              const match = dateStrB.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-              if (match) {
-                const day = parseInt(match[1]);
-                const month = parseInt(match[2]) - 1;
-                const year = parseInt(match[3]);
-                let hour = 0, min = 0, sec = 0;
-                const timeMatch = dateStrB.match(/(\d{1,2}):(\d{1,2}):(\d{1,2})/);
-                if (timeMatch) {
-                  hour = parseInt(timeMatch[1]);
-                  min = parseInt(timeMatch[2]);
-                  sec = parseInt(timeMatch[3]);
-                }
-                parsedB = new Date(year, month, day, hour, min, sec).getTime();
-              }
-            }
-
-            if (!isNaN(parsedA) && !isNaN(parsedB) && parsedA !== parsedB) {
-              return parsedB - parsedA;
-            }
+          const timeA = getEffectiveTime(a);
+          const timeB = getEffectiveTime(b);
+          
+          if (timeA && timeB && timeA !== timeB) {
+            return timeB - timeA;
           }
+          if (timeA && !timeB) return -1;
+          if (!timeA && timeB) return 1;
 
           // 3. Fallback to sorting by string IDs containing numbers
           const idA = String(a.id || a.orderId || a.orderNo || '');
@@ -1403,7 +1388,7 @@
               <!-- Notification Dropdown Menu -->
               <div
                 id="notificationDropdown"
-                class="hidden absolute right-0 mt-3 w-full max-w-xs sm:w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 py-4 z-50 animate-fade-in origin-top-right text-left"
+                class="hidden absolute right-0 mt-3 w-[300px] sm:w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 py-4 z-50 animate-fade-in origin-top-right text-left"
               >
                 <div class="px-5 pb-3 border-b border-slate-50 flex items-center justify-between">
                   <p class="text-xs font-black text-slate-800 uppercase tracking-wider">নোটিফিকেশন</p>
@@ -1431,7 +1416,7 @@
               <!-- Dropdown Menu -->
               <div
                 id="userDropdown"
-                class="hidden absolute right-0 mt-3 w-full max-w-[16rem] sm:w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3 z-50 animate-fade-in origin-top-right"
+                class="hidden absolute right-0 mt-3 w-[240px] sm:w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3 z-50 animate-fade-in origin-top-right"
               >
                 <div
                   class="px-5 py-3 border-b border-slate-50 mb-2 flex items-center justify-between"
@@ -2138,11 +2123,11 @@
               (function() {
                   
               window.getImg = function(item) {
-                  if (item.image && item.image.length > 100) return item.image;
-                  if (item.img && item.img.length > 100) return item.img;
+                  if (item.image) return item.image;
+                  if (item.img) return item.img;
                   const pid = item.productId || item.postId;
-                  if (pid && typeof appProducts !== 'undefined') {
-                      const p = appProducts.find(x => String(x.id) === String(pid));
+                  if (pid && typeof appPosts !== 'undefined') {
+                      const p = appPosts.find(x => String(x.id) === String(pid));
                       if (p && p.images && p.images.length > 0) return p.images[item.imgIdx || 0] || p.images[0];
                   }
                   return 'https://picsum.photos/seed/placeholder/200/200';
@@ -6269,7 +6254,7 @@
                               <!-- Order Products List -->
                               <div class="space-y-1.5 font-sans">
                                   <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><i class="fas fa-box-open text-[#ff6b21]"></i> প্রোডাক্ট বিবরণী</h4>
-                                  <div class="border border-slate-100 rounded-xl overflow-hidden text-[11px] max-h-32 overflow-y-auto shadow-inner">
+                                  <div class="border border-slate-100 rounded-xl overflow-hidden overflow-x-auto text-[11px] max-h-32 overflow-y-auto shadow-inner">
                                       <table class="w-full text-left border-collapse bg-white">
                                           <thead>
                                               <tr class="bg-slate-50 border-b border-slate-100 text-[9px] text-slate-400 font-black uppercase">
@@ -6415,7 +6400,7 @@
                               amount: profitAmt,
                               status: 'Success',
                               date: new Date().toLocaleString(),
-                              time: new Date().toLocaleString('en-GB'),
+                              time: new Date().toLocaleString('en-GB'), timestamp: Date.now(),
                               timestamp: Date.now(),
                               previousBalance: prevUserBal,
                               newBalance: newUserBal,
@@ -6536,7 +6521,7 @@
                           amount: amount,
                           status: 'Success',
                           date: new Date().toLocaleString(),
-                          time: new Date().toLocaleString('en-GB'),
+                          time: new Date().toLocaleString('en-GB'), timestamp: Date.now(),
                           timestamp: Date.now(),
                           previousBalance: prevUserBal,
                           newBalance: newUserBal,
@@ -10079,7 +10064,7 @@
                                       </div>
 
                                       <!-- Table (Image 7) -->
-                                      <div class="border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
+                                      <div class="border border-slate-100 rounded-3xl overflow-hidden overflow-x-auto shadow-sm">
                                           <table class="w-full text-left text-[11px]">
                                               <thead class="bg-slate-50 border-b border-slate-100 font-black text-slate-400 uppercase tracking-widest">
                                                   <tr>
@@ -10367,7 +10352,12 @@
                   });
                   if(target) target.classList.add('active');
 
-                  if(window.innerWidth < 1024) toggleSidebar();
+                  if(window.innerWidth < 1024) {
+                      const sb = document.getElementById('sidebar');
+                      if (sb && sb.classList.contains('mobile-active')) {
+                          toggleSidebar();
+                      }
+                  }
 
                   // Reset pagination when switching menus
                   productCurrentPage = 1;
@@ -10768,7 +10758,7 @@
                       type: 'Add Balance',
                       method: method,
                       amount: amount,
-                      time: new Date().toLocaleString('en-GB'),
+                      time: new Date().toLocaleString('en-GB'), timestamp: Date.now(),
                       status: 'Checking'
                   };
 
@@ -10984,7 +10974,7 @@
                                   <button onclick="renderRechargeDashboard()" class="px-4 py-2 bg-white rounded-lg font-bold text-xs shadow-sm"><i class="fas fa-arrow-left mr-2"></i>ব্যাক</button>
                               </div>
 
-                              <div class="bg-white rounded-2xl border border-slate-100 shadow-xl overflow-hidden">
+                              <div class="bg-white rounded-2xl border border-slate-100 shadow-xl overflow-hidden overflow-x-auto">
                                   <table class="w-full text-left">
                                       <thead class="bg-slate-50 border-b border-slate-100">
                                           <tr>
@@ -11209,7 +11199,7 @@
                               accountId: accId,
                               month: month,
                               contact: contact,
-                              time: new Date().toLocaleString('en-GB'),
+                              time: new Date().toLocaleString('en-GB'), timestamp: Date.now(),
                               status: 'Pending'
                           };
 
@@ -15830,7 +15820,7 @@
                                   </div>
                               </div>
 
-                              <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+                              <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden overflow-x-auto">
                                   <table class="w-full text-left font-sans">
                                       <thead class="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest italic font-sans">
                                           <tr>
@@ -18887,7 +18877,7 @@ function updateUserTicketStatus(id, newStatus) {
                               </div>
                           `}
 
-                          <div id="invoiceContainer" class="invoice-box" style="width: 800px; background: white; margin: 0 auto; box-shadow: 0 0 15px rgba(0,0,0,0.05); border-radius: 16px; overflow: hidden; font-family: 'Hind Siliguri', sans-serif;">
+                          <div id="invoiceContainer" class="invoice-box" style="width: 100%; max-width: 800px; background: white; margin: 0 auto; box-shadow: 0 0 15px rgba(0,0,0,0.05); border-radius: 16px; overflow: hidden; font-family: 'Hind Siliguri', sans-serif;">
                               ${isPaidOrDelivered ? `
                                   <div class="absolute top-[28%] right-[10%] rotate-[-12deg] border-4 border-emerald-500 text-emerald-500 font-black text-2xl px-6 py-2 rounded-xl border-dashed opacity-85 pointer-events-none select-none z-50 uppercase tracking-widest bg-emerald-50/40">
                                       PAID / DELIVERED
@@ -18895,7 +18885,7 @@ function updateUserTicketStatus(id, newStatus) {
                               ` : ''}
                               
                               <!-- 1. Top Header -->
-                              <div class="relative bg-[#1e5bb6] text-white p-8 flex justify-between items-center" style="border-bottom-left-radius: 50px;">
+                              <div class="relative bg-[#1e5bb6] text-white p-4 sm:p-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left" style="border-bottom-left-radius: 50px;">
                                   <div class="flex items-center gap-4 bg-white/10 p-3 rounded-xl backdrop-blur-sm max-w-[40%]">
                                       <img id="userProfileImg" src="${userPhoto}" 
                                            alt="Profile" class="w-16 h-16 rounded-lg object-cover bg-gray-200">
@@ -18942,8 +18932,8 @@ function updateUserTicketStatus(id, newStatus) {
                               </div>
 
                               <!-- 4. Product Details -->
-                              <div class="px-8 pb-4">
-                                  <table class="w-full text-left border-collapse rounded-xl overflow-hidden shadow-sm">
+                              <div class="px-4 sm:px-8 pb-4 overflow-x-auto">
+                                  <table class="w-full text-left border-collapse rounded-xl overflow-hidden shadow-sm min-w-[600px]">
                                       <thead>
                                           <tr class="bg-[#1e5bb6] text-white text-sm">
                                               <th class="p-3 text-center w-12">#</th>
@@ -19153,6 +19143,10 @@ function updateUserTicketStatus(id, newStatus) {
                async function downloadAndShareInvoice(event) {
                   const element = document.getElementById('invoiceContainer');
                   if (!element || !event) return;
+                  const originalWidth = element.style.width;
+                  const originalMaxWidth = element.style.maxWidth;
+                  element.style.width = '800px';
+                  element.style.maxWidth = '800px';
                   
                   const btn = event.currentTarget;
                   const originalContent = btn.innerHTML;
@@ -19180,6 +19174,8 @@ function updateUserTicketStatus(id, newStatus) {
                   } finally {
                       btn.innerHTML = originalContent;
                       btn.disabled = false;
+                      element.style.width = originalWidth;
+                      element.style.maxWidth = originalMaxWidth;
                   }
               }
 
@@ -19322,7 +19318,7 @@ function updateUserTicketStatus(id, newStatus) {
                               level: level,
                               buyer: buyer.fullName || 'Member',
                               amount: commAmount,
-                              time: new Date().toLocaleString('en-GB'),
+                              time: new Date().toLocaleString('en-GB'), timestamp: Date.now(),
                               orderId: orderId
                           });
                           referrer.passiveEarnings = (referrer.passiveEarnings || 0) + commAmount;
@@ -20147,7 +20143,7 @@ function updateUserTicketStatus(id, newStatus) {
                                     if ('settledProfitValue' in o) delete o.settledProfitValue;
                                     o.history = o.history || [];
                                     o.history.push({
-                                        time: new Date().toLocaleString('en-GB'),
+                                        time: new Date().toLocaleString('en-GB'), timestamp: Date.now(),
                                         actor: 'Super Admin',
                                         message: 'সেটেলমেন্ট অডিট লগ ডিলিট করার কারণে প্রফিট নিষ্পত্তি রিসেট করা হয়েছে।'
                                     });
