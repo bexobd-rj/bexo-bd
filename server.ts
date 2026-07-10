@@ -35,7 +35,7 @@ async function startServer() {
 
       verificationStore.set(cleanEmail, { code, expiresAt });
 
-      const smtpHost = process.env.SMTP_HOST || "";
+      const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
       const smtpPort = parseInt(process.env.SMTP_PORT || "587");
       const smtpUser = process.env.SMTP_USER || "";
       const smtpPass = process.env.SMTP_PASS || "";
@@ -45,6 +45,7 @@ async function startServer() {
       let errorMsg = "";
 
       if (smtpUser && smtpPass) {
+        console.log(`Attempting to send email to ${cleanEmail} using ${smtpUser}...`);
         try {
           const transporter = nodemailer.createTransport({
             host: smtpHost || "smtp.gmail.com",
@@ -83,6 +84,9 @@ async function startServer() {
         } catch (mailErr: any) {
           console.error("Nodemailer failed to send email:", mailErr);
           errorMsg = mailErr.message || "Failed to send email via SMTP";
+          if (errorMsg.includes("535") || errorMsg.includes("BadCredentials") || errorMsg.includes("Username and Password not accepted")) {
+            errorMsg = "SMTP Authentication Error: If you are using Gmail, make sure to use an 'App Password' instead of your regular password. (535-5.7.8)";
+          }
         }
       } else {
         console.log(`[Email Verification - DEMO MODE] Verification code for ${cleanEmail} is: ${code}`);
@@ -92,6 +96,14 @@ async function startServer() {
       // and we return the code to let them register easily in the dev/demo environment.
       const isDemoMode = !smtpUser || !smtpPass;
       
+      if (!mailSent && !isDemoMode) {
+        return res.status(500).json({ 
+          success: false, 
+          error: errorMsg || "ইমেইল পাঠানো সম্ভব হয়নি। অনুগ্রহ করে পরে চেষ্টা করুন বা অ্যাডমিনের সাথে যোগাযোগ করুন।",
+          details: errorMsg.includes("535") ? "SMTP Authentication Error: If you are using Gmail, make sure to use an 'App Password' instead of your regular password." : undefined
+        });
+      }
+
       return res.json({
         success: true,
         demoMode: isDemoMode,

@@ -101,7 +101,7 @@
     <script>
       window.runVisualSearchAI = async (base64) => {
         try {
-          const response = await fetch('/api/visual-search', {
+          const response = await fetch(API_BASE_URL + '/api/visual-search', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -986,6 +986,8 @@
                 <input
                   type="text"
                   id="loginPhone"
+                  name="username"
+                  autocomplete="username"
                   placeholder=" "
                   required
                 />
@@ -995,6 +997,8 @@
                 <input
                   type="password"
                   id="loginPass"
+                  name="password"
+                  autocomplete="current-password"
                   placeholder=" "
                   required
                 />
@@ -2077,6 +2081,7 @@
 
     <!-- === JAVASCRIPT LOGIC === -->
     <script>
+      const API_BASE_URL = 'https://ais-dev-apfakvi6im7p6idatriqrc-55826732024.asia-southeast1.run.app';
               // Prevent standard circular reference crashes on JSON.stringify across the entire app
               (function() {
                   
@@ -5146,14 +5151,16 @@
                       const initiateDualVerification = async () => {
                           showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হচ্ছে...", "info");
                           try {
-                              const res = await fetch("/api/send-verification-email", {
+                              const res = await fetch(API_BASE_URL + "/api/send-verification-email", {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ email: email })
                               });
                               const data = await res.json();
                               if (!res.ok) {
-                                  throw new Error(data.error || "ভেরিফিকেশন ইমেইল পাঠাতে ব্যর্থ হয়েছে।");
+                                  let msg = data.error || "ভেরিফিকেশন ইমেইল পাঠাতে ব্যর্থ হয়েছে।";
+                                  if (data.details) msg += " Tip: " + data.details;
+                                  throw new Error(msg);
                               }
                               
                               showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
@@ -5165,7 +5172,7 @@
                                   async (code) => {
                                       // onEmailVerify Callback
                                       try {
-                                          const verifyRes = await fetch("/api/verify-email-code", {
+                                          const verifyRes = await fetch(API_BASE_URL + "/api/verify-email-code", {
                                               method: "POST",
                                               headers: { "Content-Type": "application/json" },
                                               body: JSON.stringify({ email: email, code: code })
@@ -5184,7 +5191,7 @@
                                   async (code) => {
                                       // onPhoneVerify Callback
                                       try {
-                                          const verifyRes = await fetch("/api/verify-phone-otp", {
+                                          const verifyRes = await fetch(API_BASE_URL + "/api/verify-phone-otp", {
                                               method: "POST",
                                               headers: { "Content-Type": "application/json" },
                                               body: JSON.stringify({ phone: phone, code: code })
@@ -5205,7 +5212,7 @@
                                   },
                                   async () => {
                                       // onEmailResend Callback
-                                      const resendRes = await fetch("/api/send-verification-email", {
+                                      const resendRes = await fetch(API_BASE_URL + "/api/send-verification-email", {
                                           method: "POST",
                                           headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify({ email: email })
@@ -5215,7 +5222,7 @@
                                   async () => {
                                       // onPhoneResend Callback
                                       showToast("মোবাইল ওটিপি পাঠানো হচ্ছে...", "info");
-                                      const resendRes = await fetch("/api/send-phone-otp", {
+                                      const resendRes = await fetch(API_BASE_URL + "/api/send-phone-otp", {
                                           method: "POST",
                                           headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify({ phone: phone })
@@ -19797,7 +19804,7 @@ function updateUserTicketStatus(id, newStatus) {
                     }
 
                     // 2. Super Admin Access PIN verification check
-                    if (sessionStorage.getItem('bexo_super_admin_verified') !== 'true') {
+                    if (localStorage.getItem('bexo_super_admin_verified') !== 'true') {
                         container.innerHTML = `
                             <div class="p-4 lg:p-8 max-w-lg mx-auto animate-fade-in font-sans">
                                 <div class="bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-100/50 overflow-hidden">
@@ -20457,7 +20464,7 @@ function verifySuperAdminPin() {
 
                    const enteredPin = pinInput.value.trim();
                    if (enteredPin === 'super123') {
-                       sessionStorage.setItem('bexo_super_admin_verified', 'true');
+                       localStorage.setItem('bexo_super_admin_verified', 'true');
                        showToast("সুপার অ্যাডমিন সিকিউরিটি অ্যাক্সেস আনলকড!", "success");
                        renderResellerSettlementModule();
                    } else {
@@ -20469,7 +20476,7 @@ function verifySuperAdminPin() {
 
                // 4. Reset Session and Lock again
                function resetSuperAdminVerification() {
-                   sessionStorage.removeItem('bexo_super_admin_verified');
+                   localStorage.removeItem('bexo_super_admin_verified');
                    showToast("সুপার অ্যাডমিন সেশন লক করা হয়েছে।", "info");
                    renderResellerSettlementModule();
                }
