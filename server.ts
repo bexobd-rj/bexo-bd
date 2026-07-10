@@ -35,33 +35,25 @@ async function startServer() {
 
       verificationStore.set(cleanEmail, { code, expiresAt });
 
-      const smtpHost = (process.env.SMTP_HOST || "smtp.gmail.com").trim();
+      const smtpHost = process.env.SMTP_HOST || "";
       const smtpPort = parseInt(process.env.SMTP_PORT || "587");
-      const smtpUser = (process.env.SMTP_USER || "").trim();
-      const smtpPass = (process.env.SMTP_PASS || "").replace(/\s+/g, "");
-      const smtpFrom = (process.env.SMTP_FROM || smtpUser || "no-reply@bexobd.com").trim();
-
-      // Diagnostic logging (Hidden password for security)
-      if (smtpUser.includes("@gmail.com")) {
-        console.log(`[SMTP Diagnostic] Host: ${smtpHost}, Port: ${smtpPort}, User: ${smtpUser}, Pass Length: ${smtpPass.length}`);
-      }
+      const smtpUser = process.env.SMTP_USER || "";
+      const smtpPass = process.env.SMTP_PASS || "";
+      const smtpFrom = process.env.SMTP_FROM || smtpUser || "no-reply@bexobd.com";
 
       let mailSent = false;
       let errorMsg = "";
 
       if (smtpUser && smtpPass) {
-        console.log(`Attempting to send email to ${cleanEmail} using ${smtpUser} via port ${smtpPort}...`);
         try {
           const transporter = nodemailer.createTransport({
-            host: smtpHost,
+            host: smtpHost || "smtp.gmail.com",
             port: smtpPort,
-            secure: smtpPort === 465,
+            secure: smtpPort === 465, // true for 465, false for other ports
             auth: {
               user: smtpUser,
               pass: smtpPass,
             },
-            // Adding connection timeout for better error reporting
-            connectionTimeout: 10000,
           });
 
           await transporter.sendMail({
@@ -91,33 +83,18 @@ async function startServer() {
         } catch (mailErr: any) {
           console.error("Nodemailer failed to send email:", mailErr);
           errorMsg = mailErr.message || "Failed to send email via SMTP";
-          if (errorMsg.includes("535") || errorMsg.includes("BadCredentials") || errorMsg.includes("Username and Password not accepted")) {
-            errorMsg = `জিমেইল লগইন সমস্যা (535): আপনার জিমেইল অ্যাপ পাসওয়ার্ড সঠিক নয়। নিশ্চিত করুন আপনি ১৬ অক্ষরের অ্যাপ পাসওয়ার্ড ব্যবহার করছেন (আপনার নিয়মিত পাসওয়ার্ড নয়)। Gmail App Password Error (Detected Length: ${smtpPass.length}). Please use a 16-character App Password.`;
-          }
         }
       } else {
-        console.log(`[Email Verification - DEMO MODE] Verification code for ${cleanEmail} is: ${code}`);
+        errorMsg = "SMTP user and password are not configured.";
       }
 
-      // If mail was not sent because SMTP is not configured, we return success with a warning,
-      // and we return the code to let them register easily in the dev/demo environment.
-      const isDemoMode = !smtpUser || !smtpPass;
+      if (!mailSent) {
+         throw new Error(errorMsg || "Failed to send verification email.");
+      }
       
-      if (!mailSent && !isDemoMode) {
-        return res.status(500).json({ 
-          success: false, 
-          error: errorMsg || "ইমেইল পাঠানো সম্ভব হয়নি। অনুগ্রহ করে পরে চেষ্টা করুন বা অ্যাডমিনের সাথে যোগাযোগ করুন।",
-          details: errorMsg.includes("535") ? "SMTP Authentication Error: If you are using Gmail, make sure to use an 'App Password' instead of your regular password." : undefined
-        });
-      }
-
       return res.json({
         success: true,
-        demoMode: isDemoMode,
-        verificationCode: isDemoMode ? code : undefined,
-        message: isDemoMode 
-          ? "Demo mode is active (SMTP is not configured on the server). The verification code is printed to the server logs and returned in this response."
-          : "Verification email sent successfully!"
+        message: "Verification email sent successfully!"
       });
 
     } catch (error: any) {
@@ -229,20 +206,17 @@ async function startServer() {
           console.error("SMS sending failed:", smsErr);
           errorMsg = smsErr.message || "Failed to send SMS";
         }
+      } else {
+        errorMsg = "SMS API key is not configured.";
       }
 
-      const isDemoMode = !smsSent;
-      if (isDemoMode) {
-        console.log(`[Phone OTP - DEMO MODE] OTP code for ${cleanPhone} is: ${code}`);
+      if (!smsSent) {
+         throw new Error(errorMsg || "Failed to send SMS OTP.");
       }
 
       return res.json({
         success: true,
-        demoMode: isDemoMode,
-        otpCode: isDemoMode ? code : undefined,
-        message: isDemoMode
-          ? "Demo mode is active (SMS API key is not configured). The OTP is printed to the server logs and returned in this response."
-          : "Verification OTP sent successfully to your mobile number!"
+        message: "Verification OTP sent successfully to your mobile number!"
       });
 
     } catch (error: any) {

@@ -101,7 +101,7 @@
     <script>
       window.runVisualSearchAI = async (base64) => {
         try {
-          const response = await fetch(API_BASE_URL + '/api/visual-search', {
+          const response = await fetch('/api/visual-search', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -986,8 +986,6 @@
                 <input
                   type="text"
                   id="loginPhone"
-                  name="username"
-                  autocomplete="username"
                   placeholder=" "
                   required
                 />
@@ -997,8 +995,6 @@
                 <input
                   type="password"
                   id="loginPass"
-                  name="password"
-                  autocomplete="current-password"
                   placeholder=" "
                   required
                 />
@@ -2081,7 +2077,6 @@
 
     <!-- === JAVASCRIPT LOGIC === -->
     <script>
-      const API_BASE_URL = 'https://ais-dev-apfakvi6im7p6idatriqrc-55826732024.asia-southeast1.run.app';
               // Prevent standard circular reference crashes on JSON.stringify across the entire app
               (function() {
                   
@@ -4735,7 +4730,7 @@
                   return appUsers.find(u => u.sellerCode === code);
               }
 
-              function showDualVerificationModal(email, phone, onEmailVerify, onPhoneVerify, onEmailResend, onPhoneResend, initialEmailCode = null, initialPhoneCode = null) {
+              function showDualVerificationModal(email, phone, onEmailVerify, onPhoneVerify, onEmailResend, onPhoneResend) {
                   let modal = document.getElementById('email-verification-modal');
                   if (modal) modal.remove();
 
@@ -4744,8 +4739,6 @@
                   modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[99999] fade-in';
                   
                   let currentStep = 1; // 1: Email, 2: Phone
-                  let emailCodeLocal = initialEmailCode;
-                  let phoneCodeLocal = initialPhoneCode;
 
                   const renderStepContent = () => {
                       let title = '';
@@ -4753,7 +4746,6 @@
                       let description = '';
                       let inputLabel = '';
                       let placeholder = '';
-                      let demoAlert = '';
                       let inputVal = '';
 
                       if (currentStep === 1) {
@@ -4762,40 +4754,14 @@
                           description = `আপনার দেওয়া ইমেইল ঠিকানা <strong class="text-slate-800">${email}</strong>-এ একটি ভেরিফিকেশন কোড পাঠানো হয়েছে। অ্যাকাউন্ট তৈরি সম্পন্ন করতে কোডটি নিচে দিন।`;
                           inputLabel = '৬-ডিজিটের ইমেইল ভেরিফিকেশন কোড';
                           placeholder = '------';
-                          inputVal = emailCodeLocal || '';
-                          if (emailCodeLocal) {
-                              demoAlert = `
-                                  <div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-700 text-xs font-medium leading-relaxed">
-                                      <div class="flex items-center gap-1.5 font-bold mb-1">
-                                          <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                          </svg>
-                                          <span>ইমেইল ডেমো মোড সক্রিয়! (SMTP কনফিগার করা নেই)</span>
-                                      </div>
-                                      আপনার টেস্ট করার সুবিধার্থে কোডটি দেওয়া হলো: <strong class="text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-200">${emailCodeLocal}</strong>
-                                  </div>
-                              `;
-                          }
+                          inputVal = '';
                       } else {
                           title = 'মোবাইল ওটিপি (OTP) ভেরিফিকেশন';
                           subtitle = 'কোডটি আপনার মোবাইল নম্বরে পাঠানো হয়েছে';
                           description = `আপনার দেওয়া মোবাইল নম্বর <strong class="text-slate-800">${phone}</strong>-এ একটি ৬-ডিজিটের ওটিপি পাঠানো হয়েছে। রেজিস্ট্রেশন সম্পন্ন করতে ওটিপি-টি নিচে দিন।`;
                           inputLabel = '৬-ডিজিটের ওটিপি (OTP) কোড';
                           placeholder = '------';
-                          inputVal = phoneCodeLocal || '';
-                          if (phoneCodeLocal) {
-                              demoAlert = `
-                                  <div class="mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-medium leading-relaxed">
-                                      <div class="flex items-center gap-1.5 font-bold mb-1">
-                                          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                          </svg>
-                                          <span>মোবাইল ওটিপি ডেমো মোড সক্রিয়! (SMS Gateway কনফিগার করা নেই)</span>
-                                      </div>
-                                      আপনার টেস্ট করার সুবিধার্থে ওটিপি কোডটি হলো: <strong class="text-emerald-600 bg-white px-2 py-0.5 rounded border border-emerald-200">${phoneCodeLocal}</strong>
-                                  </div>
-                              `;
-                          }
+                          inputVal = '';
                       }
 
                       return `
@@ -4829,8 +4795,6 @@
                               <p class="text-slate-600 text-sm mb-4 leading-relaxed">
                                   ${description}
                               </p>
-
-                              ${demoAlert}
 
                               <div class="mb-5">
                                   <label class="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">${inputLabel}</label>
@@ -4889,15 +4853,9 @@
                           resendBtn.innerText = "পাঠানো হচ্ছে...";
                           try {
                               if (currentStep === 1) {
-                                  const response = await onEmailResend();
-                                  if (response && response.verificationCode) {
-                                      emailCodeLocal = response.verificationCode;
-                                  }
+                                  await onEmailResend();
                               } else {
-                                  const response = await onPhoneResend();
-                                  if (response && response.otpCode) {
-                                      phoneCodeLocal = response.otpCode;
-                                  }
+                                  await onPhoneResend();
                               }
                               modal.innerHTML = renderStepContent();
                               attachEvents();
@@ -4928,10 +4886,7 @@
                                       // Email verified successfully! Transition to Step 2
                                       currentStep = 2;
                                       submitBtn.innerHTML = `ওটিপি পাঠানো হচ্ছে...`;
-                                      const res = await onPhoneResend();
-                                      if (res && res.otpCode) {
-                                          phoneCodeLocal = res.otpCode;
-                                      }
+                                      await onPhoneResend();
                                       modal.innerHTML = renderStepContent();
                                       attachEvents();
                                   }
@@ -5151,16 +5106,14 @@
                       const initiateDualVerification = async () => {
                           showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হচ্ছে...", "info");
                           try {
-                              const res = await fetch(API_BASE_URL + "/api/send-verification-email", {
+                              const res = await fetch("/api/send-verification-email", {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ email: email })
                               });
                               const data = await res.json();
                               if (!res.ok) {
-                                  let msg = data.error || "ভেরিফিকেশন ইমেইল পাঠাতে ব্যর্থ হয়েছে।";
-                                  if (data.details) msg += " Tip: " + data.details;
-                                  throw new Error(msg);
+                                  throw new Error(data.error || "ভেরিফিকেশন ইমেইল পাঠাতে ব্যর্থ হয়েছে।");
                               }
                               
                               showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
@@ -5172,7 +5125,7 @@
                                   async (code) => {
                                       // onEmailVerify Callback
                                       try {
-                                          const verifyRes = await fetch(API_BASE_URL + "/api/verify-email-code", {
+                                          const verifyRes = await fetch("/api/verify-email-code", {
                                               method: "POST",
                                               headers: { "Content-Type": "application/json" },
                                               body: JSON.stringify({ email: email, code: code })
@@ -5191,7 +5144,7 @@
                                   async (code) => {
                                       // onPhoneVerify Callback
                                       try {
-                                          const verifyRes = await fetch(API_BASE_URL + "/api/verify-phone-otp", {
+                                          const verifyRes = await fetch("/api/verify-phone-otp", {
                                               method: "POST",
                                               headers: { "Content-Type": "application/json" },
                                               body: JSON.stringify({ phone: phone, code: code })
@@ -5212,7 +5165,7 @@
                                   },
                                   async () => {
                                       // onEmailResend Callback
-                                      const resendRes = await fetch(API_BASE_URL + "/api/send-verification-email", {
+                                      const resendRes = await fetch("/api/send-verification-email", {
                                           method: "POST",
                                           headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify({ email: email })
@@ -5222,7 +5175,7 @@
                                   async () => {
                                       // onPhoneResend Callback
                                       showToast("মোবাইল ওটিপি পাঠানো হচ্ছে...", "info");
-                                      const resendRes = await fetch(API_BASE_URL + "/api/send-phone-otp", {
+                                      const resendRes = await fetch("/api/send-phone-otp", {
                                           method: "POST",
                                           headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify({ phone: phone })
@@ -5234,9 +5187,7 @@
                                           showToast(phoneData.message || "মোবাইল ওটিপি পাঠানো হয়েছে!", "success");
                                       }
                                       return phoneData;
-                                  },
-                                  data.verificationCode || null,
-                                  null
+                                  }
                               );
                           } catch(err) {
                               showToast(err.message || "ভেরিফিকেশন ইমেইল পাঠাতে কোনো সমস্যা হয়েছে।", "error");
@@ -6006,15 +5957,6 @@
 
               function syncManagerRecordsFromOrders() {
                   let changed = false;
-                  let batches = [];
-                  let currentBatch = null;
-                  let batchCount = 0;
-                  
-                  if (window.db) {
-                      currentBatch = window.db.batch();
-                      batches.push(currentBatch);
-                  }
-
                   (appOrders || []).forEach(o => {
                       if (o && (o.status === 'Delivered' || o.status === 'Confirmed' || o.status === 'Completed' || o.status === 'Delivery Completed')) {
                           const exists = appManagerRecords.some(r => String(r.order_id) === String(o.id));
@@ -6066,26 +6008,15 @@
 
                               appManagerRecords.push(record);
                               changed = true;
-                              if (currentBatch) {
-                                  const docRef = window.db.collection('bexo_manager_records').doc(String(record.id));
-                                  currentBatch.set(docRef, sanitizeForFirestore(record));
-                                  batchCount++;
-                                  if (batchCount === 490) {
-                                      currentBatch = window.db.batch();
-                                      batches.push(currentBatch);
-                                      batchCount = 0;
-                                  }
+                              if (window.db) {
+                                  window.db.collection('bexo_manager_records').doc(String(record.id)).set(sanitizeForFirestore(record))
+                                      .catch(err => console.error("Firebase sync error:", err));
                               }
                           }
                       }
                   });
                   if (changed) {
                       saveManagerRecords();
-                      if (batches.length > 0) {
-                          batches.forEach(batch => {
-                              batch.commit().catch(err => console.error("Firebase sync error:", err));
-                          });
-                      }
                   }
               }
 
@@ -6615,10 +6546,8 @@
 
                   // Calculate metrics based on current DB
                   const totalEarnings = appManagerRecords.reduce((sum, r) => sum + Number(r.profit_amount || 0), 0);
-                  const newPayouts = appResellerPayouts.filter(p => p.status === 'Completed' || p.status === 'successful').reduce((sum, p) => sum + Number(p.amount || 0), 0);
-                  const oldWithdrawals = (window.appWithdrawals || []).filter(w => w.status === 'Completed').reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
-                  const totalPayouts = newPayouts + oldWithdrawals;
-                  const pendingBalance = Math.max(0, totalEarnings - totalPayouts);
+                  const totalPayouts = appManagerRecords.filter(r => r.payment_status === 'Payment Complete').reduce((sum, r) => sum + Number(r.profit_amount || 0), 0);
+                  const pendingBalance = appManagerRecords.filter(r => r.payment_status === 'Payment Pending').reduce((sum, r) => sum + Number(r.profit_amount || 0), 0);
 
                   // Warnings check
                   const hasResellerPriceWarning = appManagerRecords.some(r => r.payment_status === 'Payment Pending' && r.reseller_price_warning === true);
@@ -7210,6 +7139,7 @@
                       (appWithdrawals || []).forEach(w => {
                           const profileId = w.profileId;
                           if (!profileId || w.status !== 'Completed') return;
+
                           if (!resellerStatsMap[profileId]) {
                               const mu = (appUsers || []).find(u => u.profileId === profileId);
                               resellerStatsMap[profileId] = {
@@ -7224,16 +7154,8 @@
                                   pendingBalance: 0
                               };
                           }
-                          resellerStatsMap[profileId].totalPaid += Number(w.amount) || 0;
-                      });
 
-                      // Process Manager Order Payouts
-                      (appResellerPayouts || []).forEach(p => {
-                          const profileId = p.reseller_id;
-                          if (!profileId || (p.status !== 'Completed' && p.status !== 'successful')) return;
-                          if (resellerStatsMap[profileId]) {
-                              resellerStatsMap[profileId].totalPaid += Number(p.amount) || 0;
-                          }
+                          resellerStatsMap[profileId].totalPaid += Number(w.amount) || 0;
                       });
 
                       // Post-calculate due pending balance
@@ -19804,7 +19726,7 @@ function updateUserTicketStatus(id, newStatus) {
                     }
 
                     // 2. Super Admin Access PIN verification check
-                    if (localStorage.getItem('bexo_super_admin_verified') !== 'true') {
+                    if (sessionStorage.getItem('bexo_super_admin_verified') !== 'true') {
                         container.innerHTML = `
                             <div class="p-4 lg:p-8 max-w-lg mx-auto animate-fade-in font-sans">
                                 <div class="bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-100/50 overflow-hidden">
@@ -20464,7 +20386,7 @@ function verifySuperAdminPin() {
 
                    const enteredPin = pinInput.value.trim();
                    if (enteredPin === 'super123') {
-                       localStorage.setItem('bexo_super_admin_verified', 'true');
+                       sessionStorage.setItem('bexo_super_admin_verified', 'true');
                        showToast("সুপার অ্যাডমিন সিকিউরিটি অ্যাক্সেস আনলকড!", "success");
                        renderResellerSettlementModule();
                    } else {
@@ -20476,7 +20398,7 @@ function verifySuperAdminPin() {
 
                // 4. Reset Session and Lock again
                function resetSuperAdminVerification() {
-                   localStorage.removeItem('bexo_super_admin_verified');
+                   sessionStorage.removeItem('bexo_super_admin_verified');
                    showToast("সুপার অ্যাডমিন সেশন লক করা হয়েছে।", "info");
                    renderResellerSettlementModule();
                }
