@@ -35,26 +35,33 @@ async function startServer() {
 
       verificationStore.set(cleanEmail, { code, expiresAt });
 
-      const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+      const smtpHost = (process.env.SMTP_HOST || "smtp.gmail.com").trim();
       const smtpPort = parseInt(process.env.SMTP_PORT || "587");
-      const smtpUser = process.env.SMTP_USER || "";
-      const smtpPass = process.env.SMTP_PASS || "";
-      const smtpFrom = process.env.SMTP_FROM || smtpUser || "no-reply@bexobd.com";
+      const smtpUser = (process.env.SMTP_USER || "").trim();
+      const smtpPass = (process.env.SMTP_PASS || "").replace(/\s+/g, "");
+      const smtpFrom = (process.env.SMTP_FROM || smtpUser || "no-reply@bexobd.com").trim();
+
+      // Diagnostic logging (Hidden password for security)
+      if (smtpUser.includes("@gmail.com")) {
+        console.log(`[SMTP Diagnostic] Host: ${smtpHost}, Port: ${smtpPort}, User: ${smtpUser}, Pass Length: ${smtpPass.length}`);
+      }
 
       let mailSent = false;
       let errorMsg = "";
 
       if (smtpUser && smtpPass) {
-        console.log(`Attempting to send email to ${cleanEmail} using ${smtpUser}...`);
+        console.log(`Attempting to send email to ${cleanEmail} using ${smtpUser} via port ${smtpPort}...`);
         try {
           const transporter = nodemailer.createTransport({
-            host: smtpHost || "smtp.gmail.com",
+            host: smtpHost,
             port: smtpPort,
-            secure: smtpPort === 465, // true for 465, false for other ports
+            secure: smtpPort === 465,
             auth: {
               user: smtpUser,
               pass: smtpPass,
             },
+            // Adding connection timeout for better error reporting
+            connectionTimeout: 10000,
           });
 
           await transporter.sendMail({
@@ -85,7 +92,7 @@ async function startServer() {
           console.error("Nodemailer failed to send email:", mailErr);
           errorMsg = mailErr.message || "Failed to send email via SMTP";
           if (errorMsg.includes("535") || errorMsg.includes("BadCredentials") || errorMsg.includes("Username and Password not accepted")) {
-            errorMsg = "SMTP Authentication Error: If you are using Gmail, make sure to use an 'App Password' instead of your regular password. (535-5.7.8)";
+            errorMsg = `জিমেইল লগইন সমস্যা (535): আপনার জিমেইল অ্যাপ পাসওয়ার্ড সঠিক নয়। নিশ্চিত করুন আপনি ১৬ অক্ষরের অ্যাপ পাসওয়ার্ড ব্যবহার করছেন (আপনার নিয়মিত পাসওয়ার্ড নয়)। Gmail App Password Error (Detected Length: ${smtpPass.length}). Please use a 16-character App Password.`;
           }
         }
       } else {
