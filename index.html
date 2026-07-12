@@ -5521,187 +5521,6 @@
                   return appUsers.find(u => u.sellerCode === code);
               }
 
-              function showDualVerificationModal(email, phone, onEmailVerify, onPhoneVerify, onEmailResend, onPhoneResend) {
-                  let modal = document.getElementById('email-verification-modal');
-                  if (modal) modal.remove();
-
-                  modal = document.createElement('div');
-                  modal.id = 'email-verification-modal';
-                  modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[99999] fade-in';
-                  
-                  let currentStep = 1; // 1: Email, 2: Phone
-
-                  const renderStepContent = () => {
-                      let title = '';
-                      let subtitle = '';
-                      let description = '';
-                      let inputLabel = '';
-                      let placeholder = '';
-                      let inputVal = '';
-
-                      if (currentStep === 1) {
-                          title = 'ইমেইল ভেরিফিকেশন কোড';
-                          subtitle = 'কোডটি আপনার ইমেইলে পাঠানো হয়েছে';
-                          description = `আপনার দেওয়া ইমেইল ঠিকানা <strong class="text-slate-800">${email}</strong>-এ একটি ভেরিফিকেশন কোড পাঠানো হয়েছে। অ্যাকাউন্ট তৈরি সম্পন্ন করতে কোডটি নিচে দিন।`;
-                          inputLabel = '৬-ডিজিটের ইমেইল ভেরিফিকেশন কোড';
-                          placeholder = '------';
-                          inputVal = '';
-                      } else {
-                          title = 'মোবাইল ওটিপি (OTP) ভেরিফিকেশন';
-                          subtitle = 'কোডটি আপনার মোবাইল নম্বরে পাঠানো হয়েছে';
-                          description = `আপনার দেওয়া মোবাইল নম্বর <strong class="text-slate-800">${phone}</strong>-এ একটি ৬-ডিজিটের ওটিপি পাঠানো হয়েছে। রেজিস্ট্রেশন সম্পন্ন করতে ওটিপি-টি নিচে দিন।`;
-                          inputLabel = '৬-ডিজিটের ওটিপি (OTP) কোড';
-                          placeholder = '------';
-                          inputVal = '';
-                      }
-
-                      return `
-                          <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 transform scale-in duration-300">
-                              <div class="flex justify-between items-center mb-5 pb-2 border-b border-slate-100">
-                                  <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">ধাপ ${currentStep} of 2</span>
-                                  <div class="flex gap-1">
-                                      <span class="w-8 h-1.5 rounded-full ${currentStep >= 1 ? 'bg-indigo-600' : 'bg-slate-200'}"></span>
-                                      <span class="w-8 h-1.5 rounded-full ${currentStep >= 2 ? 'bg-indigo-600' : 'bg-slate-200'}"></span>
-                                  </div>
-                              </div>
-
-                              <div class="flex items-center gap-3 mb-4">
-                                  <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
-                                      ${currentStep === 1 ? `
-                                          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19v-8.93a2 2 0 01.89-1.664l8-4a2 2 0 012.22 0l8 4A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-2.25-1.5a2 2 0 00-2.22 0l-2.25 1.5" />
-                                          </svg>
-                                      ` : `
-                                          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                          </svg>
-                                      `}
-                                  </div>
-                                  <div>
-                                      <h3 class="text-lg font-bold text-slate-800">${title}</h3>
-                                      <p class="text-xs text-slate-400">${subtitle}</p>
-                                  </div>
-                              </div>
-                              
-                              <p class="text-slate-600 text-sm mb-4 leading-relaxed">
-                                  ${description}
-                              </p>
-
-                              <div class="mb-5">
-                                  <label class="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">${inputLabel}</label>
-                                  <input 
-                                      type="text" 
-                                      id="verification-code-input" 
-                                      maxlength="6"
-                                      class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl text-slate-800 font-extrabold text-center tracking-[10px] text-lg transition-all outline-none" 
-                                      placeholder="------"
-                                      value="${inputVal}"
-                                  >
-                                  >
-                              </div>
-
-                              <div class="flex flex-col gap-3">
-                                  <button 
-                                      type="button" 
-                                      id="verification-submit-btn"
-                                      class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-600/20 transition-all cursor-pointer flex items-center justify-center gap-2"
-                                  >
-                                      ${currentStep === 1 ? 'ইমেইল ভেরিফাই করুন (পরবর্তী ধাপ)' : 'ওটিপি ভেরিফাই ও অ্যাকাউন্ট তৈরি করুন'}
-                                  </button>
-                                  <div class="flex justify-between items-center text-xs mt-1">
-                                      <button 
-                                          type="button" 
-                                          id="verification-resend-btn"
-                                          class="text-indigo-600 hover:text-indigo-800 font-bold transition-all cursor-pointer"
-                                      >
-                                          কোড আবার পাঠান (Resend)
-                                      </button>
-                                      <button 
-                                          type="button" 
-                                          id="verification-cancel-btn"
-                                          class="text-slate-400 hover:text-slate-600 font-semibold transition-all cursor-pointer"
-                                      >
-                                          বাতিল করুন
-                                      </button>
-                                  </div>
-                              </div>
-                          </div>
-                      `;
-                  };
-
-                  const attachEvents = () => {
-                      const codeInput = modal.querySelector('#verification-code-input');
-                      const submitBtn = modal.querySelector('#verification-submit-btn');
-                      const resendBtn = modal.querySelector('#verification-resend-btn');
-                      const cancelBtn = modal.querySelector('#verification-cancel-btn');
-
-                      cancelBtn.onclick = () => {
-                          modal.remove();
-                          showToast("ভেরিফিকেশন বাতিল করা হয়েছে।", "error");
-                      };
-
-                      resendBtn.onclick = async () => {
-                          resendBtn.disabled = true;
-                          resendBtn.innerText = "পাঠানো হচ্ছে...";
-                          try {
-                              if (currentStep === 1) {
-                                  await onEmailResend();
-                              } else {
-                                  await onPhoneResend();
-                              }
-                              modal.innerHTML = renderStepContent();
-                              attachEvents();
-                              showToast("নতুন কোড পাঠানো হয়েছে!", "success");
-                          } catch(e) {
-                              console.error(e);
-                              showToast("কোড পুনরায় পাঠাতে সমস্যা হয়েছে।", "error");
-                          } finally {
-                              resendBtn.disabled = false;
-                              resendBtn.innerText = "কোড আবার পাঠান (Resend)";
-                          }
-                      };
-
-                      submitBtn.onclick = async () => {
-                          const code = codeInput.value.trim();
-                          if (code.length !== 6) {
-                              showToast("অনুগ্রহ করে সঠিক ৬-ডিজিটের কোড দিন!", "error");
-                              return;
-                          }
-                          submitBtn.disabled = true;
-                          const originalText = submitBtn.innerHTML;
-                          submitBtn.innerHTML = `ভেরিফাই করা হচ্ছে...`;
-                          
-                          try {
-                              if (currentStep === 1) {
-                                  const verified = await onEmailVerify(code);
-                                  if (verified) {
-                                      // Email verified successfully! Transition to Step 2
-                                      currentStep = 2;
-                                      submitBtn.innerHTML = `ওটিপি পাঠানো হচ্ছে...`;
-                                      await onPhoneResend();
-                                      modal.innerHTML = renderStepContent();
-                                      attachEvents();
-                                  }
-                              } else {
-                                  const verified = await onPhoneVerify(code);
-                                  if (verified) {
-                                      modal.remove();
-                                  }
-                              }
-                          } catch(e) {
-                              console.error(e);
-                              showToast("ভেরিফিকেশন সম্পূর্ণ করা সম্ভব হয়নি।", "error");
-                          } finally {
-                              submitBtn.disabled = false;
-                              submitBtn.innerHTML = originalText;
-                          }
-                      };
-                  };
-
-                  modal.innerHTML = renderStepContent();
-                  document.body.appendChild(modal);
-                  attachEvents();
-              }
 
               async function handleRegister() {
                   try {
@@ -10807,6 +10626,26 @@
                   saveProfile();
                   updateCartCount();
                   renderCart();
+              }
+
+              function updateCartQty(cartId, change) {
+                  if (!userProfile.cart) return;
+                  const item = userProfile.cart.find(i => String(i.cartId) === String(cartId));
+                  if (item) {
+                      item.qty = (item.qty || 1) + change;
+                      if (item.qty <= 0) {
+                          removeFromCart(cartId);
+                      } else {
+                          saveProfile();
+                          updateCartCount();
+                          renderCart();
+                      }
+                  }
+              }
+
+              function closeConfirmCancelModal() {
+                  const modal = document.getElementById('confirmCancelModal');
+                  if (modal) modal.classList.add('hidden');
               }
 
                async function getSafeBlob(url) {
@@ -16032,6 +15871,44 @@
                   `;
               }
 
+              function moveCategory(catId, direction) {
+                  appCategories.sort((a,b) => (a.order || 0) - (b.order || 0));
+                  const index = appCategories.findIndex(c => String(c.id) === String(catId));
+                  if (index === -1) return;
+                  const swapIndex = index + direction;
+                  if (swapIndex >= 0 && swapIndex < appCategories.length) {
+                      const tempOrder = appCategories[index].order || 0;
+                      appCategories[index].order = appCategories[swapIndex].order || 0;
+                      appCategories[swapIndex].order = tempOrder;
+                      if (appCategories[index].order === appCategories[swapIndex].order) {
+                          appCategories[index].order = index + direction;
+                          appCategories[swapIndex].order = index;
+                      }
+                      saveCategories();
+                      renderAdminCategoryList();
+                  }
+              }
+
+              function moveSubCategory(catId, subId, direction) {
+                  const cat = appCategories.find(c => String(c.id) === String(catId));
+                  if (!cat || !cat.subCategories) return;
+                  cat.subCategories.sort((a,b) => (a.order || 0) - (b.order || 0));
+                  const index = cat.subCategories.findIndex(s => String(s.id) === String(subId));
+                  if (index === -1) return;
+                  const swapIndex = index + direction;
+                  if (swapIndex >= 0 && swapIndex < cat.subCategories.length) {
+                      const tempOrder = cat.subCategories[index].order || 0;
+                      cat.subCategories[index].order = cat.subCategories[swapIndex].order || 0;
+                      cat.subCategories[swapIndex].order = tempOrder;
+                      if (cat.subCategories[index].order === cat.subCategories[swapIndex].order) {
+                          cat.subCategories[index].order = index + direction;
+                          cat.subCategories[swapIndex].order = index;
+                      }
+                      saveCategories();
+                      renderAdminCategoryList();
+                  }
+              }
+
               function togglePostForm() {
                   const form = document.getElementById('adminPostForm');
                   const btn = document.getElementById('postToggleBtn');
@@ -19593,7 +19470,7 @@ function updateUserTicketStatus(id, newStatus) {
                                       <i class="fas fa-file-invoice text-orange-500"></i>
                                       অর্ডার ইনভয়েস
                                   </h1>
-                                  <button onclick="switchMenu('order-list')" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                                  <button onclick="switchMenu('orders')" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
                                       <i class="fas fa-arrow-left mr-2"></i> ফিরে যান
                                   </button>
                               </div>
