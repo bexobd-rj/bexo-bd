@@ -183,13 +183,12 @@ export default function App() {
 
   const setActiveView = (view: View) => {
     if (activeView !== view) {
-      window.history.pushState(null, '', `#${view}`);
-      _setActiveView(view);
+      window.location.hash = view;
     }
   };
 
   useEffect(() => {
-    const handlePopState = () => {
+    const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '') as View;
       const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'cart', 'sales', 'balance', 'support'];
       if (validViews.includes(hash)) {
@@ -197,12 +196,17 @@ export default function App() {
       } else {
         _setActiveView('dashboard');
       }
+      setIsCheckoutOpen(false);
+      setIsSidebarOpen(false);
     };
-    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handleHashChange);
+    
+    // Add initial history entry if no hash exists so back button doesn't exit immediately
     if (!window.location.hash) {
-      window.history.replaceState(null, '', '#dashboard');
+      window.location.replace('#dashboard');
     }
-    return () => window.removeEventListener('popstate', handlePopState);
+    
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
