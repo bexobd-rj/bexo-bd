@@ -182,11 +182,14 @@ export default function App() {
   });
 
   const setActiveView = (view: View) => {
-    window.location.hash = view;
+    if (activeView !== view) {
+      window.history.pushState(null, '', `#${view}`);
+      _setActiveView(view);
+    }
   };
 
   useEffect(() => {
-    const handleHashChange = () => {
+    const handlePopState = () => {
       const hash = window.location.hash.replace('#', '') as View;
       const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'cart', 'sales', 'balance', 'support'];
       if (validViews.includes(hash)) {
@@ -195,8 +198,11 @@ export default function App() {
         _setActiveView('dashboard');
       }
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handlePopState);
+    if (!window.location.hash) {
+      window.history.replaceState(null, '', '#dashboard');
+    }
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
