@@ -478,8 +478,17 @@
                               </div>
                               ${(subId || subId === 0 || title.includes('সাব')) ? `
                               <div class="space-y-1">
-                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ছবি URL (সাব-ক্যাটাগরির জন্য)</label>
-                                  <input type="text" id="manageCatImage" value="${imageVal}" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm" placeholder="https://...">
+                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ছবি আপলোড (সাব-ক্যাটাগরির জন্য)</label>
+                                  <div class="flex flex-col sm:flex-row gap-2">
+                                      <input type="file" accept="image/*" id="manageCatImageFile" class="hidden" onchange="window.handleSubCategoryImageUpload(event, 'manageCatImage')">
+                                      <button type="button" onclick="document.getElementById('manageCatImageFile').click()" class="px-4 py-3 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2 whitespace-nowrap">
+                                          <i class="fas fa-image"></i> গ্যালারি
+                                      </button>
+                                      <input type="text" id="manageCatImage" value="${imageVal}" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm" placeholder="URL অথবা গ্যালারি থেকে ছবি নিন...">
+                                  </div>
+                                  <div id="manageCatImagePreviewContainer" class="${imageVal ? 'mt-2' : 'hidden mt-2'}">
+                                      <img id="manageCatImagePreview" src="${imageVal}" class="h-20 w-20 object-cover rounded-xl border border-slate-200">
+                                  </div>
                               </div>
                               ` : ''}
 
@@ -562,8 +571,17 @@
                                   <input type="number" id="manageSubOrder" value="1" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm">
                               </div>
                               <div class="space-y-1">
-                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ছবি URL</label>
-                                  <input type="text" id="manageSubImage" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm" placeholder="https://...">
+                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ছবি আপলোড</label>
+                                  <div class="flex flex-col sm:flex-row gap-2">
+                                      <input type="file" accept="image/*" id="manageSubImageFile" class="hidden" onchange="window.handleSubCategoryImageUpload(event, 'manageSubImage')">
+                                      <button type="button" onclick="document.getElementById('manageSubImageFile').click()" class="px-4 py-3 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2 whitespace-nowrap">
+                                          <i class="fas fa-image"></i> গ্যালারি
+                                      </button>
+                                      <input type="text" id="manageSubImage" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm" placeholder="URL অথবা গ্যালারি থেকে ছবি নিন...">
+                                  </div>
+                                  <div id="manageSubImagePreviewContainer" class="hidden mt-2">
+                                      <img id="manageSubImagePreview" src="" class="h-20 w-20 object-cover rounded-xl border border-slate-200">
+                                  </div>
                               </div>
 
                               <div class="pt-4 flex gap-3">
@@ -967,8 +985,8 @@
                       if (specificOrderId) {
                           const o = appOrders.find(order => String(order.id) === String(specificOrderId));
                           if (o) {
-                              window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
-                                  .catch(err => console.error("Firebase sync specific order error:", err));
+                              // disabled sweep order set 
+// .catch(err => console.error("Firebase sync specific order error:", err));
                           }
                       } else {
                           console.warn("Skipping full array sync for orders to prevent quota exhaustion.");
@@ -994,8 +1012,7 @@
               function saveSettings() {
                   localStorage.setItem('bexo_settings', JSON.stringify(appSettings));
                   if (window.db) {
-                      window.db.collection('bexo_settings').doc('global').set(sanitizeForFirestore(appSettings))
-                          .catch(err => console.error("Firebase sync settings error:", err));
+                      // auto-seed settings disabled
                   }
               }
               function saveAppSettings() {
@@ -1062,8 +1079,7 @@
               function saveCustomerReports() {
                   localStorage.setItem('bexo_customer_reports', JSON.stringify(appCustomerReports));
                   if (window.db) {
-                      window.db.collection('bexo_customer_reports').doc('global').set(sanitizeForFirestore(appCustomerReports))
-                          .catch(err => console.error(err));
+                      // auto-seed reports disabled
                   }
               }
 
@@ -1163,7 +1179,7 @@
                           const u = appUsers.find(user => user.profileId === id);
                           if (u && u.phone && u.password) {
                               try {
-                                  await window.db.collection('bexo_users').doc(String(id)).set(sanitizeForFirestore(u));
+                                  // Disabled pending sync to save quota
                                   console.log(`[Firebase Sync Applet] Successfully synced pending user: ${id}`);
                               } catch (err) {
                                   console.error(`[Firebase Sync Applet] Failed to sync pending user ${id}:`, err);
@@ -1199,8 +1215,8 @@
                           if (window.db) {
                               settlements.forEach(t => {
                                   if (t.id) {
-                                      window.db.collection('bexo_transactions').doc(String(t.id)).delete()
-                                          .catch(err => console.error(`[Clean Sweep] Error deleting database transaction doc ${t.id}:`, err));
+                                      // disabled sweep transaction delete 
+// .catch(err => console.error(`[Clean Sweep] Error deleting database transaction doc ${t.id}:`, err));
                                   }
                               });
                           }
@@ -1217,8 +1233,8 @@
                               resetOccurred = true;
 
                               if (window.db) {
-                                  window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
-                                      .catch(err => console.error(`[Clean Sweep] Failed resetting firestore order doc ${o.id}:`, err));
+                                  // disabled sweep order set 
+// .catch(err => console.error(`[Clean Sweep] Failed resetting firestore order doc ${o.id}:`, err));
                               }
                           }
                       });
@@ -1630,7 +1646,7 @@
                           ) {
                               data.images = [data.images.join('')];
                               // Auto-correct in db silently
-                              window.db.collection('bexo_posts').doc(String(doc.id)).update({ images: data.images }).catch(()=>{});
+                              // disabled auto fix to save quota
                           }
                           firebasePosts.push(data);
                       });
@@ -1770,8 +1786,7 @@
                               triggerViewRendering('settings');
                           }
                       } else {
-                          window.db.collection('bexo_settings').doc('global').set(sanitizeForFirestore(appSettings))
-                              .catch(err => console.error("Auto-seed settings error:", err));
+                          // auto-seed settings disabled
                       }
                   }, err => {
                       console.error("Firebase settings subscription error:", err);
@@ -1862,8 +1877,7 @@
                               triggerViewRendering('customer_reports');
                           }
                       } else {
-                          window.db.collection('bexo_customer_reports').doc('global').set(sanitizeForFirestore(appCustomerReports))
-                              .catch(err => console.error(err));
+                          // auto-seed reports disabled
                       }
                   }, err => {
                       console.error("Firebase reports subscription error:", err);
@@ -2148,7 +2162,7 @@
                       const uIdx = appUsers.findIndex(u => String(u.profileId) === String(userProfile.profileId));
                       if(uIdx > -1) {
                           appUsers[uIdx].lastActive = userProfile.lastActive;
-                          saveUsers(userProfile.profileId);
+                          // saveUsers(userProfile.profileId); // Disabled heartbeat sync to save quota
                       }
                       saveProfile();
                   }
@@ -2652,7 +2666,7 @@
                   const uIdx = appUsers.findIndex(u => String(u.profileId) === String(userProfile.profileId));
                   if(uIdx > -1) {
                       appUsers[uIdx].lastActive = userProfile.lastActive;
-                      saveUsers(userProfile.profileId);
+                      // saveUsers(userProfile.profileId); // Disabled heartbeat sync to save quota
                   }
 
                   saveProfile();
@@ -3217,7 +3231,7 @@
                               const uIdx = appUsers.findIndex(u => String(u.profileId) === String(userProfile.profileId));
                               if (uIdx > -1) {
                                   appUsers[uIdx].lastActive = userProfile.lastActive;
-                                  saveUsers(userProfile.profileId);
+                                  // saveUsers(userProfile.profileId); // Disabled heartbeat sync to save quota
                               }
                           }
 
@@ -7725,7 +7739,7 @@
                           appUsers[uIdx].rechargeBalance = userProfile.rechargeBalance;
                           appUsers[uIdx].balance = userProfile.rechargeBalance;
                           appUsers[uIdx].rechargeTransactions = userProfile.rechargeTransactions;
-                          saveUsers(userProfile.profileId);
+                          // saveUsers(userProfile.profileId); // Disabled heartbeat sync to save quota
                       }
                       
                       // Log advance charge to global appTransactions
@@ -17854,8 +17868,8 @@ function updateUserTicketStatus(id, newStatus) {
                             settlements.forEach(t => {
                                 if (t.id) {
                                     deletePromises.push(
-                                        window.db.collection('bexo_transactions').doc(String(t.id)).delete()
-                                            .catch(err => console.error(`Error deleting doc ${t.id}:`, err))
+                                        // disabled sweep transaction delete 
+// .catch(err => console.error(`Error deleting doc ${t.id}:`, err))
                                     );
                                 }
                             });
@@ -17879,8 +17893,8 @@ function updateUserTicketStatus(id, newStatus) {
 
                                     if (window.db) {
                                         orderResetPromises.push(
-                                            window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
-                                                .catch(err => console.error(`Error resetting order Doc ${o.id}:`, err))
+                                            // disabled sweep order set 
+// .catch(err => console.error(`Error resetting order Doc ${o.id}:`, err))
                                         );
                                     }
                                 }
@@ -18860,3 +18874,60 @@ window.addEventListener('DOMContentLoaded', () => {
         window.history.replaceState({ menuKey: 'dashboard' }, '', '#dashboard');
     }
 });
+
+// Image upload handler for subcategories
+window.handleSubCategoryImageUpload = function(event, inputId) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Check file size (max 2MB for thumbnails)
+    if (file.size > 2 * 1024 * 1024) {
+        showToast("ফাইলের আকার ২ মেগাবাইটের বেশি হওয়া যাবে না!", "error");
+        event.target.value = '';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        // Compress image using canvas
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 300;
+            const MAX_HEIGHT = 300;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            
+            // Apply to input
+            document.getElementById(inputId).value = compressedBase64;
+            
+            // Apply to preview
+            const previewContainer = document.getElementById(inputId + 'PreviewContainer');
+            const preview = document.getElementById(inputId + 'Preview');
+            if (preview && previewContainer) {
+                preview.src = compressedBase64;
+                previewContainer.classList.remove('hidden');
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+};
