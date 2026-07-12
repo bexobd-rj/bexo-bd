@@ -175,7 +175,29 @@ export default function App() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
-  const [activeView, setActiveView] = useState<View>('dashboard');
+  const [activeView, _setActiveView] = useState<View>(() => {
+    const hash = window.location.hash.replace('#', '') as View;
+    const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'cart', 'sales', 'balance', 'support'];
+    return validViews.includes(hash) ? hash : 'dashboard';
+  });
+
+  const setActiveView = (view: View) => {
+    window.location.hash = view;
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') as View;
+      const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'cart', 'sales', 'balance', 'support'];
+      if (validViews.includes(hash)) {
+        _setActiveView(hash);
+      } else {
+        _setActiveView('dashboard');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
