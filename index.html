@@ -457,15 +457,34 @@
           <a href="#services" class="hover:text-orange-200 transition-colors">সার্ভিস সমূহ</a>
           <a href="#" onclick="event.preventDefault(); showSupportModal();" class="hover:text-orange-200 transition-colors">যোগাযোগ</a>
         </div>
-        <div class="hidden lg:flex gap-3">
+        <div class="hidden lg:flex gap-3 items-center">
+          <!-- Language Switcher -->
+          <button
+            onclick="toggleLanguage(event)"
+            class="w-10 h-10 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full flex items-center justify-center shadow-lg transform active:scale-95 transition-all text-white relative cursor-pointer font-extrabold text-xs"
+            title="Change Language / ভাষা পরিবর্তন"
+          >
+            <i class="fas fa-globe mr-1 text-[10px]"></i>
+            <span class="globalLangLabel">EN</span>
+          </button>
           <button onclick="showAuth(false)" class="px-3 py-1.5 text-sm rounded font-bold text-orange-600 bg-white hover:bg-slate-50 transition-colors shadow-sm">রেজিস্ট্রেশন</button>
           <button onclick="showAuth(true)" class="px-3 py-1.5 text-sm rounded font-bold text-orange-600 bg-white hover:bg-slate-50 transition-colors shadow-sm">লগইন</button>
         </div>
 
-        <!-- Mobile Nav Toggle -->
-        <button onclick="toggleMobileMenu()" class="lg:hidden p-1.5 text-white hover:text-orange-200 transition-colors">
-          <i class="fas fa-bars text-lg"></i>
-        </button>
+        <!-- Mobile Language Switcher and Toggle -->
+        <div class="flex items-center gap-2 lg:hidden">
+          <button
+            onclick="toggleLanguage(event)"
+            class="w-8 h-8 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full flex items-center justify-center shadow transform active:scale-95 transition-all text-white relative cursor-pointer font-extrabold text-[10px]"
+            title="Change Language / ভাষা পরিবর্তন"
+          >
+            <i class="fas fa-globe mr-1 text-[8px]"></i>
+            <span class="globalLangLabel">EN</span>
+          </button>
+          <button onclick="toggleMobileMenu()" class="p-1.5 text-white hover:text-orange-200 transition-colors">
+            <i class="fas fa-bars text-lg"></i>
+          </button>
+        </div>
 
         <!-- Mobile Menu Overlay -->
         <div id="mobileMenu" class="absolute top-0 left-0 w-full bg-[#ff6b00] z-[200] flex flex-col hidden transform transition-transform duration-300 shadow-lg">
@@ -855,7 +874,18 @@
 
         <!-- Right Form Side -->
         <div class="w-full md:w-1/2 p-4 sm:p-8 md:p-14 flex flex-col justify-center overflow-y-auto">
-          <button onclick="const l=document.getElementById('landingSection'); if(l) l.classList.remove('hidden'); document.getElementById('authSection').classList.add('hidden');" class="text-slate-400 hover:text-orange-500 font-bold mb-6 self-start flex items-center gap-2 transition-colors"><i class="fas fa-arrow-left"></i> হোম পেজ</button>
+          <div class="flex items-center justify-between mb-6">
+            <button onclick="const l=document.getElementById('landingSection'); if(l) l.classList.remove('hidden'); document.getElementById('authSection').classList.add('hidden');" class="text-slate-400 hover:text-orange-500 font-bold flex items-center gap-2 transition-colors"><i class="fas fa-arrow-left"></i> হোম পেজ</button>
+            <!-- Language Switcher in Auth -->
+            <button
+              onclick="toggleLanguage(event)"
+              class="w-10 h-10 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-full flex items-center justify-center shadow-xs transform active:scale-95 transition-all text-slate-700 relative cursor-pointer font-extrabold text-xs"
+              title="Change Language / ভাষা পরিবর্তন"
+            >
+              <i class="fas fa-globe mr-1 text-[10px]"></i>
+              <span class="globalLangLabel font-extrabold">EN</span>
+            </button>
+          </div>
           <!-- Registration Form -->
           <div id="registerForm" class="fade-in">
             <div class="mb-8">
@@ -1327,6 +1357,19 @@
           </div>
 
           <div class="flex items-center gap-3 lg:gap-6 relative">
+            <!-- Language Switcher -->
+            <div class="relative">
+              <button
+                onclick="toggleLanguage(event)"
+                id="languageSwitcherBtn"
+                class="w-10 h-10 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full flex items-center justify-center shadow-lg transform active:scale-95 transition-all text-white relative cursor-pointer font-extrabold text-xs"
+                title="Change Language / ভাষা পরিবর্তন"
+              >
+                <i class="fas fa-globe mr-1 text-[10px]"></i>
+                <span id="langLabel" class="globalLangLabel">EN</span>
+              </button>
+            </div>
+
             <!-- Notification Dropdown Container -->
             <div class="relative">
               <button
@@ -2047,6 +2090,15 @@
                 <i class="fas fa-chart-line"></i>
               </div>
             </div>
+            <!-- Admin Language Switcher -->
+            <button
+              onclick="toggleLanguage(event)"
+              class="w-10 h-10 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-full flex items-center justify-center shadow-xs transform active:scale-95 transition-all text-slate-700 relative cursor-pointer font-extrabold text-xs mr-2"
+              title="Change Language / ভাষা পরিবর্তন"
+            >
+              <i class="fas fa-globe mr-1 text-[10px]"></i>
+              <span class="globalLangLabel font-extrabold">EN</span>
+            </button>
             <div class="flex items-center gap-3">
               <img
                 src="https://i.ibb.co/vz6WdDk/admin-avatar.png"
@@ -2129,6 +2181,571 @@
                       originalConsoleError.apply(console, args);
                   };
               })();
+
+              // Global Language/Translation Settings
+              window.currentLang = localStorage.getItem('bexo_lang') || 'bn';
+
+              const BN_TO_EN = {
+                  "ড্যাশবোর্ড ওভারভিউ": "Dashboard Overview",
+                  "ড্যাশবোর্ড": "Dashboard",
+                  "রিসেলিং স্টোর": "Reselling Store",
+                  "রিসেলিং": "Reselling",
+                  "ডাউনলোড জোন": "Download Zone",
+                  "অর্ডার ট্র্যাকিং": "Order Tracking",
+                  "লাইভ চ্যাট সাপোর্ট": "Live Chat Support",
+                  "কাস্টমার সাপোর্ট": "Customer Support",
+                  "সাপোর্ট টিকিট": "Support Ticket",
+                  "নোটিশ বোর্ড": "Notice Board",
+                  "ফ্রি মেম্বারশিপ": "Free Membership",
+                  "আমার শপ সেটিংস": "My Shop Settings",
+                  "আমার প্রোফাইল": "My Profile",
+                  "লগ-আউট করুন": "Logout",
+                  "লগ-আউট": "Logout",
+                  "পাসওয়ার্ড পরিবর্তন": "Change Password",
+                  "পাসওয়ার্ড পরিবর্তন করুন": "Change Password",
+                  "ব্যালেন্স দেখুন": "View Balance",
+                  "মোবাইল রিচার্জ": "Mobile Recharge",
+                  "বিল পেমেন্ট": "Bill Payment",
+                  "উইথড্র রিকোয়েস্ট": "Withdraw Request",
+                  "কমিশন হিস্ট্রি": "Commission History",
+                  "ব্যালেন্স অ্যাড করুন": "Add Balance",
+                  "টাকা যোগ করুন": "Add Money",
+                  "টাকা উত্তোলন": "Withdraw Money",
+                  "আপনার ব্যালেন্স": "Your Balance",
+                  "মোট টাকা": "Total Amount",
+                  "ব্যবসায়ীর নাম": "Merchant Name",
+                  "দোকানের নাম": "Shop Name",
+                  "মোবাইল নম্বর": "Mobile Number",
+                  "পাসওয়ার্ড": "Password",
+                  "পাসওয়ার্ড": "Password",
+                  "ইমেইল অ্যাড্রেস": "Email Address",
+                  "ইমেইল": "Email",
+                  "পূর্ণাঙ্গ ঠিকানা": "Full Address",
+                  "জেলা নির্বাচন করুন": "Select District",
+                  "রেফারেল কোড (ঐচ্ছিক)": "Referral Code (Optional)",
+                  "রেজিস্ট্রেশন": "Registration",
+                  "লগইন করুন": "Login",
+                  "লগইন": "Login",
+                  "নিবন্ধন করুন": "Register Now",
+                  "নতুন অ্যাকাউন্ট খুলুন": "Create New Account",
+                  "ফেসবুক পেজ লিংক": "Facebook Page Link",
+                  "ওয়েবসাইট লিংক (যদি থাকে)": "Website Link (Optional)",
+                  "সেভ করুন": "Save Changes",
+                  "আপডেট করুন": "Update",
+                  "বিস্তারিত": "Details",
+                  "কার্টে যোগ করুন": "Add to Cart",
+                  "এখনই কিনুন": "Buy Now",
+                  "অর্ডার করুন": "Order Now",
+                  "অর্ডার কনফার্ম": "Confirm Order",
+                  "বাতিল": "Cancel",
+                  "বন্ধ করুন": "Close",
+                  "সাবমিট করুন": "Submit",
+                  "নিশ্চিত করুন": "Confirm",
+                  "ফিরে যান": "Go Back",
+                  "সব": "All",
+                  "আজ": "Today",
+                  "গতকাল": "Yesterday",
+                  "এই মাসে": "This Month",
+                  "ফিল্টার": "Filter",
+                  "অনুসন্ধান": "Search",
+                  "সার্চ করুন...": "Search...",
+                  "ডেলিভারি ট্র্যাকিং আইডি": "Delivery Tracking ID",
+                  "কাস্টমার নাম": "Customer Name",
+                  "কাস্টমার মোবাইল": "Customer Mobile",
+                  "কাস্টমার ঠিকানা": "Customer Address",
+                  "অর্ডার আইডি": "Order ID",
+                  "অর্ডার স্ট্যাটাস": "Order Status",
+                  "অर्डर বিবরণ": "Order Details",
+                  "পেমেন্ট স্ট্যাটাস": "Payment Status",
+                  "পেমেন্ট বিবরণ": "Payment Details",
+                  "পেমেন্ট মেথড": "Payment Method",
+                  "লেনদেন আইডি": "Transaction ID",
+                  "লেনদেন বিবরণ": "Transaction Details",
+                  "লেনদেন তালিকা": "Transaction List",
+                  "উইথড্রয়াল রিকোয়েস্ট": "Withdrawal Request",
+                  "উত্তোলন তালিকা": "Withdrawal List",
+                  "রিচার্জ রিকোয়েস্ট": "Recharge Request",
+                  "রিচার্জ তালিকা": "Recharge List",
+                  "বিল পে রিকোয়েস্ট": "Bill Pay Request",
+                  "বিল পে তালিকা": "Bill Pay List",
+                  "নতুন টিকিট": "New Ticket",
+                  "টিকিট তালিকা": "Ticket List",
+                  "টিকিট বিবরণ": "Ticket Details",
+                  "গ্রাহক রিপোর্ট": "Customer Report",
+                  "কাস্টমার রিপোর্ট তালিকা": "Customer Report List",
+                  "ম্যানেজার প্যানেল": "Manager Panel",
+                  "ম্যানেজার তালিকা": "Manager List",
+                  "রিসেলার প্যানেল": "Reseller Panel",
+                  "রিসেলার তালিকা": "Reseller List",
+                  "এডমিন প্যানেল": "Admin Panel",
+                  "সুপার এডমিন প্যানেল": "Super Admin Panel",
+                  "গ্লোবাল সেটিংস": "Global Settings",
+                  "ক্যাটাগরি তালিকা": "Category List",
+                  "ক্যাটাগরি যোগ করুন": "Add Category",
+                  "পোস্ট তালিকা": "Post List",
+                  "পোস্ট যোগ করুন": "Add Post",
+                  "নতুন পোস্ট": "New Post",
+                  "ব্যানার তালিকা": "Banner List",
+                  "ব্যানার যোগ করুন": "Add Banner",
+                  "নতুন ব্যানার": "New Banner",
+                  "পাসওয়ার্ড রিসেট": "Password Reset",
+                  "পাসওয়ার্ড রিসেট রিকোয়েস্ট": "Password Reset Request",
+                  "রিকোয়েস্ট তালিকা": "Request List",
+                  "কার্ট খালি": "Cart is empty",
+                  "আপনার কার্ট": "Your Cart",
+                  "চেকআউট": "Checkout",
+                  "রিসেলার কমিশন": "Reseller Commission",
+                  "মাই শপ": "My Shop",
+                  "প্রোফাইল সেটিংস": "Profile Settings",
+                  "হোলসেল প্রোডাক্ট": "Wholesale Products",
+                  "কাস্টমাইজ প্রিন্ট": "Customize Print",
+                  "সাপ্লায়ার / ভেন্ডরশিপ": "Supplier / Vendorship",
+                  "লিডারশিপ ইনকাম": "Leadership Income",
+                  "ফ্রিল্যান্সিং মার্কেটপ্লেস": "Freelancing Marketplace",
+                  "মাইক্রো জবস": "Micro Jobs",
+                  "বুস্টিং সার্ভিস": "Boosting Service",
+                  "ই-কমার্স ওয়েবসাইট": "E-Commerce Website",
+                  "ড্রপশিপিং ওয়েবসাইট": "Dropshipping Website",
+                  "অনলাইন শপিং": "Online Shopping",
+                  "বিভাগসমূহ": "Categories",
+                  "সার্চ করুন": "Search",
+                  "সার্চ প্রোডাক্ট": "Search Products",
+                  "প্রোডাক্ট বিবরণ": "Product Details",
+                  "প্রোডাক্ট কোড": "Product Code",
+                  "শেয়ার লিংক": "Share Link",
+                  "ডাউনলোড ছবি": "Download Images",
+                  "ডাউনলোড ভিডিও": "Download Video",
+                  "প্রোডাক্ট ডেসক্রিপশন": "Product Description",
+                  "কপি ডেসক্রিপশন": "Copy Description",
+                  "কপি লিংক": "Copy Link",
+                  "কপি কোড": "Copy Code",
+                  "অর্ডার ফরম": "Order Form",
+                  "কাস্টমার ইনফরমেশন": "Customer Information",
+                  "পরবর্তী ধাপ": "Next Step",
+                  "আগের ধাপ": "Previous Step",
+                  "পেমেন্ট করুন": "Pay Now",
+                  "পেমেন্ট হিস্ট্রি": "Payment History",
+                  "অর্ডার হিস্ট্রি": "Order History",
+                  "রিচার্জ হিস্ট্রি": "Recharge History",
+                  "বিল পে হিস্ট্রি": "Bill Pay History",
+                  "উইথড্র হিস্ট্রি": "Withdrawal History",
+                  "রেফারেল হিস্ট্রি": "Referral History",
+                  "প্যাসিভ ইনকাম": "Passive Income",
+                  "টিম মেম্বার": "Team Members",
+                  "টোটাল টিম মেম্বার": "Total Team Members",
+                  "আজকের ইনকাম": "Today's Income",
+                  "চলতি মাসের ইনকাম": "This Month's Income",
+                  "মোট কমিশন": "Total Commission",
+                  "মোট রিচার্জ": "Total Recharge",
+                  "মোট বিল পে": "Total Bill Pay",
+                  "উত্তোলন ব্যালেন্স": "Withdrawable Balance",
+                  "চলতি ব্যালেন্স": "Current Balance",
+                  "মেইন ব্যালেন্স": "Main Balance",
+                  "রেফার লিংক": "Referral Link",
+                  "রেফার কোড": "Referral Code",
+                  "টিম কমিশন": "Team Commission",
+                  "লেভেল": "Level",
+                  "কমিশন রেট": "Commission Rate",
+                  "একটিভ মেম্বার": "Active Members",
+                  "ইনএক্টিভ মেম্বার": "Inactive Members",
+                  "টিকিট সাবমিট": "Submit Ticket",
+                  "টিকিটের বিষয়": "Ticket Subject",
+                  "মেসেজ লিখুন": "Write Message",
+                  "ফাইল আপলোড": "Upload File",
+                  "নতুন টিকিট সাবমিট করুন": "Submit New Ticket",
+                  "টিকিট আইডি": "Ticket ID",
+                  "সর্বশেষ আপডেট": "Last Updated",
+                  "অ্যাকশন নিন": "Take Action",
+                  "রিপ্লাই করুন": "Reply",
+                  "রিপ্লাই লিখুন...": "Write a reply...",
+                  "রিপ্লাই সাবমিট": "Submit Reply",
+                  "পাসওয়ার্ড পরিবর্তন": "Change Password",
+                  "নতুন পাসওয়ার্ড": "New Password",
+                  "নতুন পাসওয়ার্ড": "New Password",
+                  "বর্তমান পাসওয়ার্ড": "Current Password",
+                  "বর্তমান পাসওয়ার্ড": "Current Password",
+                  "নিশ্চিত পাসওয়ার্ড": "Confirm Password",
+                  "নিশ্চিত পাসওয়ার্ড": "Confirm Password",
+                  "পাসওয়ার্ড পরিবর্তন করুন": "Change Password",
+                  "দোকানের লোগো": "Shop Logo",
+                  "লোগো আপলোড": "Upload Logo",
+                  "দোকানের ব্যানার": "Shop Banner",
+                  "ব্যানার আপলোড": "Upload Banner",
+                  "দোকানের স্লোগান": "Shop Slogan",
+                  "স্লোগান লিখুন": "Write slogan...",
+                  "সোশ্যাল মিডিয়া লিংক": "Social Media Links",
+                  "ফেসবুক পেজ": "Facebook Page",
+                  "ইনস্টাগ্রাম": "Instagram",
+                  "ইউটিউব": "YouTube",
+                  "হোয়াটসঅ্যাপ": "WhatsApp",
+                  "শপ সেটিংস সেভ করুন": "Save Shop Settings",
+                  "পেমেন্ট মেথড সিলেক্ট করুন": "Select Payment Method",
+                  "বিকাশ": "Bkash",
+                  "নগদ": "Nagad",
+                  "রকেট": "Rocket",
+                  "ব্যাংক অ্যাকাউন্ট": "Bank Account",
+                  "অ্যাকাউন্ট টাইপ": "Account Type",
+                  "পার্সোনাল": "Personal",
+                  "এজেন্ট": "Agent",
+                  "উত্তোলনের পরিমাণ": "Withdraw Amount",
+                  "রিকোয়েস্ট সাবমিট করুন": "Submit Request",
+                  "রিচার্জের পরিমাণ": "Recharge Amount",
+                  "অপারেটর সিলেক্ট করুন": "Select Operator",
+                  "গ্রামীণফোন": "Grameenphone",
+                  "রবি": "Robi",
+                  "এয়ারটেল": "Airtel",
+                  "বাংলালিংক": "Banglalink",
+                  "টেলিটক": "Teletalk",
+                  "কানেক্টিং...": "Connecting...",
+                  "পদ্ধতি": "Method",
+                  "বিবরণ": "Description",
+                  "রিসেলিং ড্যাশবোর্ড": "Reselling Dashboard",
+                  "সেলস ড্যাশবোর্ড": "Sales Dashboard",
+                  "ব্যালেন্স এড করুন": "Add Balance",
+                  "ইউজার মেনু": "User Menu",
+                  "সব পঠিত করুন": "Mark All Read",
+                  "ড্যাশবোর্ডে ফিরুন": "Back to Dashboard",
+                  "ড্যাশবোর্ড-এ ফিরে যান": "Go back to Dashboard",
+                  "ব্যাক টু ড্যাশবোর্ড": "Back to Dashboard",
+                  "অর্ডার সম্পন্ন করুন": "Complete Order",
+                  "প্রোডাক্ট নাম": "Product Name",
+                  "কাস্টমার রিসিভড অ্যামাউন্ট": "Customer Received Amount",
+                  "হোলসেল প্রাইজ": "Wholesale Price",
+                  "আপনার প্রফিট": "Your Profit",
+                  "ডেলিভারি চার্জ": "Delivery Charge",
+                  "অর্ডার নোট (ঐচ্ছিক)": "Order Note (Optional)",
+                  "অর্ডার সাবমিট করুন": "Submit Order",
+                  "অনুরোধ": "Request",
+                  "তথ্যাদি": "Information",
+                  "অ্যাডমিন": "Admin",
+                  "সুপার এডমিন অ্যাক্সেস": "Super Admin Access",
+                  "ম্যানেজার অ্যাক্সেস": "Manager Access",
+                  "টাস্ক লিস্ট": "Task List",
+                  "নতুন নোটিশ": "New Notice",
+                  "ড্যাশবোর্ড ডেমোগ্রাফিক টাইম রেঞ্জ নির্বাচন করুন": "Select Dashboard Demographic Time Range",
+                  "সবগুলো": "All",
+                  "আজকের": "Today's",
+                  "গতকালের": "Yesterday's",
+                  "এই মাসের": "This Month's",
+                  "মোট অর্ডারের তালিকা": "Total Orders List",
+                  "ইনভয়েস": "Invoice",
+                  "ডাউনলোড ইনভয়েস": "Download Invoice",
+                  "ইনভয়েস আইডি": "Invoice ID",
+                  "বিলিং অ্যাড্রেস": "Billing Address",
+                  "ডেলিভারি স্ট্যাটাস": "Delivery Status",
+                  "শিপিং মেথড": "Shipping Method",
+                  "পেমেন্ট মেথড": "Payment Method",
+                  "প্রোডাক্ট লিস্ট": "Product List",
+                  "প্রোডাক্ট": "Product",
+                  "মূল্য": "Price",
+                  "পরিমাণ": "Qty",
+                  "মোট": "Total",
+                  "সাবটোটাল": "Subtotal",
+                  "ধন্যবাদ": "Thank you",
+                  "আমাদের সাথে থাকার জন্য ধন্যবাদ!": "Thank you for staying with us!",
+                  "ইনভয়েস জেনারেট হচ্ছে...": "Generating Invoice...",
+                  "ইনভয়েস ডাউনলোড সম্পন্ন": "Invoice Downloaded",
+                  "পেন্ডিং অর্ডার": "Pending Orders",
+                  "প্রসেসিং অর্ডার": "Processing Orders",
+                  "ডেলিভারড অর্ডার": "Delivered Orders",
+                  "বাতিলকৃত অর্ডার": "Canceled Orders",
+                  "পেমেন্ট পেন্ডিং": "Payment Pending",
+                  "পেমেন্ট সম্পন্ন": "Payment Completed",
+                  "রিফান্ডেড": "Refunded",
+                  "সম্পন্ন": "Completed",
+                  "বাতিল": "Canceled",
+                  "প্রসেসিং": "Processing",
+                  "শিপড": "Shipped",
+                  "রিটার্ন": "Returned",
+                  "হোল্ড": "On Hold",
+                  "বক্স কোর্স": "Box Course",
+                  "লাইভ ক্লাসের ভিডিও": "Live Class Videos",
+                  "ডাউনলোড জোন এর ফাইলসমূহ": "Download Zone Files",
+                  "ডাউনলোড করুন": "Download Now",
+                  "সরাসরি ডাউনলোড": "Direct Download",
+                  "পোস্ট ডেসক্রিপশন": "Post Description",
+                  "ফাইল সাইজ": "File Size",
+                  "আপলোডের তারিখ": "Upload Date",
+                  "ডাউনলোড সংখ্যা": "Downloads",
+                  "বক্স প্রিমিয়াম কোর্স": "Box Premium Course",
+                  "কোর্স কারিকুলাম": "Course Curriculum",
+                  "ক্লাস": "Class",
+                  "ভিডিও লিংক": "Video Link",
+                  "রিসেলার অ্যাকাউন্ট": "Reseller Account",
+                  "অ্যাকাউন্ট ভেরিফিকেশন": "Account Verification",
+                  "অ্যাকাউন্ট স্ট্যাটাস": "Account Status",
+                  "ভেরিফাইড": "Verified",
+                  "আনভেরিফাইড": "Unverified",
+                  "পেন্ডিং ভেরিফিকেশন": "Pending Verification",
+                  "ভেরিফিকেশন সাবমিট": "Submit Verification",
+                  "ডকুমেন্ট টাইপ": "Document Type",
+                  "জাতীয় পরিচয়পত্র (NID)": "National ID (NID)",
+                  "জন্ম নিবন্ধন": "Birth Certificate",
+                  "পাসপোর্ট": "Passport",
+                  "ডকুমেন্ট নাম্বার": "Document Number",
+                  "ডকুমেন্টের সামনের ছবি": "Front Side Image",
+                  "ডকুমেন্টের পেছনের ছবি": "Back Side Image",
+                  "সাবমিট ভেরিফিকেশন": "Submit Verification",
+                  "সাকসেস": "Success",
+                  "এরর": "Error",
+                  "সফল হয়েছে!": "Success!",
+                  "ভুল তথ্য!": "Invalid details!",
+                  "এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।": "An account with this email already exists! Please login.",
+                  "এই ফোন নম্বর দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।": "An account with this phone number already exists! Please login.",
+                  "নিরাপত্তা পরীক্ষা করা হচ্ছে...": "Checking security...",
+                  "এই ইমেইল দিয়ে ইতিপূর্বে অন্য অ্যাকাউন্ট খোলা হয়েছে!": "This email has already been registered on another account!",
+                  "এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে!": "This email is already in use!",
+                  "অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে!": "Account created successfully!",
+                  "লগইন সফল হয়েছে!": "Login successful!"
+              };
+
+              const ADDITIONAL_BN_TO_EN = {
+                  // Partially Translated Menu Items (Fixes)
+                  "সকল প্রোডাক্ট": "All Products",
+                  "সার্চ প্রোডাক্টস": "Search Products",
+                  "সার্চ প্রোডাক্ট": "Search Products",
+                  "প্রোডাক্টের ভিডিও": "Product Videos",
+                  "ফেভারিট প্রোডাক্ট": "Favorite Products",
+                  "স্টকআউট প্রোডাক্ট": "Stockout Products",
+                  "অর্ডার লিস্ট": "Order List",
+                  "অ্যাক্টিভ অর্ডার": "Active Orders",
+                  "সেলস গাইডলাইন": "Sales Guideline",
+                  "কার্ট লিস্ট ০": "Cart List 0",
+                  "কার্ট লিস্ট": "Cart List",
+                  "প্যাসিভ ইনকাম": "Passive Income",
+                  "অর্থ ও সহায়তা": "Finance & Support",
+                  "সেলস ও প্রফিট": "Sales & Profit",
+                  "ব্যালেন্স স্টেটমেন্ট": "Balance Statement",
+                  "অ্যাড অ্যাকাউন্ট": "Add Account",
+                  "উত্তোলন করুন": "Withdraw Funds",
+                  "উত্তোলন হিস্ট্রি": "Withdrawal History",
+                  "আর্থিক ও সেবা": "Finance & Service",
+                  "উইথড্র রিকোয়েস্ট": "Withdrawal Requests",
+                  "রিচার্জ রিকোয়েস্ট": "Recharge Requests",
+                  "বিল পে রিকোয়েস্ট": "Bill Pay Requests",
+                  "টিকিট সাপোর্ট": "Support Tickets",
+                  "নোটিশ ও হোম স্লাইডার": "Notices & Home Sliders",
+
+                  // Landing Page Components
+                  "বেক্সো বিডি": "Bexo BD",
+                  "হোম": "Home",
+                  "আমাদের সম্পর্কে": "About Us",
+                  "সার্ভিস সমূহ": "Our Services",
+                  "যোগাযোগ": "Contact",
+                  "দেশের সর্ববৃহৎ ড্রপশিপিং এবং রিসেলিং প্ল্যাটফর্ম": "The Country's Largest Dropshipping & Reselling Platform",
+                  "কোন প্রকার পুঁজি বা ইনভেস্ট ছাড়াই ফ্রী'তে রেজিস্ট্রেশন করে ঘরে বসে বিজনেস করুন \"বেক্সো বিডি\"-র মাধ্যমে.": "Start your home-based business through Bexo BD with free registration and zero investment.",
+                  "রেজিস্ট্রেশন করুন": "Register Now",
+                  "বিস্তারিত জানুন": "Learn More",
+                  "রিসেলার/ড্রপশিপার": "Resellers/Dropshippers",
+                  "ট্রেন্ডি প্রোডাক্টস": "Trendy Products",
+                  "অ্যাপস ডাউনলোড": "App Downloads",
+                  "সাপোর্ট সেন্টার": "Support Center",
+                  "আমাদের সুবিধা সমূহ": "Our Advantages",
+                  "শতভাগ ক্যাশ অন ডেলিভারি": "100% Cash on Delivery",
+                  "দ্রুত পেমেন্ট সুবিধা": "Fast Payment System",
+                  "সহজ অর্ডার প্রসেস": "Easy Order Process",
+                  "২৪/৭ কাস্টমার সাপোর্ট": "24/7 Customer Support",
+                  "আমাদের স্পেশাল ফিচারস": "Our Special Features",
+                  "কিভাবে আমাদের মাধ্যমে বিজনেস করবেন": "How to Do Business With Us",
+                  "ড্রপশিপার রিভিউস": "Dropshipper Reviews",
+                  "আমাদের এক্সপেরিয়েন্স": "Our Experience",
+                  "আমাদের প্রোডাক্ট সমূহ": "Our Products",
+                  "পণ্য দেখতে অনুগ্রহ করে একটি ক্যাটাগরি নির্বাচন করুন": "Please select a category to view products",
+                  "আপনার ব্যবসার যাত্রা শুরু হোক আজ থেকেই।": "Let your business journey begin today.",
+                  "নতুন অ্যাকাউন্ট খুলুন": "Create New Account",
+                  "আপনার পূর্ণ নাম": "Your Full Name",
+                  "জিমেইল / ইমেইল": "Gmail / Email",
+                  "রেফার কোড / সেলার কোড (যদি থাকে)": "Referral Code / Seller Code (Optional)",
+                  "সম্পূর্ণ ঠিকানা": "Full Address",
+                  "পাসওয়ার্ড নিশ্চিত করুন": "Confirm Password",
+                  "আমি শর্তাবলীতে রাজি আছি": "I agree to the Terms & Conditions",
+                  "শর্তাবলীতে": "Terms & Conditions",
+                  "আমি": "I agree to the ",
+                  "রাজি আছি": " ",
+                  "অ্যাকাউন্ট তৈরি করুন": "Create Account",
+                  "ইতিমধ্যে অ্যাকাউন্ট আছে?": "Already have an account?",
+                  "লগইন করুন": "Login",
+                  "লগইন": "Login",
+                  "ফিরে আসার জন্য স্বাগতম!": "Welcome Back!",
+                  "মনে রাখুন": "Remember Me",
+                  "পাসওয়ার্ড ভুলে গেছেন?": "Forgot Password?",
+                  "নতুন ইউজার?": "New User?",
+                  "রজিস্ট্রেশন করুন": "Register",
+                  "ভুল তথ্য!": "Incorrect information!",
+                  "সফল হয়েছে!": "Success!",
+                  "মোবাইল নম্বর অথবা জিমেইল / ইমেইল": "Mobile Number or Gmail / Email",
+
+                  // Long Landing Page Content Blocks
+                  "Bexo BD বাংলাদেশের সর্ববৃহৎ একটি ড্রপশিপিং এবং রিসেলিং প্লাটফর্ম। কোন প্রকার পুঁজি বা ইনভেস্টমেন্ট ছাড়াই ঘরে বসে অসংখ্য ক্যাটাগরির প্রায় দশ হাজারেরও বেশি প্রোডাক্ট নিয়ে বিজনেস করতে পারবেন অনলাইনে আমাদের মাধ্যমে। ইনস্ট্যান্ট পেমেন্ট, ভেরিফাইড প্রোডাক্ট, ছবি দিয়ে সার্চ, ক্যাশ অন ডেলিভারি এবং কল সেন্টার সাপোর্ট সহ অত্যাধুনিক সকল সুবিধা রয়েছে এখানে।": "Bexo BD is the largest dropshipping and reselling platform in Bangladesh. Without any capital or investment, you can do business online through us with more than ten thousand products across numerous categories from the comfort of your home. It features instant payment, verified products, image-based search, cash on delivery, and full call center support.",
+                  "আমাদের এই প্ল্যাটফর্মের মাধ্যমে আপনি পাচ্ছেন অসংখ্য বিজনেস এবং ইনকাম করার সুযোগ।": "Through our platform, you get numerous opportunities for business and income.",
+                  "রিসেলিং / ড্রপশিপিং": "Reselling / Dropshipping",
+                  "হোলসেল প্রোডাক্ট": "Wholesale Products",
+                  "কাস্টমাইজ প্রিন্ট": "Customized Print",
+                  "সাপ্লায়ার / ভেন্ডরশিপ": "Supplier / Vendorship",
+                  "লিডারশিপ ইনকাম": "Leadership Income",
+                  "ফ্রিল্যান্সিং মার্কেটপ্লেস": "Freelancing Marketplace",
+                  "মাইক্রো জবস": "Micro Jobs",
+                  "ডিজিটাল মার্কেটিং": "Digital Marketing",
+                  "বুস্টিং সার্ভিস": "Boosting Service",
+                  "ড্রপশিপিং ওয়েবসাইট": "Dropshipping Website",
+                  "ড্রপশিপিং এবং রিসেলিং এর জগতে আমরাই দিচ্ছি সবচেয়ে বেশি এবং আকর্ষণীয় সুবিধা।": "In the world of dropshipping and reselling, we offer the most attractive benefits.",
+                  "জিরো ইনভেস্টমেন্ট": "Zero Investment",
+                  "কোন রকম পুঁজি বা ইনভেস্টমেন্ট ছাড়াই সম্পূর্ণ ফ্রি'তে রেজিস্ট্রেশন করে ফুল ক্যাশ অন ডেলিভারিতে বিজনেস করতে পারবেন।": "Start your business with completely free registration and full Cash on Delivery, without any capital or investment.",
+                  "ইনস্ট্যান্ট পেমেন্ট": "Instant Payment",
+                  "আপনার অর্ডার ডেলিভারি হওয়ার পর প্রফিটের টাকা উইথড্র দেওয়ার সাথে সাথেই অটোমেটিক ভাবে সেকেন্ডেই চলে যাবে।": "Once your order is delivered, your profit can be withdrawn and will automatically reach you in seconds.",
+                  "ক্যাশ অন ডেলিভারি": "Cash on Delivery",
+                  "আমাদের প্ল্যাটফর্মের মাধ্যমে বিজনেস করে আপনি কাস্টমারের নিকট থেকে ফুল ক্যাশ অন ডেলিভারি কন্ডিশনে অর্ডার নিতে পারবেন।": "By doing business through our platform, you can take orders on a full Cash on Delivery condition from customers.",
+                  "ভেরিফাইড প্রোডাক্টস": "Verified Products",
+                  "প্রোডাক্ট কোয়ালিটির দিক দিয়ে আমাদের রয়েছে ভেরিফাইড এবং বুস্টিং ক্যাটাগরির প্রোডাক্ট।": "In terms of product quality, we have verified and boosting category products.",
+                  "আমাদের রয়েছে অসংখ্য ক্যাটাগরির প্রোডাক্ট, যেগুলো আপনি সহজেই সেল করতে পারবেন।": "We have products in numerous categories that you can easily sell.",
+                  "কোনরকম ঝুঁকি বা ঝামেলা ছাড়া সহজে অনলাইনে বিজনেস করুন ড্রপ শিপিং মডেলে।": "Do business online easily with the dropshipping model, without any risk or hassle.",
+                  "সম্পূর্ণ ফ্রি তে রেজিস্ট্রেশন করুন আমাদের প্ল্যাটফর্মে আপনার পেইজ অথবা শপ নাম দিয়ে।": "Register completely free on our platform with your page or shop name.",
+                  "প্রোডাক্টের ছবি এবং ডেসক্রিপশন ডাউনলোড করে আপলোড করুন আপনার নিজস্ব পেজ অথবা ওয়েবসাইটে।": "Download product images and descriptions and upload them to your own page or website.",
+                  "প্রোডাক্টগুলো ২০০-৩০০ টাকা প্রফিট রেখে সেল করুন অনলাইনে ডিজিটাল মার্কেটিং এর মাধ্যমে।": "Sell products with a profit margin of 200-300 Taka through online digital marketing.",
+                  "আপনার পাওয়া অর্ডারগুলো প্লেস করে দিন আমাদের অ্যাপসের মাধ্যমে কাস্টমারের নাম ঠিকানা দিয়ে।": "Place your orders through our app with the customer's name and address.",
+                  "আমাদের টিম আপনার অর্ডারটি আপনার শপের নামে ইনভয়েস করে পাঠিয়ে দিবে আপনার কাস্টমারের কাস্টমারের হাতে।": "Our team will invoice the order in your shop's name and deliver it to your customer's hands.",
+                  "আমাদের টিম আপনার অর্ডারটি আপনার শপের নামে ইনভয়েস করে পাঠিয়ে দিবে আপনার কাস্টমারের হাতে।": "Our team will invoice the order in your shop's name and deliver it to your customer's hands.",
+                  "অর্ডারটি ডেলিভারি হওয়ার সাথে সাথেই প্রফিটের টাকা পেয়ে যাবেন আপনার দেওয়া বিকাশ, নগদ অথবা ব্যাংক অ্যাকাউন্টে।": "As soon as the order is delivered, you will receive your profit in your specified bKash, Nagad, or Bank account.",
+                  "অসংখ্য সেলার এত ড্রপশিপার অত্যন্ত সন্তুষ্টির সহিত আমাদের সাথে বিজনেস করে আসছে প্রায় তিন বছর যাবত। আমাদের সার্ভিসের প্রতি তাদের আস্থা এবং সন্তুষ্টির কারনেই Bexo BD আজকে বাংলাদেশের নাম্বার ওয়ান ড্রপশিপিং প্ল্যাটফর্ম।": "Numerous sellers and dropshippers have been doing business with us with high satisfaction for almost three years. Bexo BD is the number one dropshipping platform in Bangladesh because of their trust and satisfaction.",
+                  "এই প্ল্যাটফর্মে আমি বিগত ২ বছর ধরে কাজ করছি। আপনাদের পেমেন্ট সিস্টেম, স্টক সাপোর্ট, প্রোডাক্ট কোয়ালিটি এবং দ্রুত বুকিং সিস্টেম আমাকে ব্যবসায় প্রভূত সাফল্য অর্জনে সাহায্য করেছে। Bexo BD Reseller Place অ্যাপসটি আমার ব্যবসার জন্য একটি অমূল্য সম্পদ।": "I have been working on this platform for the past 2 years. Your payment system, stock support, product quality, and fast booking system have helped me achieve great success in my business. The Bexo BD Reseller Place app is an invaluable asset for my business.",
+                  "হৃদয়ে বাংলাদেশ": "Hridoye Bangladesh",
+                  "আমি প্রায় তিন বছর ধরে Bexo BD তে কাজ করছি। আমি কোন রকম পুঁজি বা ইনভেস্ট ছাড়াই একটা সেলস টিম তৈরি করে মাসে ৩০-৩৫ হাজার টাকা অটোমেটিক ইনকাম করছি। আপনাদের সার্ভিস, সাপোর্ট সত্যিই অসাধারণ, সত্য বলতে একটা আস্থার প্লাটফর্ম।": "I have been working with Bexo BD for almost three years. I have created a sales team without any capital or investment and automatically earn 30-35 thousand Taka per month. Your service and support are truly outstanding, indeed a platform of trust.",
+                  "আমি কোন ধরনের মূলধন ছাড়াই আপনাদের প্রোডাক্ট নিয়ে বিজনেস করে আমি মাসে ৭০ হাজার এবং সিজনে ১.৫ লক্ষ+ টাকা ইনকাম করছি। আমি এখন পরিবারের সাথে থেকে পরিবারের হাল ধরতে পেরে Bexo BD এর প্রতি আমি চির কৃতজ্ঞতা জানাচ্ছি।": "I am doing business with your products with zero capital, earning 70,000 Taka per month and 1.5 Lakhs+ during peak seasons. I am eternally grateful to Bexo BD for enabling me to support my family while staying with them.",
+                  "Raihanul Islam": "Raihanul Islam",
+                  "বিজনেস করার মত তেমন কিছুই ছিলো না, ২০২৪ সালে আপনাদের প্রোডাক্ট নিয়ে বিজনেস শুরু করে নিজের একটি ছোট প্রতিষ্ঠান (১০জন স্টাফ) তৈরি করতে পেরেছি। আপনাদের টিমের এই সাপোর্টের জন্য শুধু ধন্যবাদ দিয়ে ছোট করতে চাই না। চাই আমরা যেন এগিয়ে যাই অনেকদূর।": "I had nothing to do business with, but starting with your products in 2024, I have managed to build a small company with 10 staff members. I don't want to just thank your team for this support, I want us to go a long way together.",
+                  "আমাদের এক্সপেরিয়েন্স": "Our Experience",
+                  "আমরা প্রায় দুই বছর যাবত আমাদের অভিজ্ঞ টিমের মাধ্যমে অত্যন্ত সুনামের সাথে আমাদের সম্মানিত সেলারদের অর্ডার প্রসেস করে আসছি এছাড়াও আমাদের আরও রয়েছে......": "We have been processing orders for our respected sellers with great reputation through our experienced team for almost two years. In addition, we have...",
+                  "হাজার হাজার অর্ডার হ্যান্ডেল করার দীর্ঘদিনের বাস্তব অভিজ্ঞতা।": "Years of practical experience handling thousands of orders.",
+                  "আমাদের রিসেলারদের নিয়মিত মুনাফা নিশ্চিত করার দীর্ঘদিনের সফল অভিজ্ঞতা।": "Long successful experience of ensuring regular profit for our resellers.",
+                  "দেশের স্বনামধন্য কুরিয়ার পার্টনারদের সাথে দীর্ঘদিনের সফল ব্যবসায়িক পার্টনারশিপের অভিজ্ঞতা।": "Years of successful business partnership experience with renowned courier partners in the country.",
+
+                  // Other System Text Strings
+                  "হোলসেল প্রাইজ": "Wholesale Price",
+                  "আপনার প্রফিট": "Your Profit",
+                  "ডেলিভারি চার্জ": "Delivery Charge",
+                  "অর্ডার নোট (ঐচ্ছিক)": "Order Note (Optional)",
+                  "অর্ডার সাবমিট করুন": "Submit Order",
+                  "অর্ডার সম্পন্ন করুন": "Complete Order",
+                  "ড্যাশবোর্ডে ফিরুন": "Back to Dashboard",
+                  "ড্যাশবোর্ড-এ ফিরে যান": "Go back to Dashboard",
+                  "ব্যাক টু ড্যাশবোর্ড": "Back to Dashboard"
+              };
+
+              // Merge ADDITIONAL_BN_TO_EN into BN_TO_EN
+              Object.assign(BN_TO_EN, ADDITIONAL_BN_TO_EN);
+
+              const translationKeys = Object.keys(BN_TO_EN).sort((a, b) => b.length - a.length);
+
+              function translateText(text) {
+                  if (!text || typeof text !== 'string') return text;
+                  let modified = text;
+                  for (const key of translationKeys) {
+                      if (modified.includes(key)) {
+                          modified = modified.replaceAll(key, BN_TO_EN[key]);
+                      }
+                  }
+                  return modified;
+              }
+
+              function translateNode(node) {
+                  if (!node) return;
+                  if (node.nodeType === Node.TEXT_NODE) {
+                      const val = node.nodeValue;
+                      if (val && /[^\s]/.test(val)) {
+                          const translated = translateText(val);
+                          if (translated !== val) {
+                              node.nodeValue = translated;
+                          }
+                      }
+                  } else if (node.nodeType === Node.ELEMENT_NODE) {
+                      const tagName = node.tagName.toLowerCase();
+                      if (tagName === 'script' || tagName === 'style' || tagName === 'iframe') {
+                          return;
+                      }
+                      
+                      if (node.hasAttribute('placeholder')) {
+                          const val = node.getAttribute('placeholder');
+                          const translated = translateText(val);
+                          if (translated !== val) {
+                              node.setAttribute('placeholder', translated);
+                          }
+                      }
+
+                      if (node.hasAttribute('title')) {
+                          const val = node.getAttribute('title');
+                          const translated = translateText(val);
+                          if (translated !== val) {
+                              node.setAttribute('title', translated);
+                          }
+                      }
+
+                      for (let child = node.firstChild; child; child = child.nextSibling) {
+                          translateNode(child);
+                      }
+                  }
+              }
+
+              window.translateDOM = function() {
+                  if (window.currentLang !== 'en') return;
+                  translateNode(document.body);
+              };
+
+              window.toggleLanguage = function(event) {
+                  if (event) {
+                      event.stopPropagation();
+                      event.preventDefault();
+                  }
+                  const newLang = window.currentLang === 'bn' ? 'en' : 'bn';
+                  localStorage.setItem('bexo_lang', newLang);
+                  window.location.reload();
+              };
+
+              let translationObserver = null;
+              function startTranslationObserver() {
+                  if (window.currentLang !== 'en') return;
+                  if (translationObserver) return;
+
+                  translationObserver = new MutationObserver((mutations) => {
+                      translationObserver.disconnect();
+                      for (const mutation of mutations) {
+                          if (mutation.type === 'childList') {
+                              mutation.addedNodes.forEach(node => translateNode(node));
+                          } else if (mutation.type === 'characterData') {
+                              const node = mutation.target;
+                              const val = node.nodeValue;
+                              if (val && /[^\s]/.test(val)) {
+                                  const translated = translateText(val);
+                                  if (translated !== val) {
+                                      node.nodeValue = translated;
+                                  }
+                              }
+                          }
+                      }
+                      translationObserver.observe(document.body, {
+                          childList: true,
+                          subtree: true,
+                          characterData: true
+                      });
+                  });
+
+                  translationObserver.observe(document.body, {
+                      childList: true,
+                      subtree: true,
+                      characterData: true
+                  });
+              }
+
+              // Run setup as early as possible and listen to DOMContentLoaded
+              document.addEventListener('DOMContentLoaded', () => {
+                  if (window.currentLang === 'en') {
+                      window.translateDOM();
+                      startTranslationObserver();
+                  }
+                  
+                  // Set initial toggle buttons
+                  const globalLabels = document.querySelectorAll('.globalLangLabel, .adminLangLabel, #langLabel');
+                  globalLabels.forEach(lbl => lbl.innerText = window.currentLang === 'bn' ? 'EN' : 'বাং');
+              });
 
               // checkAdminAccess is defined once later in the file
 
@@ -5086,7 +5703,7 @@
                   attachEvents();
               }
 
-              function handleRegister() {
+              async function handleRegister() {
                   try {
                       const shopField = document.getElementById('regShop');
                       const nameField = document.getElementById('regName');
@@ -5147,7 +5764,10 @@
                           return;
                       }
 
-                      // Check for existing user with this phone number
+                      // High-Security Check: Standardize email to lowercase
+                      const normalizedEmail = email.toLowerCase().trim();
+
+                      // Check for existing user with this phone number locally first
                       const normalizedInputPhone = normalizePhone(phone);
                       const existingUser = appUsers.find(u => normalizePhone(u.phone) === normalizedInputPhone);
                       if (existingUser) {
@@ -5155,11 +5775,32 @@
                           return;
                       }
 
-                      // Check for existing user with this email address
-                      const existingEmail = appUsers.find(u => u.email && u.email.toLowerCase().trim() === email.toLowerCase().trim());
+                      // Check for existing user with this email address locally
+                      const existingEmail = appUsers.find(u => u.email && u.email.toLowerCase().trim() === normalizedEmail);
                       if (existingEmail) {
                           showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error");
                           return;
+                      }
+
+                      // High-Security check: Check live Firestore collection direct query to avoid duplicate accounts from other browser sessions
+                      if (window.db) {
+                          try {
+                              showToast("নিরাপত্তা পরীক্ষা করা হচ্ছে...", "info");
+                              
+                              const emailQuery = await window.db.collection('bexo_users').where('email', '==', normalizedEmail).get();
+                              if (!emailQuery.empty) {
+                                  showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error");
+                                  return;
+                              }
+
+                              const phoneQuery = await window.db.collection('bexo_users').where('phone', '==', phone).get();
+                              if (!phoneQuery.empty) {
+                                  showToast("এই ফোন নম্বর দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error");
+                                  return;
+                              }
+                          } catch (dbErr) {
+                              console.error("Firestore unique checks failed during registration:", dbErr);
+                          }
                       }
 
                       // Passive Income: Referral Logic
@@ -5182,7 +5823,7 @@
                           shopName: shop,
                           fullName: name,
                           phone: phone,
-                          email: email,
+                          email: normalizedEmail,
                           address: addr,
                           password: pass,
                           referredBy: referredBy,
@@ -12046,7 +12687,7 @@
                   `;
               }
 
-              function updateProfile() {
+              async function updateProfile() {
                   try {
                       // Get fresh values from inputs
                       const phone = document.getElementById('profilePhone').value.trim();
@@ -12064,11 +12705,29 @@
                           return;
                       }
 
+                      // High-Security Check: Standardize email to lowercase and check if changed
+                      const currentEmail = (userProfile.email || '').toLowerCase().trim();
+                      const targetEmail = email.toLowerCase().trim();
+                      if (targetEmail && targetEmail !== currentEmail) {
+                          if (window.db) {
+                              try {
+                                  showToast("নিরাপত্তা পরীক্ষা করা হচ্ছে...", "info");
+                                  const emailQuery = await window.db.collection('bexo_users').where('email', '==', targetEmail).get();
+                                  if (!emailQuery.empty) {
+                                      showToast("এই ইমেইল দিয়ে ইতিপূর্বে অন্য অ্যাকাউন্ট খোলা হয়েছে!", "error");
+                                      return;
+                                  }
+                              } catch (dbErr) {
+                                  console.error("Firestore unique checks failed during profile update:", dbErr);
+                              }
+                          }
+                      }
+
                       // Update the state object
                       userProfile.phone = phone;
                       userProfile.fullName = name;
                       userProfile.shopName = shop;
-                      userProfile.email = email;
+                      userProfile.email = targetEmail;
                       userProfile.fbPage = fbPage;
                       userProfile.website = website;
                       userProfile.district = district;
