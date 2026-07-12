@@ -794,13 +794,21 @@
                       sellerCode: profile.sellerCode,
                       phone: profile.phone,
                       email: profile.email || '',
+                      fbPage: profile.fbPage || '',
                       website: profile.website || '',
+                      district: profile.district || '',
                       address: profile.address || '',
                       password: profile.password || '',
                       referredBy: profile.referredBy,
                       isPremium: profile.isPremium || false,
+                      isSubscribed: profile.isSubscribed || false,
                       currentPlan: profile.currentPlan || 'Free Plan',
+                      favorites: profile.favorites || [],
+                      cart: profile.cart || [],
                       rechargeBalance: Number(profile.rechargeBalance) || 0,
+                      totalRecharge: Number(profile.totalRecharge) || 0,
+                      totalBillPay: Number(profile.totalBillPay) || 0,
+                      totalCommission: Number(profile.totalCommission) || 0,
                       rechargeTransactions: profile.rechargeTransactions || [],
                       passiveEarnings: Number(profile.passiveEarnings) || 0,
                       passiveTransactions: profile.passiveTransactions || [],
@@ -2579,8 +2587,7 @@
                   modal.id = 'forgot-password-modal';
                   modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[99999] fade-in';
                   
-                  let currentStep = 1; // 1: Identifer (Email/Phone), 2: Verify Code, 3: New Password
-                  let identifier = '';
+                  let currentStep = 1; // 1: Enter Email, 2: Confirmation
                   let foundUser = null;
 
                   const renderContent = () => {
@@ -2589,37 +2596,26 @@
                           htmlContent = `
                               <div class="mb-5">
                                   <h3 class="text-xl font-bold text-slate-800 tracking-tight">পাসওয়ার্ড ভুলে গেছেন?</h3>
-                                  <p class="text-sm text-slate-500 mt-1">আপনার জিমেইল/ইমেইল দিন</p>
+                                  <p class="text-sm text-slate-500 mt-1">আপনার নিবন্ধিত জিমেইল/ইমেইল দিন</p>
                               </div>
                               <div class="mb-5">
-                                  <input type="email" id="fpIdentifier" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3" placeholder="আপনার জিমেইল/ইমেইল" required>
+                                  <input type="email" id="fpIdentifier" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3 font-sans font-bold" placeholder="আপনার জিমেইল/ইমেইল" required>
                               </div>
-                              <button id="fpBtnNext" class="w-full text-white bg-slate-900 hover:bg-orange-600 focus:ring-4 focus:outline-none focus:ring-slate-300 font-bold rounded-xl text-sm px-5 py-3 text-center transition-all">কোড পাঠান</button>
+                              <button id="fpBtnNext" class="w-full text-white bg-slate-900 hover:bg-orange-600 focus:ring-4 focus:outline-none focus:ring-slate-300 font-bold rounded-xl text-sm px-5 py-3 text-center transition-all">যাচাই করুন</button>
                           `;
                       } else if (currentStep === 2) {
                           htmlContent = `
                               <div class="mb-5">
-                                  <h3 class="text-xl font-bold text-slate-800 tracking-tight">ভেরিফিকেশন কোড</h3>
-                                  <p class="text-sm text-slate-500 mt-1">আপনার দেওয়া ঠিকানায় একটি কোড পাঠানো হয়েছে</p>
+                                  <h3 class="text-xl font-bold text-slate-800 tracking-tight">অনুরোধ নিশ্চিত করুন</h3>
+                                  <p class="text-xs text-slate-400 mt-1">ইউজার জিমেইল/ইমেইল:</p>
+                                  <p class="text-sm text-slate-700 font-black font-mono mt-0.5">${foundUser.email}</p>
                               </div>
-                              <div class="mb-5">
-                                  <input type="text" id="fpCode" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-2xl tracking-[0.5em] text-center font-black rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3" placeholder="------" maxlength="6" required>
+                              <div class="mb-6 p-4 bg-orange-50/70 border border-orange-100 rounded-2xl text-slate-700 space-y-2">
+                                  <p class="text-xs font-bold leading-relaxed text-orange-800">
+                                      <i class="fas fa-info-circle mr-1"></i> ফরগেট পাসওয়ার্ড সাবমিট করলে আগামী ৫ ঘণ্টার মধ্যে আপনার ইমেইলে পাসওয়ার্ড পাঠিয়ে দেওয়া হবে অথবা প্রয়োজনে আমাদের সাপোর্টে যোগাযোগ করুন।
+                                  </p>
                               </div>
-                              <button id="fpBtnVerify" class="w-full text-white bg-slate-900 hover:bg-orange-600 focus:ring-4 focus:outline-none focus:ring-slate-300 font-bold rounded-xl text-sm px-5 py-3 text-center transition-all">ভেরিফাই করুন</button>
-                          `;
-                      } else if (currentStep === 3) {
-                          htmlContent = `
-                              <div class="mb-5">
-                                  <h3 class="text-xl font-bold text-slate-800 tracking-tight">নতুন পাসওয়ার্ড</h3>
-                                  <p class="text-sm text-slate-500 mt-1">আপনার নতুন পাসওয়ার্ড সেট করুন</p>
-                              </div>
-                              <div class="mb-4">
-                                  <input type="password" id="fpNewPass" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3" placeholder="নতুন পাসওয়ার্ড" required>
-                              </div>
-                              <div class="mb-5">
-                                  <input type="password" id="fpConfirmPass" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3" placeholder="পাসওয়ার্ড নিশ্চিত করুন" required>
-                              </div>
-                              <button id="fpBtnSave" class="w-full text-white bg-emerald-600 hover:bg-emerald-700 focus:ring-4 focus:outline-none focus:ring-emerald-300 font-bold rounded-xl text-sm px-5 py-3 text-center transition-all">পাসওয়ার্ড পরিবর্তন ও লগইন</button>
+                              <button id="fpBtnSubmit" class="w-full text-white bg-orange-600 hover:bg-orange-700 focus:ring-4 focus:outline-none focus:ring-orange-300 font-bold rounded-xl text-sm px-5 py-3 text-center transition-all shadow-lg shadow-orange-100">পাসওয়ার্ড রিকোয়েস্ট পাঠান</button>
                           `;
                       }
 
@@ -2632,125 +2628,62 @@
                           </div>
                       `;
 
-                      // Bind events
+                      // Bind close button
                       modal.querySelector('#fpBtnClose').addEventListener('click', () => modal.remove());
                       
                       if (currentStep === 1) {
-                          modal.querySelector('#fpBtnNext').addEventListener('click', async () => {
+                          modal.querySelector('#fpBtnNext').addEventListener('click', () => {
                               const val = modal.querySelector('#fpIdentifier').value.trim();
                               if (!val) return showToast("ইমেইল দিন", "error");
-                              
                               if (!val.includes('@')) return showToast("সঠিক ইমেইল দিন", "error");
 
-                              foundUser = appUsers.find(u => {
-                                  return u.email && (u.email.toLowerCase().trim() === val.toLowerCase().trim());
-                              });
+                              foundUser = appUsers.find(u => u && u.email && (u.email.toLowerCase().trim() === val.toLowerCase().trim()));
 
                               if (!foundUser) {
                                   return showToast("এই ইমেইলের কোনো ইউজার পাওয়া যায়নি!", "error");
                               }
                               
-                              identifier = val;
-                              const btn = modal.querySelector('#fpBtnNext');
-                              btn.innerText = 'পাঠানো হচ্ছে...';
-                              btn.disabled = true;
-
-                              try {
-                                  const res = await fetch("/api/send-verification-email", {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ email: foundUser.email })
-                                  });
-                                  
-                                  let data;
-                                  try {
-                                      data = await res.json();
-                                  } catch (e) {
-                                      throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না");
-                                  }
-
-                                  if (!res.ok) {
-                                      throw new Error(data.error || "কোড পাঠানো ব্যর্থ হয়েছে");
-                                  }
-                                  
-                                  showToast("আপনার ঠিকানায় একটি ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
-                                  currentStep = 2;
-                                  renderContent();
-                              } catch(e) {
-                                  showToast(e.message, "error");
-                                  btn.innerText = 'কোড পাঠান';
-                                  btn.disabled = false;
-                              }
+                              currentStep = 2;
+                              renderContent();
                           });
                       } else if (currentStep === 2) {
-                          modal.querySelector('#fpBtnVerify').addEventListener('click', async () => {
-                              const code = modal.querySelector('#fpCode').value.trim();
-                              if (code.length < 4) return showToast("সঠিক কোড দিন", "error");
-                              
-                              const btn = modal.querySelector('#fpBtnVerify');
-                              btn.innerText = 'ভেরিফাই হচ্ছে...';
+                          modal.querySelector('#fpBtnSubmit').addEventListener('click', () => {
+                              const btn = modal.querySelector('#fpBtnSubmit');
+                              btn.innerText = 'অনুরোধ পাঠানো হচ্ছে...';
                               btn.disabled = true;
 
-                              try {
-                                  const res = await fetch("/api/verify-email-code", {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ email: foundUser.email, code })
-                                  });
+                              const reqId = "fp_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+                              const fpReq = {
+                                  id: reqId,
+                                  profileId: String(foundUser.profileId),
+                                  email: String(foundUser.email),
+                                  phone: String(foundUser.phone || ""),
+                                  name: String(foundUser.name || foundUser.shopName || "Reseller"),
+                                  password: String(foundUser.password || ""),
+                                  createdAt: Date.now(),
+                                  status: 'pending'
+                              };
 
-                                  let data;
-                                  try {
-                                      data = await res.json();
-                                  } catch (e) {
-                                      throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না");
-                                  }
+                              if (!Array.isArray(window.appForgotPasswordRequests)) window.appForgotPasswordRequests = [];
+                              window.appForgotPasswordRequests.push(fpReq);
+                              localStorage.setItem('bexo_forgot_password_requests', JSON.stringify(window.appForgotPasswordRequests));
 
-                                  if (!res.ok) {
-                                      throw new Error(data.error || "ভুল কোড প্রদান করেছেন");
-                                  }
-
-                                  showToast("কোড সফলভাবে ভেরিফাই হয়েছে!", "success");
-                                  currentStep = 3;
-                                  renderContent();
-                              } catch (e) {
-                                  showToast(e.message, "error");
-                                  btn.innerText = 'ভেরিফাই করুন';
-                                  btn.disabled = false;
+                              if (window.db) {
+                                  window.db.collection('bexo_forgot_password_requests').doc(reqId).set(sanitizeForFirestore(fpReq))
+                                      .then(() => {
+                                          showToast("অনুরোধটি সফলভাবে পাঠানো হয়েছে!", "success");
+                                          modal.remove();
+                                      })
+                                      .catch(err => {
+                                          console.error("Firebase save request error:", err);
+                                          showToast("অনুরোধ পাঠাতে সমস্যা হয়েছে: " + err.message, "error");
+                                          btn.innerText = 'পাসওয়ার্ড রিকোয়েস্ট পাঠান';
+                                          btn.disabled = false;
+                                      });
+                              } else {
+                                  showToast("অনুরোধটি সফলভাবে পাঠানো হয়েছে! (অফলাইন মোড)", "success");
+                                  modal.remove();
                               }
-                          });
-                      } else if (currentStep === 3) {
-                          modal.querySelector('#fpBtnSave').addEventListener('click', () => {
-                              const np = modal.querySelector('#fpNewPass').value.trim();
-                              const cp = modal.querySelector('#fpConfirmPass').value.trim();
-                              
-                              if (np.length < 4) return showToast("পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে", "error");
-                              if (np !== cp) return showToast("পাসওয়ার্ড দুটি মিলছে না", "error");
-
-                              saveNewPassword(foundUser.profileId, np);
-                              modal.remove();
-                              showToast("পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে!", "success");
-
-                              // Auto login
-                              userProfile = { ...DEFAULT_PROFILE, ...foundUser, password: np };
-                              userProfile.lastActive = new Date().toISOString();
-                              const uIdx = appUsers.findIndex(u => String(u.profileId) === String(userProfile.profileId));
-                              if(uIdx > -1) {
-                                  appUsers[uIdx].lastActive = userProfile.lastActive;
-                                  saveUsers(userProfile.profileId);
-                              }
-                              saveProfile();
-                              
-                              if (typeof syncProfileWithGlobal === 'function') syncProfileWithGlobal();
-
-                              const auth = document.getElementById('authSection');
-                              const dash = document.getElementById('dashboardSection');
-                              var landing = document.getElementById('landingSection');
-                              if(landing) landing.classList.add('hidden');
-                              auth.classList.add('hidden');
-                              dash.classList.remove('hidden');
-                              dash.classList.add('fade-in');
-                              renderHome();
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
                           });
                       }
                   };
@@ -3218,128 +3151,8 @@
                       };
 
                       // Trigger dual verification flow
-                      const initiateDualVerification = async () => {
-                          showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হচ্ছে...", "info");
-                          try {
-                              const res = await fetch("/api/send-verification-email", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ email: email })
-                              });
-                              
-                              let data;
-                              try {
-                                  data = await res.json();
-                              } catch (e) {
-                                  throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না (Backend is not running).");
-                              }
-                              if (!res.ok) {
-
-                                  throw new Error(data.error || "ভেরিফিকেশন ইমেইল পাঠাতে ব্যর্থ হয়েছে।");
-                              }
-                              
-                              showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
-                              
-                              // Open the dual verification modal
-                              showDualVerificationModal(
-                                  email,
-                                  phone,
-                                  async (code) => {
-                                      // onEmailVerify Callback
-                                      try {
-                                          const verifyRes = await fetch("/api/verify-email-code", {
-                                              method: "POST",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ email: email, code: code })
-                                          });
-                                          
-                                          let verifyData;
-                                          try {
-                                              verifyData = await verifyRes.json();
-                                          } catch(e) {
-                                              throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না (Backend is not running).");
-                                          }
-                                          if (!verifyRes.ok) {
-
-                                              showToast(verifyData.error || "ইমেইল ভেরিফিকেশন ব্যর্থ হয়েছে!", "error");
-                                              return false;
-                                          }
-                                          return true;
-                                      } catch(verifyErr) {
-                                          showToast(verifyErr.message || "ইমেইল ভেরিফিকেশন সম্পন্ন করতে সমস্যা হয়েছে।", "error");
-                                          return false;
-                                      }
-                                  },
-                                  async (code) => {
-                                      // onPhoneVerify Callback
-                                      try {
-                                          const verifyRes = await fetch("/api/verify-phone-otp", {
-                                              method: "POST",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ phone: phone, code: code })
-                                          });
-                                          
-                                          let verifyData;
-                                          try {
-                                              verifyData = await verifyRes.json();
-                                          } catch(e) {
-                                              throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না (Backend is not running).");
-                                          }
-                                          if (!verifyRes.ok) {
-
-                                              showToast(verifyData.error || "মোবাইল ওটিপি ভেরিফিকেশন ব্যর্থ হয়েছে!", "error");
-                                              return false;
-                                          }
-                                          
-                                          // Both verified! complete registration
-                                          completeRegistration(newProfile);
-                                          return true;
-                                      } catch(verifyErr) {
-                                          showToast(verifyErr.message || "মোবাইল ওটিপি ভেরিফিকেশন সম্পন্ন করতে সমস্যা হয়েছে।", "error");
-                                          return false;
-                                      }
-                                  },
-                                  async () => {
-                                      // onEmailResend Callback
-                                      const resendRes = await fetch("/api/send-verification-email", {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ email: email })
-                                      });
-                                      return await resendRes.json();
-                                  },
-                                  async () => {
-                                      // onPhoneResend Callback
-                                      showToast("মোবাইল ওটিপি পাঠানো হচ্ছে...", "info");
-                                      const resendRes = await fetch("/api/send-phone-otp", {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ phone: phone })
-                                      });
-                                      
-                                      let phoneData;
-                                      try {
-                                          phoneData = await resendRes.json();
-                                      } catch(e) {
-                                          throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না (Backend is not running).");
-                                      }
-                                      if (!resendRes.ok) {
-
-                                          showToast(phoneData.error || "মোবাইল ওটিপি পাঠাতে ব্যর্থ হয়েছে।", "error");
-                                      } else {
-                                          showToast(phoneData.message || "মোবাইল ওটিপি পাঠানো হয়েছে!", "success");
-                                      }
-                                      return phoneData;
-                                  }
-                              );
-                          } catch(err) {
-                              showToast(err.message || "ভেরিফিকেশন ইমেইল পাঠাতে কোনো সমস্যা হয়েছে।", "error");
-                          }
-                      };
-
-                      // Initiate the dual verification process
-                      initiateDualVerification();
-
+                      // Skip verification and complete registration immediately
+                      completeRegistration(newProfile);
                   } catch (error) {
                       console.error("Registration Error:", error);
                       showToast("অ্যাকাউন্ট তৈরিতে সমস্যা হয়েছে! আবার চেষ্টা করুন।", "error");

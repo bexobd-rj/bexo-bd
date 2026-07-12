@@ -27,7 +27,9 @@ import {
   TrendingUp,
   Users,
   Key,
-  ShieldAlert
+  ShieldAlert,
+  Upload,
+  Image
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from './firebase';
@@ -340,6 +342,7 @@ export default function App() {
       qProducts, 
       (snap) => {
         const p = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+        console.log("Real-time products update received from Firestore, count:", p.length);
         setProducts(p);
       },
       (err) => {
@@ -1684,7 +1687,6 @@ function AdminOrderList({ orders }: { orders: Order[] }) {
             onClose={() => setSelectedOrder(null)} 
             onUpdateStatus={handleUpdateStatus}
             onUpdateTracking={handleUpdateTracking}
-            onApproveProfit={handleApproveProfit}
           />
         )}
       </AnimatePresence>
@@ -1696,14 +1698,12 @@ function OrderDetailsModal({
   order, 
   onClose, 
   onUpdateStatus, 
-  onUpdateTracking,
-  onApproveProfit
+  onUpdateTracking
 }: { 
   order: Order, 
   onClose: () => void,
   onUpdateStatus: (id: string, s: Order['status'], h: Order['statusHistory']) => void,
-  onUpdateTracking: (id: string, l: string) => void,
-  onApproveProfit: (o: Order) => void
+  onUpdateTracking: (id: string, l: string) => void
 }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -1786,37 +1786,6 @@ function OrderDetailsModal({
                   </div>
                 </div>
               </div>
-
-              {/* Profit Settlement Panel */}
-              {order.status === 'Delivered' && (
-                <div className={cn(
-                  "border rounded-3xl p-6 shadow-sm space-y-4",
-                  order.profitStatus === 'completed' 
-                    ? "bg-emerald-50 border-emerald-100" 
-                    : "bg-orange-50 border-orange-100"
-                )}>
-                  <div className="space-y-1">
-                    <h4 className={cn("text-xs uppercase font-black tracking-wider", order.profitStatus === 'completed' ? "text-emerald-800" : "text-orange-850")}>
-                      Profit Settlement
-                    </h4>
-                    <p className={cn("text-xs font-semibold leading-relaxed", order.profitStatus === 'completed' ? "text-emerald-700" : "text-orange-700")}>
-                      ৳{order.profit?.toLocaleString()} is eligible to be settled to reseller {order.resellerShopName || order.resellerName}.
-                    </p>
-                  </div>
-                  {order.profitStatus !== 'completed' ? (
-                    <button 
-                      onClick={() => onApproveProfit(order)}
-                      className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-md transition-all active:scale-[0.98] cursor-pointer"
-                    >
-                      Approve & Add Profit
-                    </button>
-                  ) : (
-                    <div className="flex items-center justify-center gap-1.5 py-3.5 bg-emerald-100/50 rounded-2xl border border-emerald-200 text-emerald-800 font-extrabold text-xs uppercase tracking-wider">
-                      <CheckCircle2 size={14} className="stroke-[2.5]" /> Profit Settled
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Delivery History Logs Card */}
               <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
@@ -2488,10 +2457,56 @@ function AdminPayoutList({ transactions }: { transactions: Transaction[] }) {
   );
 }
 
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDimension = 500;
+        
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const base64 = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(base64);
+        } else {
+          resolve(e.target?.result as string);
+        }
+      };
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => {
+      reject(new Error('Failed to read file'));
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 function AdminProductList({ products }: { products: Product[] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   // Form states
   const [formData, setFormData] = useState({
@@ -2504,6 +2519,24 @@ function AdminProductList({ products }: { products: Product[] }) {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleFileChange = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setUploadError('শুধুমাত্র ছবি আপলোড করা যাবে!');
+      return;
+    }
+    setUploadError('');
+    setIsLoading(true);
+    try {
+      const base64Img = await compressImage(file);
+      setFormData(prev => ({ ...prev, imageUrl: base64Img }));
+    } catch (err: any) {
+      console.error(err);
+      setUploadError('ছবি আপলোড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Fill edit form
   const handleOpenEdit = (p: Product) => {
@@ -2847,18 +2880,81 @@ function AdminProductList({ products }: { products: Product[] }) {
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="micro-label">Image URL</label>
-                  <input 
-                    type="url" 
-                    value={formData.imageUrl}
-                    onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
-                    placeholder="https://picsum.photos/seed/... "
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-primary transition-all text-sm"
-                  />
-                  <span className="text-[10px] text-slate-400 font-bold block pt-1">
-                    আপনি placeholder image দিতে পারেন, অথবা খালি রাখলে পিকসাম এর একটি রেন্ডম ছবি নিয়ে নিবে।
-                  </span>
+                <div className="space-y-2">
+                  <label className="micro-label">Product Image (প্রোডাক্ট ফটো)</label>
+                  
+                  {/* File Upload Zone */}
+                  <div 
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) handleFileChange(file);
+                    }}
+                    onClick={() => document.getElementById('product-image-file')?.click()}
+                    className={cn(
+                      "border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 min-h-[140px]",
+                      isDragging 
+                        ? "border-primary bg-primary/5 scale-[1.01]" 
+                        : "border-slate-200 bg-slate-50 hover:bg-slate-100/50 hover:border-slate-300"
+                    )}
+                  >
+                    <input 
+                      type="file" 
+                      id="product-image-file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileChange(file);
+                      }}
+                      className="hidden"
+                    />
+                    
+                    {formData.imageUrl ? (
+                      <div className="relative group/img w-full max-w-[120px] aspect-square rounded-xl overflow-hidden border shadow-sm">
+                        <img 
+                          src={formData.imageUrl} 
+                          alt="Preview" 
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                          <p className="text-white text-[10px] font-black uppercase tracking-wider">Change Photo</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 rounded-full bg-slate-200/50 flex items-center justify-center text-slate-500">
+                          <Upload size={18} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-extrabold text-slate-700">ডিভাইস থেকে ফটো আপলোড করুন</p>
+                          <p className="text-[10px] text-slate-400 font-bold">ড্র্যাগ এন্ড ড্রপ করুন অথবা এখানে ক্লিক করুন</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
+                  {uploadError && (
+                    <p className="text-red-600 font-bold text-[10px] mt-1">{uploadError}</p>
+                  )}
+
+                  {/* Manual URL Input */}
+                  <div className="pt-1">
+                    <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block mb-1">অথবা ইমেজ ইউআরএল (Image URL)</span>
+                    <input 
+                      type="url" 
+                      value={formData.imageUrl}
+                      onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
+                      placeholder="https://example.com/image.jpg"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-primary transition-all text-xs"
+                    />
+                    <span className="text-[9px] text-slate-400 font-semibold block pt-1 leading-normal">
+                      সরাসরি ডিভাইস থেকে ফটো সিলেক্ট করতে পারেন, অথবা চাইলে ওয়েব ইমেজ লিংকও পেস্ট করতে পারেন। খালি রাখলে পিকসাম এর একটি রেন্ডম ছবি নিয়ে নিবে।
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-1">

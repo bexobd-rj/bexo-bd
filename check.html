@@ -945,13 +945,21 @@
                       sellerCode: profile.sellerCode,
                       phone: profile.phone,
                       email: profile.email || '',
+                      fbPage: profile.fbPage || '',
                       website: profile.website || '',
+                      district: profile.district || '',
                       address: profile.address || '',
                       password: profile.password || '',
                       referredBy: profile.referredBy,
                       isPremium: profile.isPremium || false,
+                      isSubscribed: profile.isSubscribed || false,
                       currentPlan: profile.currentPlan || 'Free Plan',
+                      favorites: profile.favorites || [],
+                      cart: profile.cart || [],
                       rechargeBalance: Number(profile.rechargeBalance) || 0,
+                      totalRecharge: Number(profile.totalRecharge) || 0,
+                      totalBillPay: Number(profile.totalBillPay) || 0,
+                      totalCommission: Number(profile.totalCommission) || 0,
                       rechargeTransactions: profile.rechargeTransactions || [],
                       passiveEarnings: Number(profile.passiveEarnings) || 0,
                       passiveTransactions: profile.passiveTransactions || [],
@@ -3369,127 +3377,8 @@
                       };
 
                       // Trigger dual verification flow
-                      const initiateDualVerification = async () => {
-                          showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হচ্ছে...", "info");
-                          try {
-                              const res = await fetch("/api/send-verification-email", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ email: email })
-                              });
-                              
-                              let data;
-                              try {
-                                  data = await res.json();
-                              } catch (e) {
-                                  throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না (Backend is not running).");
-                              }
-                              if (!res.ok) {
-
-                                  throw new Error(data.error || "ভেরিফিকেশন ইমেইল পাঠাতে ব্যর্থ হয়েছে।");
-                              }
-                              
-                              showToast("ইমেইল ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
-                              
-                              // Open the dual verification modal
-                              showDualVerificationModal(
-                                  email,
-                                  phone,
-                                  async (code) => {
-                                      // onEmailVerify Callback
-                                      try {
-                                          const verifyRes = await fetch("/api/verify-email-code", {
-                                              method: "POST",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ email: email, code: code })
-                                          });
-                                          
-                                          let verifyData;
-                                          try {
-                                              verifyData = await verifyRes.json();
-                                          } catch(e) {
-                                              throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না (Backend is not running).");
-                                          }
-                                          if (!verifyRes.ok) {
-
-                                              showToast(verifyData.error || "ইমেইল ভেরিফিকেশন ব্যর্থ হয়েছে!", "error");
-                                              return false;
-                                          }
-                                          return true;
-                                      } catch(verifyErr) {
-                                          showToast(verifyErr.message || "ইমেইল ভেরিফিকেশন সম্পন্ন করতে সমস্যা হয়েছে।", "error");
-                                          return false;
-                                      }
-                                  },
-                                  async (code) => {
-                                      // onPhoneVerify Callback
-                                      try {
-                                          const verifyRes = await fetch("/api/verify-phone-otp", {
-                                              method: "POST",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ phone: phone, code: code })
-                                          });
-                                          
-                                          let verifyData;
-                                          try {
-                                              verifyData = await verifyRes.json();
-                                          } catch(e) {
-                                              throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না (Backend is not running).");
-                                          }
-                                          if (!verifyRes.ok) {
-
-                                              showToast(verifyData.error || "মোবাইল ওটিপি ভেরিফিকেশন ব্যর্থ হয়েছে!", "error");
-                                              return false;
-                                          }
-                                          
-                                          // Both verified! complete registration
-                                          completeRegistration(newProfile);
-                                          return true;
-                                      } catch(verifyErr) {
-                                          showToast(verifyErr.message || "মোবাইল ওটিপি ভেরিফিকেশন সম্পন্ন করতে সমস্যা হয়েছে।", "error");
-                                          return false;
-                                      }
-                                  },
-                                  async () => {
-                                      // onEmailResend Callback
-                                      const resendRes = await fetch("/api/send-verification-email", {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ email: email })
-                                      });
-                                      return await resendRes.json();
-                                  },
-                                  async () => {
-                                      // onPhoneResend Callback
-                                      showToast("মোবাইল ওটিপি পাঠানো হচ্ছে...", "info");
-                                      const resendRes = await fetch("/api/send-phone-otp", {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ phone: phone })
-                                      });
-                                      
-                                      let phoneData;
-                                      try {
-                                          phoneData = await resendRes.json();
-                                      } catch(e) {
-                                          throw new Error("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না (Backend is not running).");
-                                      }
-                                      if (!resendRes.ok) {
-
-                                          showToast(phoneData.error || "মোবাইল ওটিপি পাঠাতে ব্যর্থ হয়েছে।", "error");
-                                      } else {
-                                          showToast(phoneData.message || "মোবাইল ওটিপি পাঠানো হয়েছে!", "success");
-                                      }
-                                      return phoneData;
-                                  }
-                              );
-                          } catch(err) {
-                              showToast(err.message || "ভেরিফিকেশন ইমেইল পাঠাতে কোনো সমস্যা হয়েছে।", "error");
-                          }
-                      };
-
-                      // Initiate the dual verification process
-                      initiateDualVerification();
+                      // Skip verification and complete registration immediately
+                      completeRegistration(newProfile);
 
                   } catch (error) {
                       console.error("Registration Error:", error);
