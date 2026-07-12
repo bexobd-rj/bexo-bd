@@ -287,12 +287,7 @@
                           // Prevent critical race conditions where a client overrides the entire cloud database with stale local array.
                           // However, we MUST allow admins to sync all users to Firestore to save newly registered/edited users.
                           if (isUserAdmin()) {
-                              appUsers.forEach(u => {
-                                  if (u && u.profileId) {
-                                      window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u))
-                                          .catch(err => console.error("Firebase sync user error:", err));
-                                  }
-                              });
+                              console.warn("Skipping full array sync for users to prevent quota exhaustion.");
                           } else if (userProfile && userProfile.profileId) {
                               const target = appUsers.find(u => String(u.profileId) === String(userProfile.profileId));
                               if (target && target.profileId) {
@@ -734,12 +729,7 @@
                                    if (u && u.profileId && u.phone && u.password) {
                                        const existsInFirestore = firebaseUsers.some(f => f.profileId === u.profileId);
                                        if (!existsInFirestore) {
-                                           console.log(`[Manual Direct Sync] Uploading missing local user to Firestore: ${u.profileId}`);
-                                           window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u))
-                                               .catch(err => console.error("Direct sync upload user error:", err));
-                                        }
-                                   }
-                               });
+                                           // Manual direct sync - DISABLED to save quota
 
                                const tbody = document.getElementById('adminUserTableBody');
                                if (tbody) {
@@ -748,11 +738,7 @@
                                showToast("ডাটাবেজ থেকে সকল ইউজার সফলভাবে লোড ও সিনক্রোনাইজ করা হয়েছে!", "success");
                            } else {
                                if (appUsers.length > 0) {
-                                   // Seed empty Firebase with existing local users
-                                   appUsers.forEach(u => {
-                                       window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u))
-                                           .catch(err => console.error("Auto-seed user error:", err));
-                                   });
+                                   // Seed empty Firebase - DISABLED to save quota
                                    showToast("ডিভাইসের ইউজারসমূহ সফলভাবে অনলাইন ডাটাবেজে সিঙ্ক করা হয়েছে!", "success");
                                } else {
                                    showToast("ডাটাবেজে কোন ইউজার তথ্য পাওয়া যায়নি।", "info");
@@ -985,12 +971,7 @@
                                   .catch(err => console.error("Firebase sync specific order error:", err));
                           }
                       } else {
-                          appOrders.forEach(o => {
-                              if (o && o.id) {
-                                  window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
-                                      .catch(err => console.error("Firebase sync order error:", err));
-                              }
-                          });
+                          console.warn("Skipping full array sync for orders to prevent quota exhaustion.");
                       }
                   }
               }
@@ -1091,12 +1072,7 @@
               function saveCategories() {
                   localStorage.setItem('bexo_categories', JSON.stringify(appCategories));
                   if (window.db) {
-                      appCategories.forEach(c => {
-                          if (c && c.id) {
-                              window.db.collection('bexo_categories').doc(String(c.id)).set(sanitizeForFirestore(c))
-                                  .catch(err => console.error("Firebase sync category error:", err));
-                          }
-                      });
+                      console.warn("Skipping full array sync for categories to prevent quota exhaustion.");
                   }
               }
 
@@ -1107,12 +1083,7 @@
                   localStorage.setItem('bexo_transactions', JSON.stringify(appTransactions));
                   updateHeaderBalance();
                   if (window.db) {
-                      appTransactions.forEach(t => {
-                          if (t && t.id) {
-                              window.db.collection('bexo_transactions').doc(String(t.id)).set(sanitizeForFirestore(t))
-                                  .catch(err => console.error("Firebase sync transaction error:", err));
-                          }
-                      });
+                      console.warn("Skipping full array sync for transactions to prevent quota exhaustion.");
                   }
               }
 
@@ -1676,11 +1647,7 @@
                               updateAdminStats();
                           }
                       } else if (appPosts.length > 0) {
-                          // Seed empty Firebase with existing local products
-                          appPosts.forEach(p => {
-                              window.db.collection('bexo_posts').doc(String(p.id)).set(sanitizeForFirestore(p))
-                                  .catch(err => console.error("Auto-seed product error:", err));
-                          });
+                          // Seed empty Firebase - DISABLED to save quota
                       }
                   }, err => {
                       console.error("Firebase posts snapshot subscription error:", err);
@@ -1762,18 +1729,9 @@
                               if (u && u.profileId && u.phone && u.password) {
                                   const existsInFirestore = firebaseUsers.some(f => f.profileId === u.profileId);
                                   if (!existsInFirestore) {
-                                      console.log(`[Firebase Sync] Uploading missing local user: ${u.profileId} (${u.fullName})`);
-                                      window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u))
-                                          .catch(err => console.error("Firebase auto sync-back user error:", err));
-                                  }
-                              }
-                          });
+                                      // Uploading missing local - DISABLED to save quota
                       } else if (appUsers.length > 0) {
-                          // Seed empty Firebase with existing local users
-                          appUsers.forEach(u => {
-                              window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u))
-                                  .catch(err => console.error("Auto-seed user error:", err));
-                          });
+                          // Seed empty Firebase - DISABLED to save quota
                       }
                   }, err => {
                       console.error("Firebase users snapshot subscription error:", err);
@@ -1794,12 +1752,7 @@
                           appOrders = firebaseOrders;
                           localStorage.setItem('bexo_orders', JSON.stringify(appOrders));
                           triggerViewRendering('orders');
-                      } else if (appOrders.length > 0) {
-                          appOrders.forEach(o => {
-                              window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
-                                  .catch(err => console.error("Auto-seed orders error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase orders subscription error:", err);
                       logFirebaseError("bexo_orders onSnapshot", err);
@@ -1839,12 +1792,7 @@
                           appPremiumRequests = list;
                           localStorage.setItem('bexo_premium_requests', JSON.stringify(appPremiumRequests));
                           triggerViewRendering('premium');
-                      } else if (appPremiumRequests.length > 0) {
-                          appPremiumRequests.forEach(r => {
-                              window.db.collection('bexo_premium_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
-                                  .catch(err => console.error("Auto-seed premium error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase premium subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_premium_requests");
@@ -1862,12 +1810,7 @@
                           appRechargeRequests = list;
                           localStorage.setItem('bexo_recharge_requests', JSON.stringify(appRechargeRequests));
                           triggerViewRendering('recharges');
-                      } else if (appRechargeRequests.length > 0) {
-                          appRechargeRequests.forEach(r => {
-                              window.db.collection('bexo_recharge_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
-                                  .catch(err => console.error("Auto-seed recharge error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase recharge subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_recharge_requests");
@@ -1885,12 +1828,7 @@
                           appBalanceRequests = list;
                           localStorage.setItem('bexo_balance_requests', JSON.stringify(appBalanceRequests));
                           triggerViewRendering('balances');
-                      } else if (appBalanceRequests.length > 0) {
-                          appBalanceRequests.forEach(r => {
-                              window.db.collection('bexo_balance_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
-                                  .catch(err => console.error("Auto-seed balance error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase balance subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_balance_requests");
@@ -1908,12 +1846,7 @@
                           appBillRequests = list;
                           localStorage.setItem('bexo_bill_requests', JSON.stringify(appBillRequests));
                           triggerViewRendering('bills');
-                      } else if (appBillRequests.length > 0) {
-                          appBillRequests.forEach(r => {
-                              window.db.collection('bexo_bill_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
-                                  .catch(err => console.error("Auto-seed bills error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase bill subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_bill_requests");
@@ -1949,12 +1882,7 @@
                           appCategories = list;
                           localStorage.setItem('bexo_categories', JSON.stringify(appCategories));
                           triggerViewRendering('categories');
-                      } else if (appCategories.length > 0) {
-                          appCategories.forEach(c => {
-                              window.db.collection('bexo_categories').doc(String(c.id)).set(sanitizeForFirestore(c))
-                                  .catch(err => console.error("Auto-seed categories error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase categories subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_categories");
@@ -1972,12 +1900,7 @@
                           appTransactions = list;
                           localStorage.setItem('bexo_transactions', JSON.stringify(appTransactions));
                           triggerViewRendering('transactions');
-                      } else if (appTransactions.length > 0) {
-                          appTransactions.forEach(t => {
-                              window.db.collection('bexo_transactions').doc(String(t.id)).set(sanitizeForFirestore(t))
-                                  .catch(err => console.error("Firebase sync transaction error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase transactions subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_transactions");
@@ -1995,12 +1918,7 @@
                           appAccounts = list;
                           localStorage.setItem('bexo_accounts', JSON.stringify(appAccounts));
                           triggerViewRendering('accounts');
-                      } else if (appAccounts.length > 0) {
-                          appAccounts.forEach(a => {
-                              window.db.collection('bexo_accounts').doc(String(a.id)).set(sanitizeForFirestore(a))
-                                  .catch(err => console.error("Firebase sync accounts error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase accounts subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_accounts");
@@ -2035,12 +1953,7 @@
                           appWithdrawals = list;
                           localStorage.setItem('bexo_withdrawals', JSON.stringify(appWithdrawals));
                           triggerViewRendering('withdrawals');
-                      } else if (appWithdrawals.length > 0) {
-                          appWithdrawals.forEach(w => {
-                              window.db.collection('bexo_withdrawals').doc(String(w.id)).set(sanitizeForFirestore(w))
-                                  .catch(err => console.error("Firebase sync withdrawal error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase withdrawals subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_withdrawals");
@@ -2058,12 +1971,7 @@
                           appSupportTickets = list;
                           localStorage.setItem('bexo_support_tickets', JSON.stringify(appSupportTickets));
                           triggerViewRendering('support');
-                      } else if (appSupportTickets.length > 0) {
-                          appSupportTickets.forEach(t => {
-                              window.db.collection('bexo_support_tickets').doc(String(t.id)).set(sanitizeForFirestore(t))
-                                  .catch(err => console.error("Firebase sync support tickets error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase support tick subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_support_tickets");
@@ -2081,12 +1989,7 @@
                           appManagerRecords = list;
                           localStorage.setItem('bexo_manager_records', JSON.stringify(appManagerRecords));
                           triggerViewRendering('manager');
-                      } else if (appManagerRecords.length > 0) {
-                          appManagerRecords.forEach(r => {
-                              window.db.collection('bexo_manager_records').doc(String(r.id)).set(sanitizeForFirestore(r))
-                                  .catch(err => console.error("Firebase sync manager record error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase manager records subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_manager_records");
@@ -2104,12 +2007,7 @@
                           appResellerPayouts = list;
                           localStorage.setItem('bexo_reseller_payouts', JSON.stringify(appResellerPayouts));
                           triggerViewRendering('manager');
-                      } else if (appResellerPayouts.length > 0) {
-                          appResellerPayouts.forEach(p => {
-                              window.db.collection('bexo_reseller_payouts').doc(String(p.id)).set(sanitizeForFirestore(p))
-                                  .catch(err => console.error("Firebase sync reseller payouts error:", err));
-                          });
-                      }
+                      } else { /* Auto-seed disabled to save quota */ }
                   }, err => {
                       console.error("Firebase reseller payouts subscription error:", err);
                       handleFirestoreError(err, OperationType.LIST, "bexo_reseller_payouts");
@@ -7051,7 +6949,10 @@
                   switchMenu('cart-list');
               }
 
-              function renderPostDetail(postId, mainImgIdx = 0) {
+              function renderPostDetail(postId, mainImgIdx = 0, skipHistory = false) {
+                  if (!skipHistory) {
+                      window.history.pushState({ action: 'renderPostDetail', postId: postId, imgIdx: mainImgIdx }, '', '#product-details');
+                  }
                    const p = appPosts.find(item => String(item.id) === String(postId));
                    if(!p) return;
 
@@ -8243,7 +8144,22 @@
                   }
               }
 
-              function switchMenu(menuKey) {
+              function switchMenu(menuKey, skipHistory = false) {
+                  // HISTORY API LOGIC
+                  if (!skipHistory) {
+                      const currentHash = window.location.hash.replace('#', '');
+                      if (currentHash !== menuKey) {
+                          if (currentHash === '') {
+                              // If first load, replace state to avoid immediate exit on back
+                              window.history.replaceState({ menuKey: 'dashboard' }, '', '#dashboard');
+                              if (menuKey !== 'dashboard') {
+                                  window.history.pushState({ menuKey: menuKey }, '', '#' + menuKey);
+                              }
+                          } else {
+                              window.history.pushState({ menuKey: menuKey }, '', '#' + menuKey);
+                          }
+                      }
+                  }
                   currentMenu = menuKey;
                   // UI visual feedback
                   const items = document.querySelectorAll('.sidebar-item');
@@ -9253,7 +9169,16 @@
               }
 
 
-              function renderProductList(selectedCategory = null, selectedSubCategory = null) {
+              function renderProductList(selectedCategory = null, selectedSubCategory = null, skipHistory = false) {
+                  // Only push history if it's NOT the root view (root view is handled by switchMenu)
+                  // Wait, actually, if it's called with arguments, it forwards to renderFilteredProductList.
+                  // So we should NOT push history here if selectedCategory is passed, because renderFilteredProductList will do it.
+                  if (!skipHistory && !selectedCategory) {
+                      // Only push if current hash is not #products
+                      if (window.location.hash !== '#products') {
+                          window.history.pushState({ action: 'renderProductList', cat: null, sub: null }, '', '#products');
+                      }
+                  }
                   if (!selectedCategory && !selectedSubCategory) {
                       window.productSearchQuery = '';
                       window.productPriceMin = '';
@@ -9342,7 +9267,10 @@
                   renderFilteredProductList(cat || null, subcat || null);
               };
 
-              function renderFilteredProductList(category, subCategory) {
+              function renderFilteredProductList(category, subCategory, skipHistory = false) {
+                  if (!skipHistory) {
+                      window.history.pushState({ action: 'renderFilteredProductList', cat: category, sub: subCategory }, '', '#products-filtered');
+                  }
                   const main = document.getElementById('mainContent');
 
                   // Filter products
@@ -18896,3 +18824,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(interval);
                 loadLandingProducts();
             }
+
+// Ensure History API works for Back Button
+window.addEventListener('popstate', function(event) {
+    if (event.state) {
+        if (event.state.action === 'renderProductList') {
+            renderProductList(event.state.cat, event.state.sub, true);
+        } else if (event.state.action === 'renderFilteredProductList') {
+            renderFilteredProductList(event.state.cat, event.state.sub, true);
+        } else if (event.state.action === 'renderPostDetail') {
+            renderPostDetail(event.state.postId, event.state.imgIdx, true);
+        } else if (event.state.menuKey) {
+            switchMenu(event.state.menuKey, true);
+        } else {
+            const hash = window.location.hash.replace('#', '');
+            if (hash) switchMenu(hash, true);
+            else switchMenu('dashboard', true);
+        }
+    } else {
+        const hash = window.location.hash.replace('#', '');
+        if (hash) {
+            switchMenu(hash, true);
+        } else {
+            switchMenu('dashboard', true);
+        }
+    }
+});
+
+// Initial hash load
+window.addEventListener('DOMContentLoaded', () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash && typeof switchMenu === 'function') {
+        setTimeout(() => switchMenu(hash, true), 500);
+    } else if (typeof switchMenu === 'function') {
+        window.history.replaceState({ menuKey: 'dashboard' }, '', '#dashboard');
+    }
+});
