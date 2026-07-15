@@ -1,57 +1,39 @@
 const fs = require('fs');
-let html = fs.readFileSync('index.html', 'utf8');
+let content = fs.readFileSync('index.html', 'utf8');
 
-const targetStr = "                              <div onclick=\"renderProductList('${cat.name}', '${sub.name}')\" class=\"bg-white rounded flex flex-col items-center p-1.5 shadow-sm cursor-pointer relative group border border-transparent\">\n" +
-"                                  <div class=\"absolute top-1 right-1.5 text-[10px] font-bold text-[#6a1b9a] z-10\">${toBengaliNumber(count)}</div>\n" +
-"                                  <div class=\"w-full aspect-square flex items-center justify-center p-2 mb-1\">\n" +
-"                                      <img src=\"${image}\" alt=\"${sub.name}\" class=\"w-full h-full object-contain mix-blend-multiply\">\n" +
-"                                  </div>\n" +
-"                                  <div class=\"text-center w-full pb-1\">\n" +
-"                                      <p class=\"text-[11px] sm:text-[12px] font-semibold text-[#6a1b9a] truncate\">${sub.name}</p>\n" +
-"                                  </div>\n" +
-"                              </div>\n" +
-"                          `;\n" +
-"                      }).join('');\n" +
-"\n" +
-"                      return `\n" +
-"                          <div class=\"space-y-4 animate-fade-in mt-6\">\n" +
-"                              <div class=\"py-2 px-4 text-center\">\n" +
-"                                  <h3 class=\"text-[16px] sm:text-[18px] font-bold text-[#d81b60] tracking-tight\">${cat.name} (${toBengaliNumber(totalInCat)})</h3>\n" +
-"                              </div>\n" +
-"                              <div class=\"grid grid-cols-3 min-[400px]:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 md:gap-3\">\n" +
-"                                  ${subsHtml}\n" +
-"                              </div>\n" +
-"                          </div>\n" +
-"                      `;";
+// Fix delete category not deleting from firebase
+content = content.replace(
+`                      appCategories = appCategories.filter(c => c.id != catId);
+                  }
+                  saveCategories();`,
+`                      appCategories = appCategories.filter(c => c.id != catId);
+                      if (window.db) {
+                          window.db.collection('bexo_categories').doc(String(catId)).delete().catch(err => console.error("Error deleting category:", err));
+                      }
+                  }
+                  saveCategories();`
+);
 
-const replacementStr = "                              <div onclick=\"renderProductList('${cat.name}', '${sub.name}')\" class=\"bg-white rounded flex flex-col items-center p-1 sm:p-2 shadow-sm cursor-pointer relative group border border-slate-100 hover:border-[#6a1b9a]/30 transition-all\">\n" +
-"                                  <div class=\"absolute top-1 right-1.5 text-[9px] sm:text-[10px] font-bold text-slate-400 z-10\">${toBengaliNumber(count)}</div>\n" +
-"                                  <div class=\"w-full aspect-square flex items-center justify-center p-1 sm:p-2 mb-1\">\n" +
-"                                      <img src=\"${image}\" alt=\"${sub.name}\" class=\"w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-300\">\n" +
-"                                  </div>\n" +
-"                                  <div class=\"text-center w-full pb-1 px-0.5\">\n" +
-"                                      <p class=\"text-[10px] sm:text-[12px] font-semibold text-[#6a1b9a] truncate\">${sub.name}</p>\n" +
-"                                  </div>\n" +
-"                              </div>\n" +
-"                          `;\n" +
-"                      }).join('');\n" +
-"\n" +
-"                      return `\n" +
-"                          <div class=\"animate-fade-in mt-4 mb-8\">\n" +
-"                              <div class=\"py-2.5 px-4 mb-3 text-center bg-[#fff8fa] border-y border-[#f8e0e6] shadow-[0_1px_2px_rgba(0,0,0,0.02)]\">\n" +
-"                                  <h3 class=\"text-[15px] sm:text-[17px] font-bold text-[#d81b60] tracking-tight\">${cat.name} (${toBengaliNumber(totalInCat)})</h3>\n" +
-"                              </div>\n" +
-"                              <div class=\"grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-3 px-1.5 sm:px-0\">\n" +
-"                                  ${subsHtml}\n" +
-"                              </div>\n" +
-"                          </div>\n" +
-"                      `;";
+// Fix grid size in admin category list
+content = content.replace(
+`                              <div class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 font-sans">
+                                  \${subsHtml}
+                                  <!-- Add Sub Button Tile -->
+                                  <div onclick="openAddSubCategoryModal('\${cat.id}')" class="bg-slate-50 border border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center p-3 cursor-pointer hover:bg-orange-50 hover:border-orange-200 group transition-all h-[130px] min-h-[130px]">`,
+`                              <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 font-sans">
+                                  \${subsHtml}
+                                  <!-- Add Sub Button Tile -->
+                                  <div onclick="openAddSubCategoryModal('\${cat.id}')" class="bg-slate-50 border border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center p-3 cursor-pointer hover:bg-orange-50 hover:border-orange-200 group transition-all h-[110px] min-h-[110px]">`
+);
 
-const regexStr = targetStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-if(html.match(new RegExp(regexStr))) {
-    html = html.replace(new RegExp(regexStr), replacementStr);
-    fs.writeFileSync('index.html', html);
-    console.log("Replaced!");
-} else {
-    console.log("Not found!");
-}
+// Fix image container size in the tile
+content = content.replace(
+`                                      <div class="w-20 h-20 flex items-center justify-center p-1.5">
+                                          <img src="\${image}" alt="\${sub.name}" class="max-w-full max-h-full object-contain transition-transform group-hover:scale-110 duration-500">
+                                      </div>`,
+`                                      <div class="w-16 h-16 flex items-center justify-center p-1">
+                                          <img src="\${image}" alt="\${sub.name}" class="max-w-full max-h-full object-contain transition-transform group-hover:scale-110 duration-500">
+                                      </div>`
+);
+
+fs.writeFileSync('index.html', content);
