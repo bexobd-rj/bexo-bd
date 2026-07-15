@@ -9335,14 +9335,14 @@
                                             <!-- Variants -->
                                             <div class="space-y-4">
                                                 ${(() => {
-                                                    const variants = p.variants || [];
-                                                    // Fallback to legacy size or default size
+                                                    const variants = p.variants ? JSON.parse(JSON.stringify(p.variants)) : [];
+                                                    // Fallback to legacy size or default size ONLY IF availableSizes exists
                                                     if (!variants.find(v => v.name === 'সাইজ' || v.name.toLowerCase() === 'size')) {
-                                                        const sizeOptions = p.availableSizes && p.availableSizes.length > 0 ? p.availableSizes : ['M', 'L', 'XL'];
-                                                        variants.push({ name: 'সাইজ', options: sizeOptions });
+                                                        if (p.availableSizes && p.availableSizes.length > 0) {
+                                                            variants.push({ name: 'সাইজ', options: p.availableSizes });
+                                                        }
                                                     }
-                                                    
-// Automatically add "কালার" option if specified in info but not in variants
+                                                    // Automatically add "কালার" option if specified in info but not in variants
                                                    if (p.color && p.color !== 'N/A' && !variants.find(v => v.name === 'কালার' || v.name.toLowerCase() === 'color')) {
                                                        variants.push({ name: 'কালার', options: [p.color] });
                                                    }
@@ -12961,8 +12961,12 @@
                   }
 
                   // Populate Variants
-                  if (p && p.variants && p.variants.length > 0) {
-                      p.variants.forEach(v => addAdminVariantGroup(v.name, v.isMandatory || false, v.options));
+                  if (p) {
+                      if (p.variants && p.variants.length > 0) {
+                          p.variants.forEach(v => addAdminVariantGroup(v.name, v.isMandatory || false, v.options));
+                      } else if (!p.variants && p.availableSizes && p.availableSizes.length > 0) {
+                          addAdminVariantGroup('Size', true, p.availableSizes);
+                      }
                   } else {
                       addAdminVariantGroup('Size', true, ['M', 'L', 'XL']);
                   }

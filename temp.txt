@@ -1,0 +1,14 @@
+                                                ${(() => {
+                                                    const variants = p.variants || [];
+                                                    // Fallback to legacy size or default size
+                                                    if (!variants.find(v => v.name === 'সাইজ' || v.name.toLowerCase() === 'size')) {
+                                                        const sizeOptions = p.availableSizes && p.availableSizes.length > 0 ? p.availableSizes : ['M', 'L', 'XL'];
+                                                        variants.push({ name: 'সাইজ', options: sizeOptions });
+                                                    }
+                                                    
+// Automatically add "কালার" option if specified in info but not in variants
+                                                   if (p.color && p.color !== 'N/A' && !variants.find(v => v.name === 'কালার' || v.name.toLowerCase() === 'color')) {
+                                                       variants.push({ name: 'কালার', options: [p.color] });
+                                                   }
+
+                                                   return variants.map(v => {
