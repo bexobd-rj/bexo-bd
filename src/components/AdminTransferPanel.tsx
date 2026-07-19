@@ -16,6 +16,7 @@ import {
   collection 
 } from 'firebase/firestore';
 import { Order, Transaction } from '../types';
+import { useBackButtonModal } from '../lib/utils';
 
 interface AdminTransferPanelProps {
   orders: Order[];
@@ -27,6 +28,8 @@ export function AdminTransferPanel({ orders }: AdminTransferPanelProps) {
   const [transferAmount, setTransferAmount] = useState<number>(0);
   const [transferNote, setTransferNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useBackButtonModal(!!selectedOrder, () => setSelectedOrder(null));
 
   // Filter: ONLY Delivered orders as requested (ডেলিভারি কনফার্মড)
   const deliveredOrders = orders.filter(o => o.status === 'Delivered');

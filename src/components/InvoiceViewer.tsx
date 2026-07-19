@@ -5,6 +5,7 @@ import {
   FileText, ShieldCheck, Receipt, Download, X, Send, Loader2, Heart
 } from 'lucide-react';
 import { Order, UserProfile } from '../types';
+import { useBackButtonModal } from '../lib/utils';
 import html2pdf from 'html2pdf.js';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -140,6 +141,8 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
   const [emailProgress, setEmailProgress] = useState(0);
   const [emailLogs, setEmailLogs] = useState<string[]>([]);
   const [isEmailSuccess, setIsEmailSuccess] = useState(false);
+
+  useBackButtonModal(isEmailModalOpen, () => setIsEmailModalOpen(false));
 
   const triggerEmailSimulation = () => {
     if (!targetEmail.trim()) return;

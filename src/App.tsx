@@ -56,7 +56,7 @@ import {
   updateDoc,
   runTransaction
 } from 'firebase/firestore';
-import { cn } from './lib/utils';
+import { cn, useBackButtonModal } from './lib/utils';
 import { Product, Order, UserProfile, Transaction } from './types';
 import { AdminUsersList } from './components/AdminUsersList';
 import { AdminTransferPanel } from './components/AdminTransferPanel';
@@ -203,7 +203,7 @@ export default function App() {
     
     // Add initial history entry if no hash exists so back button doesn't exit immediately
     if (!window.location.hash) {
-      window.location.replace('#dashboard');
+      window.location.hash = 'dashboard';
     }
     
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -215,6 +215,9 @@ export default function App() {
   const [cart, setCart] = useState<Product | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+
+  useBackButtonModal(isCheckoutOpen, () => setIsCheckoutOpen(false));
+  useBackButtonModal(isSidebarOpen, () => setIsSidebarOpen(false));
 
   // --- Auth & Profile ---
   useEffect(() => {
@@ -1298,6 +1301,8 @@ function CheckoutModal({ product, onClose, userId, profile, orders }: { product:
 function OrderList({ orders, profile, user }: { orders: Order[], profile: UserProfile | null, user: any }) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
+  useBackButtonModal(!!selectedOrder, () => setSelectedOrder(null));
+
   const stats = useMemo(() => {
     let totalBuyingCost = 0;
     let totalSellingRevenue = 0;
@@ -1566,6 +1571,8 @@ function ResellerOrderDetailsModal({ order, onClose, profile, user }: { order: O
 function AdminOrderList({ orders }: { orders: Order[] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  useBackButtonModal(!!selectedOrder, () => setSelectedOrder(null));
 
   const filtered = orders.filter(o => 
     o.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -2027,6 +2034,8 @@ function StatusBadge({ status }: { status: Order['status'] }) {
 
 function BalanceStatement({ transactions, profile }: { transactions: Transaction[], profile: UserProfile | null }) {
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
+  
+  useBackButtonModal(isWithdrawalOpen, () => setIsWithdrawalOpen(false));
 
   const totalIncome = transactions
     .filter(t => t.type === 'income' && t.status === 'completed')
@@ -2539,6 +2548,8 @@ function AdminProductList({ products }: { products: Product[] }) {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState('');
+
+  useBackButtonModal(isFormOpen, () => setIsFormOpen(false));
 
   // Form states
   const [formData, setFormData] = useState({
