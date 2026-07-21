@@ -454,10 +454,10 @@ export default function App() {
   if (isLoadingAuth) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
-        <div className="w-20 h-20 bg-primary/10 text-primary rounded-[2rem] flex items-center justify-center mb-6 animate-pulse">
+        <div className="w-20 h-20 bg-primary/10 text-primary rounded-[2rem] flex items-center justify-center mb-6 ">
           <Package size={40} />
         </div>
-        <h2 className="text-xl font-black text-text-main animate-pulse">Initializing Portal...</h2>
+        <h2 className="text-xl font-black text-text-main ">Initializing Portal...</h2>
       </div>
     );
   }
@@ -912,7 +912,7 @@ function ProductGrid({ products, onAdd }: { products: Product[], onAdd: (p: Prod
                 : "bg-surface text-text-muted hover:text-text-main hover:bg-[#FAF9F8] border border-transparent"
             )}
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500 " />
             🟢 Available (ইন স্টক)
           </button>
           

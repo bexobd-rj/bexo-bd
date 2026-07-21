@@ -1,24 +1,8 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-import { useEffect, useRef } from "react"
+const fs = require('fs');
+let code = fs.readFileSync('src/lib/utils.ts', 'utf8');
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-
-export function useBackButtonModal(isOpen: boolean, onClose: () => void) {
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    const stateId = Math.random().toString(36).substring(7);
-    window.history.pushState({ modalId: stateId }, '', window.location.hash);
-    
-    const handlePopState = (e: PopStateEvent) => {
+code = code.replace(/const handlePopState = \(e: PopStateEvent\) => \{\s*onCloseRef\.current\(\);\s*\};/g, 
+`const handlePopState = (e: PopStateEvent) => {
       // Only close if we are actually popping this specific modal's state.
       // Wait, if the user presses back, the current state will be the PREVIOUS state, not stateId.
       // So if the current state is NOT stateId, it means our state was popped!
@@ -33,16 +17,7 @@ export function useBackButtonModal(isOpen: boolean, onClose: () => void) {
       if (e.state?.modalId !== stateId) {
           onCloseRef.current();
       }
-    };
-    
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-      setTimeout(() => {
-        if (window.history.state?.modalId === stateId) {
-          window.history.back();
-        }
-      }, 0);
-    };
-  }, [isOpen]);
-}
+    };`);
+
+fs.writeFileSync('src/lib/utils.ts', code);
+console.log("Fixed utils.ts");
