@@ -2768,7 +2768,7 @@ function AdminProductList({ products }: { products: Product[] }) {
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map(p => {
-                const isOutOfStock = p.stockStatus === 'out_of_stock' || (p.stock !== undefined && p.stock <= 0);
+                const isOutOfStock = p.stockStatus === 'out_of_stock' || (p.stock !== undefined && p.stock <= 0) || (p as any).isStockOut === true || ((p as any).stockCount !== undefined && (p as any).stockCount <= 0);
                 return (
                   <tr key={p.id} className="hover:bg-background/20 transition-colors">
                     <td className="px-6 py-4">

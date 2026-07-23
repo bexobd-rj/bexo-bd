@@ -3458,6 +3458,20 @@
               ensureBexoPayFields();
 
               let appPosts = JSON.parse(localStorage.getItem('bexo_posts')) || [];
+appPosts.forEach(p => {
+    const s = (p.stockCount !== undefined && p.stockCount !== null) ? Number(p.stockCount) : ((p.stock !== undefined && p.stock !== null) ? Number(p.stock) : null);
+    if (s !== null && s > 0) {
+        p.isStockOut = false;
+        p.stockStatus = 'in_stock';
+        p.stockCount = s;
+        p.stock = s;
+    } else if (s !== null && s <= 0) {
+        p.isStockOut = true;
+        p.stockStatus = 'out_of_stock';
+        p.stockCount = 0;
+        p.stock = 0;
+    }
+});
               
               // ONE-TIME FIX for corrupted image arrays
               let _needsSave = false;
@@ -3474,7 +3488,61 @@
               let productCurrentPage = 1;
               const productsPerPage = 18;
 
-              function savePosts() {
+              
+window.isProductOutOfStock = function(p) {
+    if (!p) return true;
+    const numStock = (p.stockCount !== undefined && p.stockCount !== null) ? Number(p.stockCount) : ((p.stock !== undefined && p.stock !== null) ? Number(p.stock) : null);
+    if (numStock !== null && numStock > 0) {
+        p.isStockOut = false;
+        p.stockStatus = 'in_stock';
+        return false;
+    }
+    if (numStock !== null && numStock <= 0) {
+        p.isStockOut = true;
+        p.stockStatus = 'out_of_stock';
+        return true;
+    }
+    if (p.isStockOut === true || p.stockStatus === 'out_of_stock') return true;
+    return false;
+};
+
+window.deductProductStock = function(items) {
+    if (!items || !Array.isArray(items)) return;
+    let updated = false;
+    items.forEach(item => {
+        const pId = item.productId || item.id;
+        const qty = item.qty || 1;
+        const product = typeof appPosts !== 'undefined' ? appPosts.find(p => String(p.id) === String(pId) || (p.sku && item.sku && p.sku === item.sku) || p.title === item.title) : null;
+        if (product) {
+            const currentStock = (product.stockCount !== undefined && product.stockCount !== null) ? Number(product.stockCount) : ((product.stock !== undefined && product.stock !== null) ? Number(product.stock) : 100);
+            const newStock = Math.max(0, currentStock - qty);
+            product.stockCount = newStock;
+            product.stock = newStock;
+            if (newStock <= 0) {
+                product.isStockOut = true;
+                product.stockStatus = 'out_of_stock';
+            } else {
+                product.isStockOut = false;
+                product.stockStatus = 'in_stock';
+            }
+            updated = true;
+            if (window.db) {
+                window.db.collection('bexo_posts').doc(String(product.id)).set(sanitizeForFirestore(product))
+                    .catch(err => console.error("Firebase update stock error:", err));
+            }
+        }
+    });
+    if (updated && typeof savePosts === 'function') {
+        savePosts();
+        if (typeof renderAdminPostList === 'function' && document.getElementById('adminViewContainer')) {
+            renderAdminPostList();
+        }
+        if (typeof loadLandingProducts === 'function') loadLandingProducts();
+        if (typeof renderPosts === 'function') renderPosts();
+    }
+};
+
+function savePosts() {
                   localStorage.setItem('bexo_posts', JSON.stringify(appPosts));
               }
 
@@ -3802,6 +3870,17 @@
                               // Auto-correct in db silently
                               window.db.collection('bexo_posts').doc(String(doc.id)).update({ images: data.images }).catch(()=>{});
                           }
+                          // Normalize stock status for real-time consistency across all clients
+                          const numStock = (data.stockCount !== undefined && data.stockCount !== null) ? Number(data.stockCount) : ((data.stock !== undefined && data.stock !== null) ? Number(data.stock) : 0);
+                          data.stockCount = numStock;
+                          data.stock = numStock;
+                          if (numStock > 0) {
+                              data.isStockOut = false;
+                              data.stockStatus = 'in_stock';
+                          } else {
+                              data.isStockOut = true;
+                              data.stockStatus = 'out_of_stock';
+                          }
                           firebasePosts.push(data);
                       });
                       firebasePosts.sort((a, b) => Number(b.id) - Number(a.id));
@@ -3810,6 +3889,9 @@
                           appPosts = firebasePosts;
                           localStorage.setItem('bexo_posts', JSON.stringify(appPosts));
                           triggerViewRendering('posts');
+                          if (typeof renderPosts === 'function') {
+                              renderPosts();
+                          }
                           if (typeof loadLandingProducts === 'function') {
                               loadLandingProducts();
                           }
@@ -4260,15 +4342,15 @@
               function triggerViewRendering(type) {
                   if (typeof currentMenu === 'string') {
                       if (type === 'posts') {
-                          if (currentMenu === 'products') {
+                          if (typeof renderPosts === 'function') renderPosts();
+                          if (typeof loadLandingProducts === 'function') loadLandingProducts();
+                          if (currentMenu === 'products' && typeof renderProductList === 'function') {
                               renderProductList();
-                          } else if (currentMenu === 'dashboard') {
+                          } else if (currentMenu === 'dashboard' && typeof renderHome === 'function') {
                               renderHome();
-                          } else if (currentMenu === 'new-post') {
-                              renderNewPost();
                           } else if (currentMenu === 'admin') {
                               const subView = localStorage.getItem('bexo_admin_subview') || 'dashboard';
-                              if (subView === 'all-products' && typeof renderAdminPostList === 'function') {
+                              if ((subView === 'all-products' || subView === 'stock-out') && typeof renderAdminPostList === 'function') {
                                   renderAdminPostList();
                               }
                           }
@@ -10108,6 +10190,7 @@
 
                   // Sync to Global appOrders for Admin
                   appOrders.unshift(order);
+                  if (typeof window.deductProductStock === 'function') window.deductProductStock(order.items);
                   saveOrders();
 
                   userProfile.cart = [];
@@ -11582,7 +11665,7 @@
                   const filtered = appPosts.filter(p => {
                       const isPublished = p.isPublished !== false;
                       if (!isPublished) return false;
-                      if (p.isStockOut === true) return false;
+                      if (window.isProductOutOfStock(p)) return false;
 
                       if (category && subCategory && (p.category !== category || p.subCategory !== subCategory)) return false;
                       else if (category && !subCategory && p.category !== category) return false;
@@ -12769,7 +12852,7 @@
                                                           <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">স্টক স্ট্যাটাস</p>
                                                       </div>
                                                       <label class="relative inline-flex items-center cursor-pointer">
-                                                          <input type="checkbox" id="apStockOut" class="sr-only peer" ${p && p.isStockOut ? 'checked' : ''}>
+                                                          <input type="checkbox" id="apStockOut" onchange="if(this.checked){ document.getElementById('apStockCount').value = 0; document.getElementById('stockDisplayCounter').innerText = 0; document.getElementById('stockStatusText').innerText = 'স্টক নেই'; } else { const cur = parseInt(document.getElementById('apStockCount').value) || 0; const n = cur > 0 ? cur : 10; document.getElementById('apStockCount').value = n; document.getElementById('stockDisplayCounter').innerText = n; document.getElementById('stockStatusText').innerText = 'স্টক আছে'; }" class="sr-only peer" ${p && window.isProductOutOfStock(p) ? 'checked' : ''}>
                                                           <div class="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-600"></div>
                                                       </label>
                                                   </div>
@@ -12880,7 +12963,7 @@
                                                       <div class="mt-4 pt-4 border-t border-white/20">
                                                           <div class="flex items-center justify-between text-[10px] font-black uppercase tracking-widest opacity-60">
                                                               <span>অবস্থা (Status)</span>
-                                                              <span id="stockStatusText">${p && p.stockCount > 0 ? 'স্টক আছে' : 'স্টক নেই'}</span>
+                                                              <span id="stockStatusText">${p && !window.isProductOutOfStock(p) ? 'স্টক আছে' : 'স্টক নেই'}</span>
                                                           </div>
                                                       </div>
                                                   </div>
@@ -12904,7 +12987,7 @@
                                                       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                                                           <div class="space-y-1">
                                                               <label class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">মজুদ পরিমাণ (Stock)</label>
-                                                              <input type="number" id="apStockCount" value="${p ? p.stockCount : 0}" min="0" oninput="document.getElementById('stockDisplayCounter').innerText = this.value || 0; document.getElementById('stockStatusText').innerText = (this.value > 0 ? 'স্টক আছে' : 'স্টক নেই');" class="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm">
+                                                              <input type="number" id="apStockCount" value="${p ? (p.stockCount !== undefined ? p.stockCount : (p.stock !== undefined ? p.stock : 0)) : 0}" min="0" oninput="const v = parseInt(this.value) || 0; document.getElementById('stockDisplayCounter').innerText = v; document.getElementById('stockStatusText').innerText = (v > 0 ? 'স্টক আছে' : 'স্টক নেই'); const chk = document.getElementById('apStockOut'); if (chk) chk.checked = (v <= 0);" class="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm">
                                                           </div>
                                                           <div class="space-y-1">
                                                               <label class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">ইউনিট টাইপ</label>
@@ -15639,7 +15722,8 @@
                   const sku = document.getElementById('apSku').value.trim() || `SKU-${Date.now().toString().slice(-6)}`;
                   const details = document.getElementById('apDetails').value.trim();
                   const imagesText = document.getElementById('apImages').value.trim();
-                  const isStockOut = document.getElementById('apStockOut').checked;
+                  const apStockOutCheck = document.getElementById('apStockOut') ? document.getElementById('apStockOut').checked : false;
+                  const isStockOut = stockCount <= 0;
                   const autoPost = document.getElementById('apAutoPost').checked;
                   const rating = parseInt(document.getElementById('apRating') ? document.getElementById('apRating').value : 5);
 
@@ -15703,6 +15787,8 @@
                               costPrice: costPrice,
                               maxSellingPrice: suggestedMaxPrice,
                               stockCount: stockCount,
+                              stock: stockCount,
+                              stockStatus: isStockOut ? 'out_of_stock' : 'in_stock',
                               unitType: unitType,
                               variants: variants,
                               availableSizes: variants.find(v => v.name.toLowerCase() === 'size')?.options || [],
@@ -15732,6 +15818,8 @@
                           costPrice: costPrice,
                           maxSellingPrice: suggestedMaxPrice,
                           stockCount: stockCount,
+                          stock: stockCount,
+                          stockStatus: isStockOut ? 'out_of_stock' : 'in_stock',
                           unitType: unitType,
                           variants: variants,
                           availableSizes: variants.find(v => v.name.toLowerCase() === 'size')?.options || [],
@@ -15804,7 +15892,18 @@
               function toggleStockStatus(id) {
                   const p = appPosts.find(item => String(item.id) === String(id));
                   if(p) {
-                      p.isStockOut = !p.isStockOut;
+                      const isCurrentlyOut = window.isProductOutOfStock(p);
+                      if (isCurrentlyOut) {
+                          p.isStockOut = false;
+                          p.stockStatus = 'in_stock';
+                          p.stockCount = (p.stockCount && p.stockCount > 0) ? p.stockCount : 10;
+                          p.stock = p.stockCount;
+                      } else {
+                          p.isStockOut = true;
+                          p.stockStatus = 'out_of_stock';
+                          p.stockCount = 0;
+                          p.stock = 0;
+                      }
                       savePosts();
                       if (window.db) {
                           window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForFirestore(p))
@@ -15990,8 +16089,8 @@
                                                   </td>
                                                   <td class="px-4 sm:px-8 py-6">
                                                       <div class="flex flex-col gap-2 font-sans">
-                                                          <button onclick="toggleStockStatus(${p.id})" class="px-4 py-1.5 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all ${!p.isStockOut ? 'bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600' : 'bg-rose-50 text-rose-600 hover:bg-emerald-50 hover:text-emerald-600'}">
-                                                              ${!p.isStockOut ? 'In Stock' : 'Stock Out'}
+                                                          <button onclick="toggleStockStatus(${p.id})" class="px-4 py-1.5 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all ${!window.isProductOutOfStock(p) ? 'bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600' : 'bg-rose-50 text-rose-600 hover:bg-emerald-50 hover:text-emerald-600'}">
+                                                              ${!window.isProductOutOfStock(p) ? 'In Stock' : 'Stock Out'}
                                                           </button>
                                                           <button onclick="togglePublishStatus(${p.id})" class="px-4 py-1.5 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all ${p.isPublished !== false ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}">
                                                               <i class="fas fa-rss mr-1"></i> ${p.isPublished !== false ? 'Feed On' : 'Feed Off'}
@@ -15999,9 +16098,12 @@
                                                       </div>
                                                   </td>
                                                   <td class="px-4 sm:px-8 py-6">
-                                                      <div onclick="changePrice(${p.id})" class="cursor-pointer group/price flex items-center gap-2 font-sans">
+                                                      <div onclick="changePrice(${p.id})" class="cursor-pointer group/price flex items-center gap-2 font-sans mb-1">
                                                           <p class="text-base font-black text-slate-900 tracking-tighter">৳${p.price}</p>
                                                           <i class="fas fa-edit text-slate-200 group-hover/price:text-orange-400 text-[10px] transition-all"></i>
+                                                      </div>
+                                                      <div onclick="changeStock(${p.id})" class="cursor-pointer group/stock flex items-center gap-1.5 font-sans">
+                                                          <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md group-hover/stock:bg-orange-100 group-hover/stock:text-orange-600 transition-all">স্টক: ${p.stockCount !== undefined ? p.stockCount : (p.stock !== undefined ? p.stock : 0)} Pcs <i class="fas fa-edit text-[9px] ml-1"></i></span>
                                                       </div>
                                                   </td>
                                                   <td class="px-4 sm:px-8 py-6 text-right font-sans">
@@ -16082,7 +16184,38 @@
               }
 
 
-              function changePrice(id) {
+              
+function changeStock(id) {
+    const p = appPosts.find(item => String(item.id) === String(id));
+    if(!p) return;
+    const currentStock = p.stockCount !== undefined ? p.stockCount : (p.stock !== undefined ? p.stock : 0);
+    const newStockStr = prompt(`নতুন স্টক পরিমাণ লিখুন (${p.title}):`, currentStock);
+    if(newStockStr !== null && !isNaN(newStockStr)) {
+        const newStock = Math.max(0, parseInt(newStockStr));
+        p.stockCount = newStock;
+        p.stock = newStock;
+        if (newStock > 0) {
+            p.isStockOut = false;
+            p.stockStatus = 'in_stock';
+        } else {
+            p.isStockOut = true;
+            p.stockStatus = 'out_of_stock';
+        }
+        savePosts();
+        if (window.db) {
+            window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForFirestore(p))
+                .catch(err => console.error("Firebase update stock error:", err));
+        }
+        renderAdminPostList();
+        if (typeof loadLandingProducts === 'function') loadLandingProducts();
+        if (typeof renderPosts === 'function') renderPosts();
+        if(typeof showSuccessOverlay === 'function') {
+            showSuccessOverlay("স্টক আপডেট হয়েছে!", `নতুন স্টক: ${p.stockCount} Pcs`, "fas fa-boxes", "text-emerald-500", "bg-emerald-50");
+        }
+    }
+}
+
+function changePrice(id) {
                   const p = appPosts.find(item => String(item.id) === String(id));
                   if(!p) return;
                   const newPrice = prompt(`নতুন মূল্য নির্ধারণ করুন (${p.title}):`, p.price);
@@ -16650,6 +16783,7 @@
                   };
 
                   appOrders.unshift(newOrder);
+                  if (typeof window.deductProductStock === 'function') window.deductProductStock(newOrder.items);
                   saveOrders();
 
                   // Show Success Screen
@@ -18594,7 +18728,7 @@ function updateUserTicketStatus(id, newStatus) {
 
                       if (type === 'name') {
                           filtered = appPosts.filter(p => {
-                              if (p.isPublished === false || p.isStockOut === true) return false;
+                              if (p.isPublished === false || window.isProductOutOfStock(p)) return false;
                               return searchKeywords.every(keyword =>
                                   p.title.toLowerCase().includes(keyword) ||
                                   (p.desc && p.desc.toLowerCase().includes(keyword)) ||
@@ -18603,7 +18737,7 @@ function updateUserTicketStatus(id, newStatus) {
                               );
                           });
                       } else if (type === 'sku') {
-                          filtered = appPosts.filter(p => p.sku && p.sku.toLowerCase().includes(inputVal) && p.isPublished !== false && p.isStockOut !== true);
+                          filtered = appPosts.filter(p => p.sku && p.sku.toLowerCase().includes(inputVal) && p.isPublished !== false && !window.isProductOutOfStock(p));
                       }
 
                       filtered.sort((a, b) => Number(b.id) - Number(a.id));
