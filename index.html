@@ -14377,14 +14377,23 @@ function savePosts() {
                   showToast("Testing connection...", "info");
                   
                   try {
-                      // Attempt a connection to the provided endpoint (or base url if empty)
-                      const req = prepareApiRequestOptions(api.baseUrl, '/products');
-                      const response = await fetch(req.url, req.options);
+                      const response = await fetch('/api/test-connection', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                              baseUrl: api.baseUrl,
+                              authType: api.authType,
+                              apiKey: api.apiKey,
+                              secretKey: api.secretKey
+                          })
+                      });
                       
-                      if (response.ok) {
+                      const data = await response.json();
+                      
+                      if (response.ok && data.success) {
                           appSettings.apiIntegration.status = 'Connected';
                           saveAppSettings();
-                          showToast("Connection Successful!", "success");
+                          showToast(data.message || "Connection Successful!", "success");
                           
                           const badge = document.getElementById('apiStatusBadge');
                           if (badge) {
@@ -14397,20 +14406,13 @@ function savePosts() {
                               fetchBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                           }
                       } else {
-                          let errText = await response.text();
-                          try {
-                              const errJson = JSON.parse(errText);
-                              errText = errJson.message || errJson.error || JSON.stringify(errJson);
-                          } catch(e) {}
-                          
-                          throw new Error(`Status ${response.status}: ${errText}`);
+                          throw new Error(data.error || `Status ${response.status}`);
                       }
                   } catch (err) {
                       console.error("API Test Error:", err);
                       appSettings.apiIntegration.status = 'Failed';
                       saveAppSettings();
                       showToast("Connection Failed: " + err.message, "error");
-                      alert("API Error details:\n" + err.message);
                       
                       const badge = document.getElementById('apiStatusBadge');
                       if (badge) {
@@ -14449,67 +14451,31 @@ function savePosts() {
                       list.innerHTML = `
                           <div class="p-12 text-center flex flex-col items-center justify-center">
                               <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-4"></div>
-                              <p class="text-slate-400 font-bold text-sm">Contacting API and fetching products...</p>
+                              <p class="text-slate-400 font-bold text-sm">Contacting API via backend proxy and fetching products...</p>
                           </div>
                       `;
                   }
                   
                   try {
-                      const req = prepareApiRequestOptions(api.baseUrl, endpoint);
-                      const response = await fetch(req.url, req.options);
-                      
-                      if (!response.ok) {
-                          throw new Error(`HTTP ${response.status}`);
-                      }
+                      const response = await fetch('/api/import-products', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                              baseUrl: api.baseUrl,
+                              endpoint: endpoint,
+                              authType: api.authType,
+                              apiKey: api.apiKey,
+                              secretKey: api.secretKey
+                          })
+                      });
                       
                       const data = await response.json();
                       
-                      // Handle various API response structures
-                      let productsArray = [];
-                      if (Array.isArray(data)) {
-                          productsArray = data;
-                      } else if (data && data.data && Array.isArray(data.data)) {
-                          productsArray = data.data;
-                      } else if (data && data.products && Array.isArray(data.products)) {
-                          productsArray = data.products;
-                      } else if (data && data.items && Array.isArray(data.items)) {
-                          productsArray = data.items;
-                      } else {
-                          throw new Error("Could not find an array of products in the API response.");
+                      if (!response.ok || !data.success) {
+                          throw new Error(data.error || `HTTP ${response.status}`);
                       }
                       
-                      // Map to our structure
-                      window.fetchedApiProducts = productsArray.map(item => {
-                          // Try to extract common fields
-                          const id = item.id || item._id || item.productId || Math.random().toString(36).substr(2, 9);
-                          const name = item.name || item.title || item.productName || 'Unknown Product';
-                          const sku = item.sku || item.productCode || item.code || '';
-                          const category = item.category || item.categoryName || 'Uncategorized';
-                          const stock = item.stock || item.quantity || item.inventory || 0;
-                          
-                          // Image
-                          let img = '';
-                          if (item.image && typeof item.image === 'string') img = item.image;
-                          else if (item.imageUrl && typeof item.imageUrl === 'string') img = item.imageUrl;
-                          else if (item.images && Array.isArray(item.images) && item.images.length > 0) img = item.images[0];
-                          
-                          // Price
-                          let price = 0;
-                          if (item.price !== undefined) price = parseFloat(item.price);
-                          else if (item.regularPrice !== undefined) price = parseFloat(item.regularPrice);
-                          else if (item.salePrice !== undefined) price = parseFloat(item.salePrice);
-                          
-                          return {
-                              originalId: id,
-                              name,
-                              sku,
-                              category,
-                              stock,
-                              img,
-                              sourcePrice: price,
-                              rawData: item
-                          };
-                      });
+                      window.fetchedApiProducts = data.products || [];
                       
                       renderFetchedProducts(window.fetchedApiProducts);
                       showToast(`Found ${window.fetchedApiProducts.length} products!`, "success");
@@ -14529,7 +14495,7 @@ function savePosts() {
                       }
                   }
               };
-              
+
               function renderFetchedProducts(products) {
                   const list = document.getElementById('apiProductPreviewList');
                   if (!list) return;
