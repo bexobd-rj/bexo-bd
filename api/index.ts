@@ -349,4 +349,299 @@ app.use(express.json());
 
   
 
+
+  // ==========================================
+  // BEXO BD SUPPLIER API INTEGRATION ENDPOINTS
+  // ==========================================
+
+  // 1. Test Connection to Supplier API
+  app.post("/api/supplier/test-connection", async (req, res) => {
+    const startTime = Date.now();
+    try {
+      const { baseUrl, apiKey, secretKey } = req.body;
+      if (!baseUrl) {
+        return res.status(400).json({
+          success: false,
+          httpStatus: "400 Bad Request",
+          statusCode: 400,
+          authStatus: "Base URL Missing",
+          productsCount: 0,
+          responseTimeMs: Date.now() - startTime,
+          error: "Base URL is required"
+        });
+      }
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(baseUrl);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          httpStatus: "400 Bad Request",
+          statusCode: 400,
+          authStatus: "Invalid URL Format",
+          productsCount: 0,
+          responseTimeMs: Date.now() - startTime,
+          error: "Invalid Base URL format. Must start with http:// or https://"
+        });
+      }
+
+      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+        return res.status(400).json({
+          success: false,
+          httpStatus: "400 Bad Request",
+          statusCode: 400,
+          authStatus: "Invalid Protocol",
+          productsCount: 0,
+          responseTimeMs: Date.now() - startTime,
+          error: "Only http or https URLs are permitted"
+        });
+      }
+
+      const hostname = parsedUrl.hostname.toLowerCase();
+      const isInternal = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "169.254.169.254" || hostname.startsWith("10.") || hostname.startsWith("192.168.");
+      if (isInternal) {
+        return res.status(403).json({
+          success: false,
+          httpStatus: "403 Forbidden",
+          statusCode: 403,
+          authStatus: "Access Forbidden",
+          productsCount: 0,
+          responseTimeMs: Date.now() - startTime,
+          error: "Internal or private URLs are forbidden for security"
+        });
+      }
+
+      const headers: Record<string, string> = {
+        "User-Agent": "BexoBD-SupplierIntegration/1.0",
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      };
+
+      if (apiKey) {
+        headers["X-API-Key"] = apiKey;
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      }
+      if (secretKey) {
+        headers["X-Secret-Key"] = secretKey;
+      }
+
+      let testUrl = baseUrl.trim();
+      if (!testUrl.includes('/products') && !testUrl.includes('/items') && !testUrl.includes('/api')) {
+        testUrl = testUrl.replace(/\/$/, '') + '/products';
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+
+      let response;
+      try {
+        response = await fetch(testUrl, { method: "GET", headers, signal: controller.signal });
+      } catch (fetchErr: any) {
+        clearTimeout(timeout);
+        const responseTimeMs = Date.now() - startTime;
+        return res.status(200).json({
+          success: false,
+          httpStatus: "Connection Error / Timeout",
+          statusCode: 0,
+          authStatus: "Unable to connect to supplier server",
+          productsCount: 0,
+          responseTimeMs,
+          error: `Unable to connect to supplier server: ${fetchErr.message || 'Timeout'}`
+        });
+      }
+      clearTimeout(timeout);
+
+      const responseTimeMs = Date.now() - startTime;
+      const statusCode = response.status;
+      const httpStatus = `${statusCode} ${response.statusText || (statusCode === 200 ? 'OK' : 'Response')}`;
+
+      if (!response.ok) {
+        let errSnippet = "";
+        try {
+          const errText = await response.text();
+          errSnippet = errText.slice(0, 200);
+        } catch (e) {}
+
+        let authStatus = "Authentication Failed";
+        if (statusCode === 401) authStatus = "❌ Invalid API Key / Unauthorized (401)";
+        else if (statusCode === 403) authStatus = "❌ Access Forbidden / Invalid Secret Key (403)";
+        else if (statusCode === 404) authStatus = "❌ Products endpoint not found (404)";
+        else authStatus = `❌ HTTP ${statusCode} Error`;
+
+        return res.status(200).json({
+          success: false,
+          httpStatus,
+          statusCode,
+          authStatus,
+          productsCount: 0,
+          responseTimeMs,
+          error: `Supplier API Test Failed (${httpStatus})${errSnippet ? ': ' + errSnippet : ''}`
+        });
+      }
+
+      const data = await response.json();
+      let productList: any[] = [];
+      if (Array.isArray(data)) {
+        productList = data;
+      } else if (Array.isArray(data.products)) {
+        productList = data.products;
+      } else if (Array.isArray(data.data)) {
+        productList = data.data;
+      } else if (Array.isArray(data.items)) {
+        productList = data.items;
+      } else if (Array.isArray(data.result)) {
+        productList = data.result;
+      } else if (typeof data === 'object' && data !== null) {
+        productList = Object.values(data).filter(v => typeof v === 'object' && v !== null);
+      }
+
+      return res.json({
+        success: true,
+        httpStatus: "200 OK (Connected)",
+        statusCode,
+        authStatus: "✅ Authenticated Successfully",
+        productsCount: productList.length,
+        responseTimeMs,
+        message: `Supplier API Connection Successful! Found ${productList.length} products.`
+      });
+    } catch (error: any) {
+      console.error("Supplier Test Connection Error:", error);
+      return res.status(200).json({
+        success: false,
+        httpStatus: "500 Internal Error",
+        statusCode: 500,
+        authStatus: "Execution Exception",
+        productsCount: 0,
+        responseTimeMs: Date.now() - startTime,
+        error: error.message || "Failed to establish connection with Supplier API"
+      });
+    }
+  });
+
+  // 2. Fetch Products from Supplier API
+  app.post("/api/supplier/fetch-products", async (req, res) => {
+    try {
+      const { baseUrl, apiKey, secretKey } = req.body;
+      if (!baseUrl) {
+        return res.status(400).json({ success: false, error: "Base URL is required" });
+      }
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(baseUrl);
+      } catch (e) {
+        return res.status(400).json({ success: false, error: "Invalid Base URL format" });
+      }
+
+      const headers: Record<string, string> = {
+        "User-Agent": "BexoBD-SupplierIntegration/1.0",
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      };
+
+      if (apiKey) {
+        headers["X-API-Key"] = apiKey;
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      }
+      if (secretKey) {
+        headers["X-Secret-Key"] = secretKey;
+      }
+
+      let fetchUrl = baseUrl.trim();
+      if (!fetchUrl.includes('/products') && !fetchUrl.includes('/items') && !fetchUrl.includes('/api')) {
+        fetchUrl = fetchUrl.replace(/\/$/, '') + '/products';
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
+      let response;
+      try {
+        response = await fetch(fetchUrl, { method: "GET", headers, signal: controller.signal });
+      } catch (fetchErr: any) {
+        clearTimeout(timeout);
+        return res.status(200).json({
+          success: false,
+          error: `Connection error: ${fetchErr.message || 'Timeout connecting to supplier server'}`
+        });
+      }
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        let errSnippet = "";
+        try {
+          const errText = await response.text();
+          errSnippet = errText.slice(0, 200);
+        } catch (e) {}
+        return res.status(200).json({
+          success: false,
+          error: `Supplier API HTTP ${response.status} ${response.statusText}${errSnippet ? ': ' + errSnippet : ''}`
+        });
+      }
+
+      const rawData = await response.json();
+      let productList: any[] = [];
+      if (Array.isArray(rawData)) {
+        productList = rawData;
+      } else if (Array.isArray(rawData.products)) {
+        productList = rawData.products;
+      } else if (Array.isArray(rawData.data)) {
+        productList = rawData.data;
+      } else if (Array.isArray(rawData.items)) {
+        productList = rawData.items;
+      } else if (Array.isArray(rawData.result)) {
+        productList = rawData.result;
+      } else if (typeof rawData === 'object' && rawData !== null) {
+        productList = Object.values(rawData).filter(v => typeof v === 'object' && v !== null);
+      }
+
+      const normalizedProducts = productList.map((p: any, idx: number) => {
+        const suppId = String(p.supplierProductId || p.id || p.productId || p.product_id || p.sku || p.code || `SUP-${idx + 1}`);
+        const sku = String(p.sku || p.code || suppId);
+        const title = String(p.title || p.name || p.productName || p.product_name || `Imported Item #${suppId}`);
+        const costPrice = Math.round(Number(p.costPrice ?? p.cost_price ?? p.wholesalePrice ?? p.wholesale_price ?? p.supplierPrice ?? p.supplier_price ?? p.price ?? p.amount ?? 0));
+        const stockCount = Math.max(0, Math.round(Number(p.stockCount ?? p.stock ?? p.quantity ?? p.inventory ?? p.stock_quantity ?? 10)));
+        const category = String(p.category || p.cat || p.category_name || "পোশাক");
+        const subCategory = String(p.subCategory || p.sub_category || "নতুন কালেকশন");
+        const details = String(p.details || p.description || p.desc || p.summary || "অফিশিয়াল প্রিমিয়াম সাপ্লায়ার প্রোডাক্ট।");
+
+        let imagesList: string[] = [];
+        if (Array.isArray(p.images) && p.images.length > 0) {
+          imagesList = p.images.map((img: any) => typeof img === 'string' ? img : (img.url || img.src || '')).filter(Boolean);
+        } else if (typeof p.images === 'string' && p.images.trim()) {
+          imagesList = p.images.split(/[\s,]+/).filter(Boolean);
+        } else if (p.image || p.photo || p.thumbnail) {
+          imagesList = [String(p.image || p.photo || p.thumbnail)];
+        }
+
+        if (imagesList.length === 0) {
+          imagesList = [`https://picsum.photos/seed/supp-${suppId}/800/600`];
+        }
+
+        return {
+          supplierProductId: suppId,
+          sku,
+          title,
+          category,
+          subCategory,
+          costPrice,
+          stockCount,
+          details,
+          images: imagesList
+        };
+      });
+
+      return res.json({
+        success: true,
+        count: normalizedProducts.length,
+        products: normalizedProducts
+      });
+    } catch (error: any) {
+      console.error("Fetch Supplier Products Error:", error);
+      return res.status(200).json({ success: false, error: error.message || "Failed to fetch supplier products" });
+    }
+  });
+
+
 export default app;

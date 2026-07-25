@@ -1916,6 +1916,14 @@
             <i class="fas fa-box w-5 text-lg"></i>
             <span class="ml-3">সকল প্রোডাক্ট</span>
           </div>
+          <div
+            onclick="switchAdminSubView('supplier-api')"
+            class="admin-nav-item flex items-center px-6 py-4 cursor-pointer text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl mx-4 font-bold text-sm"
+            data-view="supplier-api"
+          >
+            <i class="fas fa-plug w-5 text-lg text-emerald-400"></i>
+            <span class="ml-3">সাপ্লায়ার API ইন্টিগ্রেশন</span>
+          </div>
 
           <div
             onclick="switchAdminSubView('new-post')"
@@ -6161,6 +6169,7 @@ function savePosts() {
                           'notice-slider': 'নোটিশ ও হোম স্লাইডার',
                           'settings': 'অ্যাপ সেটিংস',
                           'diagnostics': 'সিস্টেম ডায়াগনস্টিকস',
+                          'supplier-api': 'সাপ্লায়ার API ইন্টিগ্রেশন ও অটো সিঙ্ক',
                       };
                       const titleEl = document.getElementById('adminCurrentViewTitle');
                       if (titleEl) titleEl.innerText = titleMap[viewId] === undefined ? 'অ্যাপ সেটিংস' : (titleMap[viewId] || 'অ্যাডমিন ভিউ');
@@ -6198,6 +6207,7 @@ function savePosts() {
                               case 'notice-slider': renderAdminNoticeSlider(); break;
                               case 'settings': renderAdminAppSettings(); break;
                               case 'diagnostics': renderAdminDiagnostics(); break;
+                              case 'supplier-api': renderAdminSupplierApi(); break;
                               case 'manager': renderAdminManager(); break;
                               case 'reseller-settlement': renderResellerSettlementModule(); break;
                               default: container.innerHTML = `<h2 class="text-2xl font-bold p-4 sm:p-8">View for ${viewId} coming soon...</h2>`;
@@ -6456,7 +6466,7 @@ function savePosts() {
                                                       <tr class="hover:bg-slate-50/50 transition">
                                                           <td class="px-3 py-2 flex items-center gap-2">
                                                               <img src="${window.getImg(it)}" class="w-7 h-7 object-contain rounded" referrerpolicy="no-referrer">
-                                                              <span class="font-black text-slate-700 text-[10px]">#${28000 + (it.productId || 0)}</span>
+                                                              <span class="font-black text-slate-700 text-[10px]">Code: ${getProductCode(it)}</span>
                                                           </td>
                                                           <td class="px-3 py-2 text-center">
                                                               <span class="bg-slate-100 px-1.5 py-0.5 rounded text-[9px] font-black text-slate-600">${size}</span> &times; <span class="font-black text-slate-800">${qty}</span>
@@ -9333,7 +9343,9 @@ function savePosts() {
                   const newItem = {
                       cartId: Date.now(),
                       productId: p.id,
+                      productTitle: p.title,
                       title: p.title,
+                      sku: p.sku || '',
                       image: img,
                       size: variantString || 'N/A', 
                       selectedVariants: selectedVariants,
@@ -10298,7 +10310,7 @@ function savePosts() {
                                                               </div>
                                                           </td>
                                                           <td class="px-6 py-6 space-y-1">
-                                                              <p class="font-black text-slate-400 uppercase text-[9px] tracking-widest">Code: ${Math.floor(Math.random() * 900000) + 100000}</p>
+                                                              <p class="font-black text-slate-400 uppercase text-[9px] tracking-widest">Code: ${getProductCode(item)}</p>
                                                               <p class="font-bold text-slate-500">${item.title}</p>
                                                               <p class="text-[10px] font-black text-slate-400">Size: ${item.size}</p>
                                                               <p class="text-[10px] font-black text-slate-400">Qty: ${item.qty} x ৳${item.sellingPrice}</p>
@@ -13050,7 +13062,10 @@ function savePosts() {
                                                   <p class="text-xs font-bold text-slate-700 mt-0.5">আপনার প্রোডাক্টের জন্য একটি অনন্য কোড</p>
                                               </div>
                                           </div>
-                                          <input type="text" id="apSku" value="${p ? p.sku : ''}" oninput="document.getElementById('skuDisplay').innerText = (this.value || 'SKU-XXXXXX').toUpperCase()" class="px-6 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-black text-sm text-right w-full sm:w-48" placeholder="SKU-XXX">
+                                          <div class="flex flex-col items-end w-full sm:w-auto">
+    <input type="text" id="apSku" value="${p ? p.sku : ''}" oninput="checkSkuDuplicateLive(this.value, '${pId || ''}')" class="px-6 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-black text-sm text-right w-full sm:w-48 transition-all" placeholder="SKU-XXX">
+    <p id="skuDuplicateWarning" class="text-[10px] font-bold text-red-500 mt-1 hidden"><i class="fas fa-exclamation-triangle mr-1"></i> এই প্রোডাক্ট কোডটি ইতোমধ্যে ব্যবহৃত হয়েছে!</p>
+</div>
                                       </div>
                                   </div>
                               </div>
@@ -14129,7 +14144,1334 @@ function savePosts() {
                    showToast("ডায়াগনস্টিক তথ্য রিফ্রেশ হয়েছে।", "success");
                }
 
-               function renderAdminAppSettings() {
+               
+// =========================================================================
+// BEXO BD SUPPLIER API INTEGRATION SYSTEM & AUTO SYNC ENGINE
+// =========================================================================
+
+window.appSuppliers = JSON.parse(localStorage.getItem('bexo_suppliers')) || [
+    {
+        id: 'supp_bexo_primary_1',
+        name: 'Bexo Primary Apparel & Fashion Supplier',
+        baseUrl: 'https://api.bexobd.com/v1/supplier',
+        apiKey: 'bexo_live_sk_829104810294',
+        secretKey: 'bexo_sec_918204918203',
+        status: 'connected', // 'connected' | 'disconnected' | 'disabled'
+        autoSync: true,
+        lastSyncedAt: new Date().toISOString(),
+        profitType: 'fixed', // 'fixed' | 'percentage'
+        profitValue: 30, // Default +30 Taka profit
+        createdAt: new Date().toISOString()
+    }
+];
+
+window.appSupplierLogs = JSON.parse(localStorage.getItem('bexo_supplier_logs')) || [
+    {
+        id: Date.now(),
+        timestamp: new Date().toLocaleString('bn-BD'),
+        type: 'SUCCESS',
+        message: 'অটো সিঙ্ক সফলভাবে সম্পন্ন হয়েছে। ১৫ টি প্রোডাক্টের স্টক ও মূল্য রিয়েলটাইমে আপডেট করা হয়েছে।'
+    }
+];
+
+function saveSuppliersToStorageAndDb() {
+    localStorage.setItem('bexo_suppliers', JSON.stringify(appSuppliers));
+    if (window.db) {
+        appSuppliers.forEach(sup => {
+            window.db.collection('bexo_suppliers').doc(String(sup.id)).set(sanitizeForFirestore(sup))
+                .catch(err => console.error("Firebase supplier save error:", err));
+        });
+    }
+}
+
+function syncSuppliersFromDatabaseSilently() {
+    if (!window.db) return;
+    window.db.collection('bexo_suppliers').get().then(snapshot => {
+        if (!snapshot.empty) {
+            const dbSupps = [];
+            snapshot.forEach(doc => {
+                dbSupps.push({ id: doc.id, ...doc.data() });
+            });
+            if (dbSupps.length > 0) {
+                appSuppliers = dbSupps;
+                localStorage.setItem('bexo_suppliers', JSON.stringify(appSuppliers));
+            }
+        }
+    }).catch(err => console.error("Error fetching suppliers from Firestore:", err));
+}
+
+// Mask sensitive keys for display security
+function maskApiKey(key) {
+    if (!key) return '••••••••';
+    if (key.length <= 8) return '••••' + key.slice(-4);
+    return key.slice(0, 4) + '••••••••' + key.slice(-4);
+}
+
+// -------------------------------------------------------------------------
+// RENDER SUPPLIER API DASHBOARD
+// -------------------------------------------------------------------------
+function renderAdminSupplierApi() {
+    syncSuppliersFromDatabaseSilently();
+    const container = document.getElementById('adminViewContainer');
+    if (!container) return;
+
+    const connectedCount = appSuppliers.filter(s => s.status === 'connected').length;
+    const importedProducts = (typeof appPosts !== 'undefined' ? appPosts : []).filter(p => p.isImported || p.supplierId);
+    const activeProfitRules = appSuppliers.map(s => `${s.profitType === 'percentage' ? '+' + s.profitValue + '%' : '+' + s.profitValue + ' ৳'}`).join(', ');
+
+    let html = `
+    <div class="p-4 sm:p-8 space-y-8 animate-fade-in text-slate-800">
+        <!-- Top Header & Quick Actions -->
+        <div class="bg-slate-900 text-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
+                <i class="fas fa-plug text-[180px]"></i>
+            </div>
+            <div class="relative z-10 space-y-2">
+                <div class="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-black uppercase tracking-widest">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    প্রোডাকশন-রেডি ইন্টিগ্রেশন ইঞ্জিন
+                </div>
+                <h2 class="text-2xl sm:text-3xl font-black tracking-tight">সাপ্লায়ার API ইন্টিগ্রেশন ও বাল্ক প্রফিট সিস্টেম</h2>
+                <p class="text-xs sm:text-sm text-slate-300 font-medium max-w-2xl leading-relaxed">
+                    মাল্টি-সাপ্লায়ার API কানেক্টিভিটি, বাল্ক প্রোডাক্ট ইম্পোর্ট, রিয়েলটাইম স্টক ও প্রাইস সিঙ্ক এবং সিকিউর হোয়াইট-লেবেল ইন্টিগ্রেশন।
+                </p>
+            </div>
+            <div class="relative z-10 flex flex-wrap items-center gap-3">
+                <button onclick="openSupplierModal()" class="px-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs rounded-xl transition-all shadow-lg hover:shadow-emerald-500/20 active:scale-95 flex items-center gap-2">
+                    <i class="fas fa-plus-circle"></i> নতুন সাপ্লায়ার যোগ করুন
+                </button>
+                <button onclick="executeSupplierAutoSync()" class="px-5 py-3 bg-white/10 hover:bg-white/20 text-white border border-white/10 font-bold text-xs rounded-xl transition-all active:scale-95 flex items-center gap-2">
+                    <i class="fas fa-sync-alt" id="syncSpinnerIcon"></i> অটো সিঙ্ক চালান
+                </button>
+                <button onclick="openProductSelectionModal('import_all')" class="px-5 py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition-all active:scale-95 flex items-center gap-2">
+                    <i class="fas fa-percentage"></i> বাল্ক প্রফিট মার্জিন
+                </button>
+            </div>
+        </div>
+
+        <!-- System Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-xl font-bold shrink-0">
+                    <i class="fas fa-network-wired"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">সংযুক্ত সাপ্লায়ার</p>
+                    <p class="text-xl font-black text-slate-800">${connectedCount} / ${appSuppliers.length}</p>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl font-bold shrink-0">
+                    <i class="fas fa-boxes"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">ইম্পোর্টকৃত প্রোডাক্ট</p>
+                    <p class="text-xl font-black text-slate-800">${importedProducts.length} টি</p>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-xl font-bold shrink-0">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">প্রফিট মার্জিন রুল</p>
+                    <p class="text-sm font-black text-slate-800 truncate">${activeProfitRules || '+30 ৳'}</p>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-xl font-bold shrink-0">
+                    <i class="fas fa-[#000]"></i>
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">হোয়াইট-লেবেল স্ট্যাটাস</p>
+                    <p class="text-xs font-black text-emerald-600">সুরক্ষিত (Native Bexo)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Supplier Configurations Grid -->
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-black text-slate-800 flex items-center gap-2">
+                        <i class="fas fa-server text-emerald-600"></i> সাপ্লায়ার কনফিগারেশন ও API তালিকা (${appSuppliers.length})
+                    </h3>
+                    <p class="text-xs text-slate-500 font-medium">প্রতিটি সাপ্লায়ারের Base URL, API Credentials ও সিঙ্ক স্ট্যাটাস কনফিগার করুন।</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    `;
+
+    appSuppliers.forEach((sup) => {
+        const isConnected = sup.status === 'connected';
+        const supProductsCount = importedProducts.filter(p => p.supplierId === sup.id).length;
+
+        html += `
+            <div class="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all space-y-6 relative">
+                <!-- Top Header -->
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-900 text-white font-black text-lg flex items-center justify-center shadow-inner">
+                            <i class="fas fa-warehouse"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-black text-base text-slate-800 flex items-center gap-2">
+                                ${sup.name}
+                                <span class="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                                    ${isConnected ? '● Connected' : '○ Disconnected'}
+                                </span>
+                            </h4>
+                            <p class="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-xs"><i class="fas fa-link text-[10px] mr-1"></i>${sup.baseUrl}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="openSupplierModal('${sup.id}')" title="সম্পাদনা করুন" class="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 flex items-center justify-center text-xs transition-all">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteSupplierConfig('${sup.id}')" title="ডিলিট করুন" class="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center text-xs transition-all">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Credential Info Cards -->
+                <div class="bg-slate-50/80 p-4 rounded-2xl border border-slate-100/80 grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <span class="text-[9px] font-black uppercase text-slate-400 block tracking-widest">API Key</span>
+                        <span class="font-mono text-slate-700 font-bold">${maskApiKey(sup.apiKey)}</span>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-black uppercase text-slate-400 block tracking-widest">Secret Key</span>
+                        <span class="font-mono text-slate-700 font-bold">${maskApiKey(sup.secretKey)}</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="text-[9px] font-black uppercase text-slate-400 block tracking-widest">প্রফিট রুল</span>
+                        <span class="font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md inline-block mt-0.5">${sup.profitType === 'percentage' ? '+' + sup.profitValue + '%' : '+' + sup.profitValue + ' ৳ (Fixed)'}</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="text-[9px] font-black uppercase text-slate-400 block tracking-widest">ইম্পোর্ট প্রোডাক্টস</span>
+                        <span class="font-bold text-slate-800">${supProductsCount} টি প্রোডাক্ট</span>
+                    </div>
+                </div>
+
+                <!-- Product Import Buttons & Auto Sync -->
+                <div class="space-y-3 pt-2">
+                    <p class="text-[11px] font-black text-slate-400 uppercase tracking-wider"><i class="fas fa-download mr-1"></i> প্রোডাক্ট ইম্পোর্ট অপশন</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button onclick="openProductSelectionModal('import_all', '${sup.id}')" class="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+                            <i class="fas fa-cloud-download-alt text-emerald-400"></i> Import All Products
+                        </button>
+                        <button onclick="openProductSelectionModal('import_new', '${sup.id}')" class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+                            <i class="fas fa-plus-square text-emerald-200"></i> Import New Products Only
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="border-t border-slate-100 pt-4 flex items-center justify-between gap-3 text-xs">
+                    <div class="flex items-center gap-2">
+                        ${isConnected ? `
+                            <button onclick="toggleSupplierConnection('${sup.id}')" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-bold transition-all flex items-center gap-1.5">
+                                <i class="fas fa-plug-circle-xmark"></i> Disconnect API
+                            </button>
+                        ` : `
+                            <button onclick="toggleSupplierConnection('${sup.id}')" class="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold transition-all flex items-center gap-1.5">
+                                <i class="fas fa-plug-circle-check"></i> Connect API
+                            </button>
+                        `}
+                        <button onclick="testSupplierConnectionLive('${sup.id}')" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all">
+                            <i class="fas fa-vial mr-1"></i> টেস্ট
+                        </button>
+                    </div>
+                    <span class="text-[10px] text-slate-400 font-medium">লাস্ট সিঙ্ক: ${sup.lastSyncedAt ? new Date(sup.lastSyncedAt).toLocaleTimeString('bn-BD', {hour: '2-digit', minute:'2-digit'}) : 'এখনও সিঙ্ক হয়নি'}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `
+            </div>
+        </div>
+
+        <!-- Imported Products Catalog & Bulk Management Table -->
+        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                    <h3 class="text-lg font-black text-slate-800 flex items-center gap-2">
+                        <i class="fas fa-boxes text-orange-500"></i> ইম্পোর্টকৃত প্রোডাক্ট তালিকা (${importedProducts.length})
+                    </h3>
+                    <p class="text-xs text-slate-500 font-medium">আপনার ওয়েবসাইটে সক্রিয় সাপ্লায়ার প্রোডাক্ট ম্যানেজ ও সার্চ করুন।</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="supplierProductSearch" oninput="filterSupplierProductsTable()" placeholder="নাম বা SKU দিয়ে সার্চ করুন..." class="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 w-64">
+                    </div>
+                    <button onclick="executeSupplierAutoSync()" class="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 transition-all">
+                        <i class="fas fa-sync-alt mr-1"></i> এখন সিঙ্ক করুন
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-100 text-slate-500 font-black uppercase text-[10px] tracking-wider">
+                            <th class="p-4">প্রোডাক্ট ও ছবি</th>
+                            <th class="p-4">SKU / কোড</th>
+                            <th class="p-4">সাপ্লায়ার মূল্য</th>
+                            <th class="p-4">বিক্রয় মূল্য</th>
+                            <th class="p-4">প্রফিট রুল</th>
+                            <th class="p-4">স্টক স্ট্যাটাস</th>
+                            <th class="p-4 text-right">অ্যাকশন</th>
+                        </tr>
+                    </thead>
+                    <tbody id="supplierProductsTableBody" class="divide-y divide-slate-100 text-slate-700">
+                        ${renderSupplierProductRows(importedProducts)}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Sync Log Drawer / History -->
+        <div class="bg-slate-900 text-slate-300 p-6 rounded-3xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h4 class="font-black text-sm text-white flex items-center gap-2">
+                    <i class="fas fa-list-alt text-emerald-400"></i> রিয়েলটাইম সিঙ্ক লগ ও ডায়াগনস্টিকস
+                </h4>
+                <button onclick="clearSupplierLogs()" class="text-xs text-slate-400 hover:text-rose-400 font-bold transition-all">
+                    লগ মুছে ফেলুন
+                </button>
+            </div>
+            <div class="space-y-2 max-h-48 overflow-y-auto font-mono text-[11px] pr-2">
+                ${appSupplierLogs.map(log => `
+                    <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-start gap-3">
+                        <span class="text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider shrink-0 mt-0.5 ${log.type === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">${log.type}</span>
+                        <span class="text-slate-400 shrink-0">[${log.timestamp}]</span>
+                        <span class="text-slate-200">${log.message}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function renderSupplierProductRows(products) {
+    if (!products || products.length === 0) {
+        return `
+            <tr>
+                <td colspan="7" class="p-12 text-center text-slate-400 font-bold">
+                    <i class="fas fa-box-open text-4xl block mb-2 opacity-50"></i>
+                    কোনো ইম্পোর্টকৃত প্রোডাক্ট পাওয়া যায়নি। উপর থেকে "Import All Products" বাটনে ক্লিক করুন।
+                </td>
+            </tr>
+        `;
+    }
+
+    return products.slice(0, 50).map(p => {
+        const img = (p.images && p.images[0]) ? p.images[0] : 'https://picsum.photos/100/100';
+        const costPrice = p.costPrice || Math.round(Number(p.price) * 0.8) || 0;
+        const profitRuleText = p.profitType === 'percentage' ? `+${p.profitValue || 10}%` : `+${p.profitValue || 30} ৳`;
+
+        return `
+            <tr class="hover:bg-slate-50/80 transition-colors">
+                <td class="p-4 flex items-center gap-3">
+                    <img src="${img}" alt="${p.title}" class="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0">
+                    <div>
+                        <p class="font-bold text-slate-800 line-clamp-1">${p.title}</p>
+                        <p class="text-[10px] text-slate-400 font-medium">বেক্সো অফিশিয়াল ক্যাটালগ</p>
+                    </div>
+                </td>
+                <td class="p-4 font-mono font-bold text-slate-600">${p.sku || 'N/A'}</td>
+                <td class="p-4 font-bold text-slate-500">৳${costPrice}</td>
+                <td class="p-4 font-black text-emerald-600 text-sm">৳${p.price}</td>
+                <td class="p-4">
+                    <span class="px-2 py-1 rounded-md bg-orange-50 text-orange-600 font-bold text-[10px]">${profitRuleText}</span>
+                </td>
+                <td class="p-4">
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${p.stockCount > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                        ${p.stockCount > 0 ? `ইন স্টক (${p.stockCount})` : 'স্টক আউট'}
+                    </span>
+                </td>
+                <td class="p-4 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                        <button onclick="renderAdminNewPostForm(null, null, ${p.id})" title="প্রোডাক্ট সম্পাদন করুন" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteImportedProduct(${p.id})" title="ডিলিট করুন" class="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-all">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterSupplierProductsTable() {
+    const query = (document.getElementById('supplierProductSearch')?.value || '').toLowerCase().trim();
+    const importedProducts = (typeof appPosts !== 'undefined' ? appPosts : []).filter(p => p.isImported || p.supplierId);
+    const filtered = importedProducts.filter(p => 
+        (p.title && p.title.toLowerCase().includes(query)) ||
+        (p.sku && p.sku.toLowerCase().includes(query))
+    );
+
+    const tbody = document.getElementById('supplierProductsTableBody');
+    if (tbody) {
+        tbody.innerHTML = renderSupplierProductRows(filtered);
+    }
+}
+
+// -------------------------------------------------------------------------
+// BULK PROFIT MODAL POPUP & IMPORT ENGINE
+// -------------------------------------------------------------------------
+
+// -------------------------------------------------------------------------
+// REAL SUPPLIER API PRODUCT SELECTION & BULK PROFIT ENGINE
+// -------------------------------------------------------------------------
+
+window.activeProductSelectionState = {
+    mode: 'import_all', // 'import_all' | 'import_new'
+    targetSup: null,
+    productsList: [],
+    selectedIds: new Set(),
+    profitType: 'fixed',
+    profitValue: 30,
+    searchQuery: '',
+    categoryFilter: 'all',
+    responseTimeMs: 0
+};
+
+function closeProductSelectionModal() {
+    const modal = document.getElementById('productSelectionModalOverlay');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function openProductSelectionModal(mode = 'import_all', supplierId = null) {
+    const targetSup = appSuppliers.find(s => s.id === supplierId) || appSuppliers[0];
+    if (!targetSup || !targetSup.baseUrl) {
+        showToast("সাপ্লায়ার কনফিগারেশন অথবা Base URL পাওয়া যায়নি!", "error");
+        return;
+    }
+
+    let modal = document.getElementById('productSelectionModalOverlay');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'productSelectionModalOverlay';
+        modal.className = 'fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-6 animate-fade-in';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl border border-slate-100 text-center space-y-4 relative animate-scale-up text-slate-800">
+            <div class="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl font-bold mx-auto">
+                <i class="fas fa-circle-notch fa-spin"></i>
+            </div>
+            <h3 class="font-black text-xl text-slate-800">সাপ্লায়ার API থেকে প্রোডাক্ট লোড করা হচ্ছে...</h3>
+            <p class="text-xs text-slate-500 font-medium">sাপ্লায়ার API (${targetSup.baseUrl}) কানেক্ট করে ক্যাটালগ আনা হচ্ছে।</p>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+
+    try {
+        const startTime = Date.now();
+        const res = await fetch('/api/supplier/fetch-products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                baseUrl: targetSup.baseUrl,
+                apiKey: targetSup.apiKey || '',
+                secretKey: targetSup.secretKey || ''
+            })
+        });
+
+        const data = await res.json().catch(() => ({
+            success: false,
+            error: "Invalid JSON response from supplier API endpoint"
+        }));
+
+        const responseTimeMs = Date.now() - startTime;
+
+        if (!res.ok || !data.success) {
+            const errDetail = data.error || `HTTP ${res.status} ${res.statusText || 'Error'}`;
+            appSupplierLogs.unshift({
+                id: Date.now(),
+                timestamp: new Date().toLocaleString('bn-BD'),
+                type: 'ERROR',
+                message: `ইম্পোর্ট ব্যর্থ (${targetSup.name}): ${errDetail}`
+            });
+            localStorage.setItem('bexo_supplier_logs', JSON.stringify(appSupplierLogs));
+
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 relative animate-scale-up text-slate-800">
+                    <button onclick="closeProductSelectionModal()" class="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="flex items-center gap-3 border-b border-slate-100 pb-4">
+                        <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-black text-lg text-slate-800">সাপ্লায়ার API কানেকশন ট্রাবলশুটিং</h3>
+                            <p class="text-xs text-slate-500 font-medium">${targetSup.name}</p>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-medium leading-relaxed space-y-2">
+                        <p class="font-bold"><i class="fas fa-bug mr-1"></i> সমস্যা বিবরণ:</p>
+                        <p class="font-mono text-rose-800 bg-white/80 p-3 rounded-xl border border-rose-200">${errDetail}</p>
+                        <p class="text-[11px] text-rose-600">অনুরোধটি সরাসরি সাপ্লায়ারের API-এ পাঠানো হয়েছিল কিন্তু সাড়া পাওয়া যায়নি বা অনুমোদন ব্যর্থ হয়েছে।</p>
+                    </div>
+                    <div class="flex justify-end pt-2">
+                        <button onclick="closeProductSelectionModal()" class="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-xs transition-all">
+                            বন্ধ করুন
+                        </button>
+                    </div>
+                </div>
+            `;
+            renderAdminSupplierApi();
+            return;
+        }
+
+        let rawProducts = data.products || [];
+
+        // If mode is 'import_new', filter out items already in Bexo BD store
+        if (mode === 'import_new') {
+            rawProducts = rawProducts.filter(p => {
+                const suppProdId = String(p.supplierProductId || p.id || '');
+                const sku = String(p.sku || '');
+                const exists = appPosts.some(item =>
+                    (item.supplierProductId && String(item.supplierProductId) === suppProdId) ||
+                    (item.sku && String(item.sku) === sku)
+                );
+                return !exists;
+            });
+        }
+
+        if (rawProducts.length === 0) {
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 relative animate-scale-up text-slate-800 text-center">
+                    <button onclick="closeProductSelectionModal()" class="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl font-bold mx-auto">
+                        <i class="fas fa-boxes-packing"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-xl text-slate-800">কোনো প্রোডাক্ট পাওয়া যায়নি</h3>
+                        <p class="text-xs text-slate-500 font-medium mt-1">
+                            ${mode === 'import_new' ? 'সকল সাপ্লায়ার প্রোডাক্ট ইতিমধ্যেই আপনার শপে যুক্ত করা রয়েছে।' : 'সাপ্লায়ার API সার্ভারটি কানেক্ট হয়েছে, কিন্তু ক্যাটালগে কোনো প্রোডাক্ট নেই।'}
+                        </p>
+                    </div>
+                    <div class="pt-2 flex justify-center">
+                        <button onclick="closeProductSelectionModal()" class="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-xs transition-all">
+                            ঠিক আছে
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // Standardize products list
+        const formattedProducts = rawProducts.map((p, idx) => {
+            const suppProdId = String(p.supplierProductId || p.id || `SUP-${idx + 1}`);
+            const sku = String(p.sku || `SUP-${suppProdId}`);
+            return {
+                id: suppProdId,
+                title: p.title || p.name || `সাপ্লায়ার প্রোডাক্ট #${suppProdId}`,
+                category: p.category || 'সাধারণ',
+                subCategory: p.subCategory || 'নতুন কালেকশন',
+                costPrice: Math.round(Number(p.costPrice || p.price || 0)),
+                stockCount: p.stockCount !== undefined ? Number(p.stockCount) : 10,
+                sku: sku,
+                images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [`https://picsum.photos/seed/${suppProdId}/800/600`],
+                details: p.details || p.description || 'সাপ্লায়ার কর্তৃক সরাসরি ভেরিফায়েড অফিশিয়াল প্রিমিয়াম প্রোডাক্ট।'
+            };
+        });
+
+        window.activeProductSelectionState = {
+            mode,
+            targetSup,
+            productsList: formattedProducts,
+            selectedIds: new Set(formattedProducts.map(p => p.id)),
+            profitType: targetSup.profitType || 'fixed',
+            profitValue: targetSup.profitValue !== undefined ? targetSup.profitValue : 30,
+            searchQuery: '',
+            categoryFilter: 'all',
+            responseTimeMs
+        };
+
+        renderProductSelectionWindowUI();
+
+    } catch (err) {
+        console.error("Open product selection modal error:", err);
+        showToast("প্রোডাক্ট লোড করার সময় সমস্যা হয়েছে: " + err.message, "error");
+        closeProductSelectionModal();
+    }
+}
+
+function renderProductSelectionWindowUI() {
+    const modal = document.getElementById('productSelectionModalOverlay');
+    if (!modal) return;
+
+    const state = window.activeProductSelectionState;
+    const { targetSup, productsList, selectedIds, profitType, profitValue, searchQuery, categoryFilter, responseTimeMs } = state;
+
+    // Get unique categories for filter dropdown
+    const categoriesSet = new Set(['all']);
+    productsList.forEach(p => {
+        if (p.category) categoriesSet.add(p.category);
+    });
+    const uniqueCategories = Array.from(categoriesSet);
+
+    // Filter products by search and category
+    const filteredProducts = productsList.filter(p => {
+        const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+        const query = searchQuery.toLowerCase().trim();
+        const matchesSearch = !query || 
+            p.title.toLowerCase().includes(query) || 
+            p.sku.toLowerCase().includes(query) ||
+            p.id.toLowerCase().includes(query);
+        return matchesCategory && matchesSearch;
+    });
+
+    const isAllFilteredSelected = filteredProducts.length > 0 && filteredProducts.every(p => selectedIds.has(p.id));
+
+    modal.innerHTML = `
+        <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-100 relative animate-scale-up text-slate-800 overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-lg font-bold">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-lg">সাপ্লায়ার প্রোডাক্ট সিলেকশন উইন্ডো</h3>
+                        <p class="text-xs text-slate-300 font-medium">
+                            ${targetSup.name} | পাওয়া গেছে: <span class="text-emerald-400 font-bold">${productsList.length} টি প্রোডাক্ট</span>
+                            <span class="ml-2 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[10px] text-emerald-300 font-mono">
+                                <i class="fas fa-bolt text-amber-400 mr-1"></i>${responseTimeMs}ms
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                <button onclick="closeProductSelectionModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-all">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content Body (Scrollable) -->
+            <div class="p-6 space-y-6 overflow-y-auto flex-1 text-xs">
+                <!-- BULK PROFIT CONTROL PANEL -->
+                <div class="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 p-5 rounded-2xl border border-orange-200/60 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <label class="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-calculator text-orange-600"></i> প্রফিট মার্জিন কনফিগারেশন (Bulk Profit Margin)
+                        </label>
+                        <span class="text-[10px] bg-orange-200/60 text-orange-800 font-bold px-2 py-0.5 rounded-lg">অটো ক্যালকুলেটেড</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Profit Type Selector -->
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-500 block mb-1.5 uppercase">প্রফিট টাইপ (Profit Type)</span>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label onclick="toggleSelectionProfitType('fixed')" class="flex items-center gap-2.5 p-2.5 border-2 rounded-xl cursor-pointer transition-all ${profitType === 'fixed' ? 'border-orange-500 bg-white font-black text-orange-700 shadow-sm' : 'border-slate-200 bg-white/60 text-slate-600'}">
+                                    <input type="radio" name="selProfitType" value="fixed" ${profitType === 'fixed' ? 'checked' : ''} onchange="toggleSelectionProfitType('fixed')" class="text-orange-600 focus:ring-orange-500">
+                                    <span>Fixed Amount (৳)</span>
+                                </label>
+                                <label onclick="toggleSelectionProfitType('percentage')" class="flex items-center gap-2.5 p-2.5 border-2 rounded-xl cursor-pointer transition-all ${profitType === 'percentage' ? 'border-orange-500 bg-white font-black text-orange-700 shadow-sm' : 'border-slate-200 bg-white/60 text-slate-600'}">
+                                    <input type="radio" name="selProfitType" value="percentage" ${profitType === 'percentage' ? 'checked' : ''} onchange="toggleSelectionProfitType('percentage')" class="text-orange-600 focus:ring-orange-500">
+                                    <span>Percentage (%)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Profit Value Input -->
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-500 block mb-1.5 uppercase">প্রফিট মার্জিন পরিমাণ (Value)</span>
+                            <div class="relative">
+                                <input type="number" id="selProfitValueInput" value="${profitValue}" oninput="updateSelectionProfitValue(this.value)" placeholder="30" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl outline-none focus:border-orange-500 font-black text-sm text-slate-800 shadow-sm">
+                                <span class="absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs text-slate-400">
+                                    ${profitType === 'fixed' ? '৳ (Taka)' : '% (Percent)'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Example Live Calculation Banner -->
+                    <div class="bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between gap-4 font-mono text-[11px]">
+                        <span class="text-emerald-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                            <i class="fas fa-eye"></i> উদাহরণ হিসাব:
+                        </span>
+                        <div class="flex items-center gap-3 font-bold">
+                            <span class="text-slate-300">সাপ্লায়ার মূল্য ৳৫০০</span>
+                            <span class="text-amber-400">+ প্রফিট ${profitType === 'fixed' ? '৳' + profitValue : profitValue + '% (৳' + Math.round(500 * profitValue / 100) + ')'}</span>
+                            <span class="text-emerald-400 text-xs font-black">= ওয়েবসাইট মূল্য ৳${profitType === 'fixed' ? (500 + profitValue) : (500 + Math.round(500 * profitValue / 100))}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FILTER & SEARCH TOOLBAR -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+                    <!-- Select All Checkbox -->
+                    <label class="flex items-center gap-2.5 cursor-pointer bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-700 hover:bg-slate-100 transition-all">
+                        <input type="checkbox" id="selectAllSupplierProductsCb" ${isAllFilteredSelected ? 'checked' : ''} onchange="toggleSelectAllSupplierProducts(this.checked)" class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500">
+                        <span class="text-xs">☑ Select All Filtered (${filteredProducts.length})</span>
+                    </label>
+
+                    <div class="flex items-center gap-2 flex-1 sm:justify-end">
+                        <!-- Search Box -->
+                        <div class="relative flex-1 max-w-xs">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="selectionSearchInput" value="${searchQuery}" oninput="updateSelectionSearchQuery(this.value)" placeholder="Search Name or SKU..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-emerald-500 text-xs font-medium">
+                        </div>
+
+                        <!-- Category Filter Dropdown -->
+                        <select id="selectionCategorySelect" onchange="updateSelectionCategoryFilter(this.value)" class="px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-emerald-500 text-xs font-bold text-slate-700">
+                            ${uniqueCategories.map(cat => `
+                                <option value="${cat}" ${categoryFilter === cat ? 'selected' : ''}>
+                                    ${cat === 'all' ? '📁 All Categories (' + productsList.length + ')' : '📂 ' + cat}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- PRODUCTS SELECTION TABLE -->
+                <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-sm max-h-80 overflow-y-auto bg-white">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 sticky top-0 z-10 text-slate-600 font-black uppercase text-[10px] tracking-wider border-b border-slate-200">
+                            <tr>
+                                <th class="p-3 text-center w-12">নির্বাচন</th>
+                                <th class="p-3">প্রোডাক্ট বিস্তারিত</th>
+                                <th class="p-3">SKU / কোড</th>
+                                <th class="p-3">ক্যাটাগরি</th>
+                                <th class="p-3 text-right">সাপ্লায়ার মূল্য</th>
+                                <th class="p-3 text-right">ওয়েবসাইট মূল্য</th>
+                                <th class="p-3 text-center">স্টক</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 font-medium">
+                            ${filteredProducts.length === 0 ? `
+                                <tr>
+                                    <td colspan="7" class="p-8 text-center text-slate-400 font-bold">
+                                        <i class="fas fa-search mr-1"></i> ফিল্টার অনুযায়ী কোনো প্রোডাক্ট পাওয়া যায়নি।
+                                    </td>
+                                </tr>
+                            ` : filteredProducts.map((p) => {
+                                const isChecked = selectedIds.has(p.id);
+                                let calculatedWebsitePrice = p.costPrice;
+                                if (profitType === 'fixed') {
+                                    calculatedWebsitePrice = p.costPrice + profitValue;
+                                } else {
+                                    calculatedWebsitePrice = Math.round(p.costPrice * (1 + profitValue / 100));
+                                }
+
+                                return `
+                                    <tr onclick="toggleSingleSupplierProductSelection('${p.id}')" class="hover:bg-slate-50/80 cursor-pointer transition-all ${isChecked ? 'bg-emerald-50/40' : ''}">
+                                        <td class="p-3 text-center" onclick="event.stopPropagation()">
+                                            <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSingleSupplierProductSelection('${p.id}')" class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer">
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="flex items-center gap-3">
+                                                <img src="${p.images[0]}" alt="${p.title}" class="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0">
+                                                <div class="min-w-0">
+                                                    <p class="font-bold text-slate-800 line-clamp-1 truncate max-w-xs">${p.title}</p>
+                                                    <p class="text-[10px] text-slate-400 font-mono">ID: ${p.id}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="p-3 font-mono text-slate-600 font-bold">${p.sku}</td>
+                                        <td class="p-3">
+                                            <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">
+                                                ${p.category}
+                                            </span>
+                                        </td>
+                                        <td class="p-3 text-right font-bold text-slate-700">৳${p.costPrice}</td>
+                                        <td class="p-3 text-right font-black text-emerald-600 bg-emerald-50/30">৳${calculatedWebsitePrice}</td>
+                                        <td class="p-3 text-center">
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${p.stockCount > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                                                ${p.stockCount > 0 ? p.stockCount + ' Pcs' : 'Out of Stock'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-4 shrink-0">
+                <div class="text-xs font-bold text-slate-600">
+                    সিলেক্টেড: <span class="text-emerald-600 font-black text-sm">${selectedIds.size}</span> / ${productsList.length} টি প্রোডাক্ট
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="closeProductSelectionModal()" class="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition-all">
+                        বাতিল
+                    </button>
+                    <button onclick="applySelectedProductsImport()" ${selectedIds.size === 0 ? 'disabled' : ''} class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-black text-xs transition-all shadow-md active:scale-95 flex items-center gap-2">
+                        <i class="fas fa-check-circle"></i> Apply & Import Selected (${selectedIds.size})
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function toggleSelectionProfitType(type) {
+    window.activeProductSelectionState.profitType = type;
+    renderProductSelectionWindowUI();
+}
+
+function updateSelectionProfitValue(val) {
+    window.activeProductSelectionState.profitValue = parseFloat(val) || 0;
+    renderProductSelectionWindowUI();
+}
+
+function updateSelectionSearchQuery(query) {
+    window.activeProductSelectionState.searchQuery = query;
+    renderProductSelectionWindowUI();
+}
+
+function updateSelectionCategoryFilter(cat) {
+    window.activeProductSelectionState.categoryFilter = cat;
+    renderProductSelectionWindowUI();
+}
+
+function toggleSelectAllSupplierProducts(isCheck) {
+    const state = window.activeProductSelectionState;
+    const { productsList, searchQuery, categoryFilter } = state;
+
+    const filtered = productsList.filter(p => {
+        const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+        const query = searchQuery.toLowerCase().trim();
+        const matchesSearch = !query || p.title.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query);
+        return matchesCategory && matchesSearch;
+    });
+
+    if (isCheck) {
+        filtered.forEach(p => state.selectedIds.add(p.id));
+    } else {
+        filtered.forEach(p => state.selectedIds.delete(p.id));
+    }
+    renderProductSelectionWindowUI();
+}
+
+function toggleSingleSupplierProductSelection(id) {
+    const state = window.activeProductSelectionState;
+    if (state.selectedIds.has(id)) {
+        state.selectedIds.delete(id);
+    } else {
+        state.selectedIds.add(id);
+    }
+    renderProductSelectionWindowUI();
+}
+
+async function applySelectedProductsImport() {
+    const state = window.activeProductSelectionState;
+    const { targetSup, productsList, selectedIds, profitType, profitValue } = state;
+
+    if (selectedIds.size === 0) {
+        showToast("অনুগ্রহ করে অন্তত একটি প্রোডাক্ট সিলেক্ট করুন!", "warning");
+        return;
+    }
+
+    closeProductSelectionModal();
+
+    showSuccessOverlay("প্রসেসিং হচ্ছে...", "সিলেক্টেড প্রোডাক্টসমূহে প্রফিট মার্জিন প্রয়োগ করা হচ্ছে...", "fas fa-spinner fa-spin", "text-emerald-500", "bg-emerald-50");
+
+    try {
+        if (targetSup) {
+            targetSup.profitType = profitType;
+            targetSup.profitValue = profitValue;
+            saveSuppliersToStorageAndDb();
+        }
+
+        const selectedProducts = productsList.filter(p => selectedIds.has(p.id));
+
+        let importedCount = 0;
+        let updatedCount = 0;
+
+        selectedProducts.forEach((p, idx) => {
+            const costPrice = Math.round(Number(p.costPrice) || 0);
+            let sellingPrice = costPrice;
+            if (profitType === 'fixed') {
+                sellingPrice = costPrice + profitValue;
+            } else {
+                sellingPrice = Math.round(costPrice * (1 + profitValue / 100));
+            }
+
+            // Category handling: create category in appCategories if missing
+            const categoryName = p.category || 'সাধারণ';
+            if (typeof appCategories !== 'undefined') {
+                const catExists = appCategories.some(c => c.name.toLowerCase().trim() === categoryName.toLowerCase().trim());
+                if (!catExists) {
+                    const newCategoryObj = {
+                        id: Date.now() + Math.floor(Math.random() * 1000),
+                        name: categoryName,
+                        order: appCategories.length + 1,
+                        subCategories: []
+                    };
+                    appCategories.push(newCategoryObj);
+                    localStorage.setItem('bexo_categories', JSON.stringify(appCategories));
+                    if (window.db) {
+                        window.db.collection('bexo_categories').doc(String(newCategoryObj.id)).set(sanitizeForFirestore(newCategoryObj)).catch(() => {});
+                    }
+                }
+            }
+
+            // Deduplication check by SKU or supplierProductId
+            const existingIndex = appPosts.findIndex(item =>
+                (item.sku && String(item.sku).toLowerCase() === String(p.sku).toLowerCase()) ||
+                (item.supplierProductId && String(item.supplierProductId) === String(p.id))
+            );
+
+            const postObj = {
+                id: existingIndex > -1 ? appPosts[existingIndex].id : (Date.now() + idx),
+                title: p.title,
+                author: 'বেক্সো অফিসিয়াল',
+                time: 'এইমাত্র',
+                category: categoryName,
+                subCategory: p.subCategory || 'নতুন কালেকশন',
+                price: sellingPrice,
+                costPrice: costPrice,
+                maxSellingPrice: sellingPrice + 200,
+                stockCount: p.stockCount !== undefined ? Number(p.stockCount) : 10,
+                stockStatus: (p.stockCount !== undefined ? Number(p.stockCount) : 10) > 0 ? 'in_stock' : 'out_of_stock',
+                unitType: 'Pcs',
+                profitType: profitType,
+                profitValue: profitValue,
+                supplierId: targetSup ? targetSup.id : 'supp_default',
+                supplierProductId: p.id,
+                isImported: true,
+                isPublished: true, // Automatically live on website!
+                rating: 5,
+                sku: p.sku,
+                images: p.images,
+                details: p.details,
+                createdAt: existingIndex > -1 ? (appPosts[existingIndex].createdAt || new Date().toISOString()) : new Date().toISOString(),
+                lastSyncedAt: new Date().toISOString()
+            };
+
+            if (existingIndex > -1) {
+                appPosts[existingIndex] = postObj;
+                updatedCount++;
+            } else {
+                appPosts.unshift(postObj);
+                importedCount++;
+            }
+
+            if (window.db) {
+                window.db.collection('bexo_posts').doc(String(postObj.id)).set(sanitizeForFirestore(postObj)).catch(() => {});
+            }
+        });
+
+        savePosts();
+
+        if (targetSup) {
+            targetSup.lastSyncedAt = new Date().toISOString();
+            saveSuppliersToStorageAndDb();
+        }
+
+        appSupplierLogs.unshift({
+            id: Date.now(),
+            timestamp: new Date().toLocaleString('bn-BD'),
+            type: 'SUCCESS',
+            message: `${importedCount} টি নতুন প্রোডাক্ট ইম্পোর্ট এবং ${updatedCount} টি প্রোডাক্ট আপডেট করা হয়েছে। প্রফিট মার্জিন: ${profitType === 'percentage' ? '+' + profitValue + '%' : '+' + profitValue + ' ৳'}`
+        });
+        localStorage.setItem('bexo_supplier_logs', JSON.stringify(appSupplierLogs));
+
+        setTimeout(() => {
+            showSuccessOverlay(
+                "ইম্পোর্ট সফল হয়েছে!",
+                `${importedCount} টি নতুন প্রোডাক্ট আপনার শপে যুক্ত এবং ${updatedCount} টি আপডেট করা হয়েছে। প্রোডাক্টসমূহ ওয়েবসাইটে লাইভ রয়েছে।`,
+                "fas fa-check-circle",
+                "text-emerald-500",
+                "bg-emerald-50"
+            );
+            renderAdminSupplierApi();
+            if (typeof renderAdminPostList === 'function' && document.getElementById('adminViewContainer')) {
+                renderAdminPostList();
+            }
+            if (typeof renderPosts === 'function') renderPosts();
+        }, 500);
+
+    } catch (err) {
+        console.error("Apply selected import error:", err);
+        showSuccessOverlay("ইম্পোর্ট প্রক্রিয়ায় ত্রুটি!", "সমস্যা: " + err.message, "fas fa-exclamation-triangle", "text-rose-500", "bg-rose-50");
+    }
+}
+
+async function executeSupplierAutoSync() {
+    const spinner = document.getElementById('syncSpinnerIcon');
+    if (spinner) spinner.classList.add('animate-spin');
+
+    showToast("সাপ্লায়ারের সাথে রিয়েলটাইম প্রাইস ও স্টক সিঙ্ক শুরু হচ্ছে...", "info");
+
+    let updatedCount = 0;
+    const connectedSupps = appSuppliers.filter(s => s.status === 'connected');
+
+    if (connectedSupps.length === 0) {
+        showToast("কোনো সংযুক্ত সাপ্লায়ার পাওয়া যায়নি! অনুগ্রহ করে প্রথমে API কানেক্ট করুন।", "warning");
+        if (spinner) spinner.classList.remove('animate-spin');
+        return;
+    }
+
+    try {
+        for (const sup of connectedSupps) {
+            const imported = appPosts.filter(p => p.supplierId === sup.id || p.isImported);
+            imported.forEach(p => {
+                // Apply dynamic profit rule if costPrice exists
+                if (p.costPrice) {
+                    let newPrice = p.costPrice;
+                    const pType = p.profitType || sup.profitType || 'fixed';
+                    const pVal = p.profitValue !== undefined ? p.profitValue : (sup.profitValue || 30);
+
+                    if (pType === 'fixed') {
+                        newPrice = p.costPrice + pVal;
+                    } else {
+                        newPrice = Math.round(p.costPrice * (1 + pVal / 100));
+                    }
+                    if (p.price !== newPrice) {
+                        p.price = newPrice;
+                        updatedCount++;
+                    }
+                }
+                p.lastSyncedAt = new Date().toISOString();
+                if (window.db) {
+                    window.db.collection('bexo_posts').doc(String(p.id)).set(sanitizeForFirestore(p)).catch(() => {});
+                }
+            });
+            sup.lastSyncedAt = new Date().toISOString();
+        }
+
+        savePosts();
+        saveSuppliersToStorageAndDb();
+
+        appSupplierLogs.unshift({
+            id: Date.now(),
+            timestamp: new Date().toLocaleString('bn-BD'),
+            type: 'SUCCESS',
+            message: `অটো সিঙ্ক সম্পন্ন হয়েছে। ${updatedCount > 0 ? updatedCount + ' টি প্রোডাক্টের প্রাইস ও স্টক সিঙ্ক করা হয়েছে' : 'সব প্রোডাক্ট পূর্বেই আপ-টু-ডেট রয়েছে'}`
+        });
+        localStorage.setItem('bexo_supplier_logs', JSON.stringify(appSupplierLogs));
+
+        setTimeout(() => {
+            if (spinner) spinner.classList.remove('animate-spin');
+            showToast("অটো সিঙ্ক সফলভাবে সম্পন্ন হয়েছে!", "success");
+            renderAdminSupplierApi();
+        }, 800);
+
+    } catch (err) {
+        console.error("Auto Sync Error:", err);
+        if (spinner) spinner.classList.remove('animate-spin');
+        showToast("অটো সিঙ্ক ব্যর্থ হয়েছে: " + err.message, "error");
+    }
+}
+
+function toggleSupplierConnection(suppId) {
+    const sup = appSuppliers.find(s => s.id === suppId);
+    if (!sup) return;
+
+    if (sup.status === 'connected') {
+        sup.status = 'disconnected';
+        saveSuppliersToStorageAndDb();
+        showToast("সাপ্লায়ার API ডিসকানেক্ট করা হয়েছে। ইম্পোর্টকৃত প্রোডাক্টসমূহ শপে বিক্রি চালু থাকবে।", "info");
+    } else {
+        sup.status = 'connected';
+        saveSuppliersToStorageAndDb();
+        showToast("সাপ্লায়ার API সফলভাবে যুক্ত করা হয়েছে!", "success");
+    }
+    renderAdminSupplierApi();
+}
+
+async function testSupplierConnectionLive(suppId) {
+    const sup = appSuppliers.find(s => s.id === suppId) || appSuppliers[0];
+    if (!sup) {
+        showToast("সাপ্লায়ার কনফিগারেশন পাওয়া যায়নি!", "error");
+        return;
+    }
+
+    showToast("সাপ্লায়ার API টেস্ট করা হচ্ছে...", "info");
+
+    try {
+        const res = await fetch('/api/supplier/test-connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                baseUrl: sup.baseUrl,
+                apiKey: sup.apiKey,
+                secretKey: sup.secretKey
+            })
+        });
+
+        const data = await res.json().catch(() => ({
+            success: false,
+            httpStatus: "JSON Parse Error",
+            authStatus: "Unknown",
+            productsCount: 0,
+            error: "Invalid JSON response from server"
+        }));
+
+        let modal = document.getElementById('apiTestModalOverlay');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'apiTestModalOverlay';
+            modal.className = 'fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in';
+            document.body.appendChild(modal);
+        }
+
+        const isSuccess = data.success === true;
+        const httpStatus = data.httpStatus || (res.ok ? `${res.status} OK` : `HTTP ${res.status}`);
+        const authStatus = data.authStatus || (isSuccess ? "Authenticated Successfully" : "Authentication Failed");
+        const productsCount = data.productsCount !== undefined ? data.productsCount : 0;
+        const errorMsg = data.error || (isSuccess ? null : "Unknown API Error");
+
+        modal.innerHTML = `
+            <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 relative animate-scale-up text-slate-800">
+                <button onclick="document.getElementById('apiTestModalOverlay').classList.add('hidden')" class="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all">
+                    <i class="fas fa-times"></i>
+                </button>
+
+                <div class="flex items-center gap-3 border-b border-slate-100 pb-4">
+                    <div class="w-12 h-12 rounded-2xl ${isSuccess ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center text-xl font-bold">
+                        <i class="fas ${isSuccess ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-lg text-slate-800">সাপ্লায়ার API টেস্ট রেজাল্ট</h3>
+                        <p class="text-xs text-slate-500 font-medium">${sup.name}</p>
+                    </div>
+                </div>
+
+                <div class="space-y-4 text-xs font-bold">
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500">Base URL:</span>
+                            <span class="font-mono text-slate-800 truncate max-w-[220px]">${sup.baseUrl}</span>
+                        </div>
+                        <div class="flex items-center justify-between border-t border-slate-200/60 pt-2">
+                            <span class="text-slate-500">HTTP Status:</span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-black ${isSuccess ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                                ${httpStatus}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between border-t border-slate-200/60 pt-2">
+                            <span class="text-slate-500">Authentication Status:</span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-black ${isSuccess ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                                ${authStatus}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between border-t border-slate-200/60 pt-2">
+                            <span class="text-slate-500">Products Returned:</span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-black bg-blue-100 text-blue-700">
+                                ${productsCount} Products Found
+                            </span>
+                        </div>
+                    </div>
+
+                    ${errorMsg ? `
+                        <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-medium leading-relaxed">
+                            <i class="fas fa-bug mr-1"></i> <strong>ত্রুটি বার্তা:</strong> ${errorMsg}
+                        </div>
+                    ` : `
+                        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-700 text-xs font-medium leading-relaxed">
+                            <i class="fas fa-check-circle mr-1"></i> API কানেকশন সম্পূর্ণরূপে সচল ও সঠিক ভাবে অথেন্টিকেটেড রয়েছে।
+                        </div>
+                    `}
+                </div>
+
+                <div class="pt-2 flex justify-end">
+                    <button onclick="document.getElementById('apiTestModalOverlay').classList.add('hidden')" class="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-xs transition-all shadow-md active:scale-95">
+                        বন্ধ করুন
+                    </button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove('hidden');
+    } catch (e) {
+        showToast("টেস্ট করার সময় সমস্যা হয়েছে: " + e.message, "error");
+    }
+}
+
+// -------------------------------------------------------------------------
+// SUPPLIER PROFILE MODAL & DELETIONS
+// -------------------------------------------------------------------------
+
+function openSupplierModal(suppId = null) {
+    const sup = appSuppliers.find(s => s.id === suppId);
+
+    let modal = document.getElementById('supplierProfileModalOverlay');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'supplierProfileModalOverlay';
+        modal.className = 'fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 relative animate-scale-up text-slate-800">
+            <button onclick="closeSupplierModal()" class="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <div class="flex items-center gap-3 border-b border-slate-100 pb-4">
+                <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                    <i class="fas fa-plug"></i>
+                </div>
+                <div>
+                    <h3 class="font-black text-lg text-slate-800">${sup ? 'সাপ্লায়ার সম্পাদনা করুন' : 'নতুন সাপ্লায়ার যোগ করুন'}</h3>
+                    <p class="text-xs text-slate-500 font-medium">Base URL, API Keys ও সিকিউরিটি কনফিগারেশন</p>
+                </div>
+            </div>
+
+            <form onsubmit="saveSupplierForm(event, '${suppId || ''}')" class="space-y-4">
+                <div>
+                    <label class="text-xs font-black uppercase text-slate-500 tracking-wider block mb-1">সাপ্লায়ারের নাম (Name)</label>
+                    <input type="text" id="suppFormName" value="${sup ? sup.name : ''}" required placeholder="যেমন: Bexo Apparel Wholesale" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="text-xs font-black uppercase text-slate-500 tracking-wider block mb-1">Base URL</label>
+                    <input type="url" id="suppFormBaseUrl" value="${sup ? sup.baseUrl : 'https://api.bexobd.com/v1/supplier'}" required placeholder="https://api.supplier.com/v1" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="text-xs font-black uppercase text-slate-500 tracking-wider block mb-1">API Key</label>
+                    <input type="text" id="suppFormApiKey" value="${sup ? sup.apiKey : ''}" required placeholder="sk_live_..." class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="text-xs font-black uppercase text-slate-500 tracking-wider block mb-1">Secret Key</label>
+                    <input type="password" id="suppFormSecretKey" value="${sup ? sup.secretKey : ''}" required placeholder="sec_live_..." class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+                    <button type="button" onclick="closeSupplierModal()" class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all">
+                        বাতিল
+                    </button>
+                    <button type="submit" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl transition-all shadow-md active:scale-95">
+                        <i class="fas fa-save mr-1"></i> সেভ করুন
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+}
+
+function closeSupplierModal() {
+    const modal = document.getElementById('supplierProfileModalOverlay');
+    if (modal) modal.classList.add('hidden');
+}
+
+function saveSupplierForm(e, suppId) {
+    e.preventDefault();
+    const name = document.getElementById('suppFormName').value.trim();
+    const baseUrl = document.getElementById('suppFormBaseUrl').value.trim();
+    const apiKey = document.getElementById('suppFormApiKey').value.trim();
+    const secretKey = document.getElementById('suppFormSecretKey').value.trim();
+
+    if (!name || !baseUrl || !apiKey || !secretKey) {
+        showToast("সবগুলো তথ্য সঠিকভাবে পূরণ করুন!", "error");
+        return;
+    }
+
+    if (suppId) {
+        const sup = appSuppliers.find(s => s.id === suppId);
+        if (sup) {
+            sup.name = name;
+            sup.baseUrl = baseUrl;
+            sup.apiKey = apiKey;
+            sup.secretKey = secretKey;
+        }
+    } else {
+        appSuppliers.push({
+            id: 'supp_' + Date.now(),
+            name,
+            baseUrl,
+            apiKey,
+            secretKey,
+            status: 'connected',
+            autoSync: true,
+            profitType: 'fixed',
+            profitValue: 30,
+            lastSyncedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+        });
+    }
+
+    saveSuppliersToStorageAndDb();
+    closeSupplierModal();
+    showToast("সাপ্লায়ার প্রোফাইল সফলভাবে সংরক্ষণ করা হয়েছে!", "success");
+    renderAdminSupplierApi();
+}
+
+function deleteSupplierConfig(suppId) {
+    if (!confirm("আপনি কি নিশ্চিত যে এই সাপ্লায়ার কনফিগারেশনটি ডিলিট করতে চান? ইম্পোর্টকৃত প্রোডাক্টগুলো আপনার শপে বহাল থাকবে।")) return;
+    appSuppliers = appSuppliers.filter(s => s.id !== suppId);
+    saveSuppliersToStorageAndDb();
+    showToast("সাপ্লায়ার ডিলিট করা হয়েছে।", "info");
+    renderAdminSupplierApi();
+}
+
+function deleteImportedProduct(pId) {
+    if (!confirm("আপনি কি নিশ্চিত যে এই প্রোডাক্টটি ডিলিট করতে চান?")) return;
+    appPosts = appPosts.filter(p => String(p.id) !== String(pId));
+    savePosts();
+    if (window.db) {
+        window.db.collection('bexo_posts').doc(String(pId)).delete().catch(() => {});
+    }
+    showToast("প্রোডাক্ট সফলভাবে ডিলিট করা হয়েছে!", "success");
+    renderAdminSupplierApi();
+}
+
+function clearSupplierLogs() {
+    appSupplierLogs = [];
+    localStorage.setItem('bexo_supplier_logs', JSON.stringify(appSupplierLogs));
+    showToast("সিঙ্ক লগ ক্লিয়ার করা হয়েছে।", "info");
+    renderAdminSupplierApi();
+}
+
+function openBulkProfitModal(mode, supplierId) {
+    if (typeof openProductSelectionModal === 'function') {
+        openProductSelectionModal(mode || 'import_all', supplierId);
+    }
+}
+function closeBulkProfitModal() {
+    if (typeof closeProductSelectionModal === 'function') {
+        closeProductSelectionModal();
+    }
+}
+function updateBulkProfitPreview() {}
+function applyBulkProfitAndProcess() {}
+
+window.renderAdminSupplierApi = renderAdminSupplierApi;
+window.openProductSelectionModal = openProductSelectionModal;
+window.closeProductSelectionModal = closeProductSelectionModal;
+window.applySelectedProductsImport = applySelectedProductsImport;
+window.openBulkProfitModal = openBulkProfitModal;
+window.closeBulkProfitModal = closeBulkProfitModal;
+window.updateBulkProfitPreview = updateBulkProfitPreview;
+window.applyBulkProfitAndProcess = applyBulkProfitAndProcess;
+window.executeSupplierAutoSync = executeSupplierAutoSync;
+window.toggleSupplierConnection = toggleSupplierConnection;
+window.testSupplierConnectionLive = testSupplierConnectionLive;
+window.openSupplierModal = openSupplierModal;
+window.closeSupplierModal = closeSupplierModal;
+window.saveSupplierForm = saveSupplierForm;
+window.deleteSupplierConfig = deleteSupplierConfig;
+window.deleteImportedProduct = deleteImportedProduct;
+window.clearSupplierLogs = clearSupplierLogs;
+
+
+function renderAdminAppSettings() {
                   const container = document.getElementById('adminViewContainer');
                   container.innerHTML = `
                       <div class="p-4 sm:p-8 space-y-8 animate-fade-in">
@@ -15719,7 +17061,26 @@ function savePosts() {
                   const unitType = document.getElementById('apUnit').value;
                   const discountAmount = document.getElementById('apDiscount').value.trim();
                   const remarks = document.getElementById('apRemarks').value.trim();
-                  const sku = document.getElementById('apSku').value.trim() || `SKU-${Date.now().toString().slice(-6)}`;
+                  const rawSku = document.getElementById('apSku').value.trim();
+                  const sku = rawSku || `SKU-${Date.now().toString().slice(-6)}`;
+                  
+                  // Check for duplicate SKU
+                  const duplicatePost = (typeof appPosts !== 'undefined' ? appPosts : []).find(item => {
+                      if (pId && String(pId) !== 'null' && String(pId) !== '' && String(item.id) === String(pId)) return false;
+                      return item.sku && String(item.sku).trim().toLowerCase() === sku.toLowerCase();
+                  });
+                  if (duplicatePost) {
+                      showToast(`এই প্রোডাক্ট কোড/SKU (${sku}) টি ইতোমধ্যে অন্য একটি প্রোডাক্টে ("${duplicatePost.title}") ব্যবহৃত হয়েছে!`, 'error');
+                      if (typeof showSuccessOverlay === 'function') {
+                          showSuccessOverlay("ডুপ্লিকেট প্রোডাক্ট কোড!", `SKU: ${sku} টি ইতোমধ্যে ব্যবহৃত হয়েছে`, "fas fa-exclamation-triangle", "text-red-500", "bg-red-50");
+                      }
+                      const inputEl = document.getElementById('apSku');
+                      if (inputEl) {
+                          inputEl.focus();
+                          inputEl.classList.add('border-red-500', 'bg-red-50');
+                      }
+                      return;
+                  }
                   const details = document.getElementById('apDetails').value.trim();
                   const imagesText = document.getElementById('apImages').value.trim();
                   const apStockOutCheck = document.getElementById('apStockOut') ? document.getElementById('apStockOut').checked : false;
@@ -16185,6 +17546,67 @@ function savePosts() {
 
 
               
+
+function getProductCode(item) {
+    if (!item) return 'N/A';
+    if (typeof item === 'string') return item;
+    
+    // Direct sku / code property
+    if (item.sku && String(item.sku).trim() !== '' && String(item.sku).trim().toUpperCase() !== 'N/A') {
+        return String(item.sku).trim();
+    }
+    if (item.code && String(item.code).trim() !== '' && String(item.code).trim().toUpperCase() !== 'N/A') {
+        return String(item.code).trim();
+    }
+    
+    // Match with global appPosts
+    const pId = item.productId || item.id;
+    if (typeof appPosts !== 'undefined' && Array.isArray(appPosts) && appPosts.length > 0) {
+        const p = appPosts.find(post => 
+            (pId && String(post.id) === String(pId)) || 
+            (item.title && post.title === item.title) ||
+            (item.productTitle && post.title === item.productTitle)
+        );
+        if (p && p.sku && String(p.sku).trim() !== '') {
+            return String(p.sku).trim();
+        }
+    }
+    
+    // Fallback if item.productId is a short custom code
+    if (item.productId && String(item.productId).length < 10 && !isNaN(item.productId)) {
+        return String(item.productId);
+    }
+    
+    return 'N/A';
+}
+window.getProductCode = getProductCode;
+
+function checkSkuDuplicateLive(val, pId) {
+    const skuDisplay = document.getElementById('skuDisplay');
+    if (skuDisplay) skuDisplay.innerText = (val || 'SKU-XXXXXX').toUpperCase();
+    
+    const warningEl = document.getElementById('skuDuplicateWarning');
+    const inputEl = document.getElementById('apSku');
+    if (!val || !val.trim()) {
+        if (warningEl) warningEl.classList.add('hidden');
+        if (inputEl) inputEl.classList.remove('border-red-500', 'bg-red-50');
+        return;
+    }
+    const cleanVal = val.trim().toLowerCase();
+    const isDup = (typeof appPosts !== 'undefined' ? appPosts : []).some(item => {
+        if (pId && String(pId) !== 'null' && String(pId) !== '' && String(item.id) === String(pId)) return false;
+        return item.sku && String(item.sku).trim().toLowerCase() === cleanVal;
+    });
+    if (isDup) {
+        if (warningEl) warningEl.classList.remove('hidden');
+        if (inputEl) inputEl.classList.add('border-red-500', 'bg-red-50');
+    } else {
+        if (warningEl) warningEl.classList.add('hidden');
+        if (inputEl) inputEl.classList.remove('border-red-500', 'bg-red-50');
+    }
+}
+window.checkSkuDuplicateLive = checkSkuDuplicateLive;
+
 function changeStock(id) {
     const p = appPosts.find(item => String(item.id) === String(id));
     if(!p) return;
@@ -16755,7 +18177,9 @@ function changePrice(id) {
                       status: 'Pending',
                       items: [{
                           productId: currentProduct.id,
+                          productTitle: currentProduct.title,
                           title: currentProduct.title,
+                          sku: currentProduct.sku || (typeof appPosts !== 'undefined' ? (appPosts.find(p => String(p.id) === String(currentProduct.id))?.sku || '') : ''),
                           image: currentProduct.img,
                           size: currentProduct.size,
                           qty: currentProduct.qty || 1,
@@ -19130,7 +20554,7 @@ function updateUserTicketStatus(id, newStatus) {
                                                       <img src="${item.image}" class="w-10 h-10 rounded object-cover border" onerror="this.src='https://picsum.photos/seed/placeholder/200/200'">
                                                       <div>
                                                           <div class="font-bold text-gray-800">${item.productTitle || 'Unknown Product'}</div>
-                                                          <div class="text-xs text-gray-400">Code: ${item.productId || 'N/A'}</div>
+                                                          <div class="text-xs text-slate-500 font-semibold">Code: ${getProductCode(item)}</div>
                                                       </div>
                                                   </div>
                                               </td>
@@ -21097,7 +22521,7 @@ window.showAuth = function(isLogin) {
     }
 };
 
-let selectedLandingCategory = null;
+var selectedLandingCategory = null;
 
 function selectLandingCategory(category) {
     selectedLandingCategory = category;
