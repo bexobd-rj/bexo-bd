@@ -14313,7 +14313,7 @@ function savePosts() {
               }
 
               // Handlers for API Import
-              window.saveApiSettings = function() {
+              window.saveApiSettings = async function() {
                   const baseUrl = document.getElementById('apiBaseUrl').value.trim();
                   const authType = document.getElementById('apiAuthType').value;
                   const apiKey = document.getElementById('apiKey').value.trim();
@@ -14326,6 +14326,17 @@ function savePosts() {
                   appSettings.apiIntegration.secretKey = secretKey;
                   
                   saveAppSettings();
+                  
+                  try {
+                      await fetch('/api/save-settings', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(appSettings.apiIntegration)
+                      });
+                  } catch (e) {
+                      console.error("Backend save settings error", e);
+                  }
+                  
                   showToast("API Settings Saved!", "success");
               };
               
