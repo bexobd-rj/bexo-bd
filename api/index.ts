@@ -347,301 +347,283 @@ app.use(express.json());
     }
   });
 
-  
-
-
-  // ==========================================
-  // BEXO BD SUPPLIER API INTEGRATION ENDPOINTS
-  // ==========================================
-
-  // 1. Test Connection to Supplier API
-  app.post("/api/supplier/test-connection", async (req, res) => {
-    const startTime = Date.now();
+  // API Route to Test External API Connection
+  app.post("/api/test-api-connection", async (req, res) => {
     try {
-      const { baseUrl, apiKey, secretKey } = req.body;
-      if (!baseUrl) {
-        return res.status(400).json({
-          success: false,
-          httpStatus: "400 Bad Request",
-          statusCode: 400,
-          authStatus: "Base URL Missing",
-          productsCount: 0,
-          responseTimeMs: Date.now() - startTime,
-          error: "Base URL is required"
-        });
+      let { websiteUrl, apiType, authType, apiKey, apiSecret, customHeaders } = req.body;
+      if (!websiteUrl) {
+        return res.status(400).json({ success: false, errorReason: "Website URL is required" });
+      }
+
+      websiteUrl = websiteUrl.trim();
+      if (!websiteUrl.startsWith("http://") && !websiteUrl.startsWith("https://")) {
+        websiteUrl = "https://" + websiteUrl;
       }
 
       let parsedUrl: URL;
       try {
-        parsedUrl = new URL(baseUrl);
+        parsedUrl = new URL(websiteUrl);
       } catch (e) {
-        return res.status(400).json({
-          success: false,
-          httpStatus: "400 Bad Request",
-          statusCode: 400,
-          authStatus: "Invalid URL Format",
-          productsCount: 0,
-          responseTimeMs: Date.now() - startTime,
-          error: "Invalid Base URL format. Must start with http:// or https://"
-        });
-      }
-
-      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-        return res.status(400).json({
-          success: false,
-          httpStatus: "400 Bad Request",
-          statusCode: 400,
-          authStatus: "Invalid Protocol",
-          productsCount: 0,
-          responseTimeMs: Date.now() - startTime,
-          error: "Only http or https URLs are permitted"
-        });
+        return res.status(400).json({ success: false, errorReason: "Website Not Supported: Invalid URL format" });
       }
 
       const hostname = parsedUrl.hostname.toLowerCase();
-      const isInternal = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "169.254.169.254" || hostname.startsWith("10.") || hostname.startsWith("192.168.");
+      const isInternal = 
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "0.0.0.0" ||
+        hostname === "169.254.169.254" || 
+        hostname.startsWith("10.") ||
+        hostname.startsWith("192.168.") ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+
       if (isInternal) {
-        return res.status(403).json({
-          success: false,
-          httpStatus: "403 Forbidden",
-          statusCode: 403,
-          authStatus: "Access Forbidden",
-          productsCount: 0,
-          responseTimeMs: Date.now() - startTime,
-          error: "Internal or private URLs are forbidden for security"
-        });
+        return res.status(403).json({ success: false, errorReason: "API Connection Failed: Private network addresses are forbidden" });
       }
 
       const headers: Record<string, string> = {
-        "User-Agent": "BexoBD-SupplierIntegration/1.0",
-        "Accept": "application/json",
-        "Content-Type": "application/json"
+        "User-Agent": "BexoBD-ProductImportCenter/1.0",
+        "Accept": "application/json"
       };
 
-      if (apiKey) {
-        headers["X-API-Key"] = apiKey;
-        headers["Authorization"] = `Bearer ${apiKey}`;
-      }
-      if (secretKey) {
-        headers["X-Secret-Key"] = secretKey;
-      }
-
-      let testUrl = baseUrl.trim();
-      if (!testUrl.includes('/products') && !testUrl.includes('/items') && !testUrl.includes('/api')) {
-        testUrl = testUrl.replace(/\/$/, '') + '/products';
-      }
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-
-      let response;
-      try {
-        response = await fetch(testUrl, { method: "GET", headers, signal: controller.signal });
-      } catch (fetchErr: any) {
-        clearTimeout(timeout);
-        const responseTimeMs = Date.now() - startTime;
-        return res.status(200).json({
-          success: false,
-          httpStatus: "Connection Error / Timeout",
-          statusCode: 0,
-          authStatus: "Unable to connect to supplier server",
-          productsCount: 0,
-          responseTimeMs,
-          error: `Unable to connect to supplier server: ${fetchErr.message || 'Timeout'}`
-        });
-      }
-      clearTimeout(timeout);
-
-      const responseTimeMs = Date.now() - startTime;
-      const statusCode = response.status;
-      const httpStatus = `${statusCode} ${response.statusText || (statusCode === 200 ? 'OK' : 'Response')}`;
-
-      if (!response.ok) {
-        let errSnippet = "";
+      if (customHeaders) {
         try {
-          const errText = await response.text();
-          errSnippet = errText.slice(0, 200);
+          const parsedHeaders = typeof customHeaders === "string" ? JSON.parse(customHeaders) : customHeaders;
+          Object.assign(headers, parsedHeaders);
         } catch (e) {}
+      }
 
-        let authStatus = "Authentication Failed";
-        if (statusCode === 401) authStatus = "❌ Invalid API Key / Unauthorized (401)";
-        else if (statusCode === 403) authStatus = "❌ Access Forbidden / Invalid Secret Key (403)";
-        else if (statusCode === 404) authStatus = "❌ Products endpoint not found (404)";
-        else authStatus = `❌ HTTP ${statusCode} Error`;
+      if (authType === "bearer" && apiKey) {
+        headers["Authorization"] = `Bearer ${apiKey.trim()}`;
+      } else if (authType === "api_key_header" && apiKey) {
+        headers["X-API-Key"] = apiKey.trim();
+      } else if (authType === "basic_auth" && (apiKey || apiSecret)) {
+        const token = Buffer.from(`${apiKey || ''}:${apiSecret || ''}`).toString('base64');
+        headers["Authorization"] = `Basic ${token}`;
+      }
 
-        return res.status(200).json({
+      const urlsToTest: string[] = [];
+      const cleanBase = websiteUrl.replace(/\/+$/, "");
+
+      if (apiType === "woocommerce") {
+        let authQuery = "";
+        if (authType === "query_param" || (apiKey && apiSecret)) {
+          authQuery = `?consumer_key=${encodeURIComponent(apiKey || '')}&consumer_secret=${encodeURIComponent(apiSecret || '')}`;
+        }
+        urlsToTest.push(`${cleanBase}/wp-json/wc/v3/products${authQuery}`);
+        urlsToTest.push(`${cleanBase}/wp-json/wc/v2/products${authQuery}`);
+        urlsToTest.push(`${cleanBase}/wp-json/wp/v2/posts`);
+      } else if (apiType === "shopify") {
+        urlsToTest.push(`${cleanBase}/products.json`);
+      } else if (apiType === "rest_api") {
+        let authQuery = "";
+        if (authType === "query_param" && apiKey) {
+          authQuery = `?api_key=${encodeURIComponent(apiKey)}`;
+        }
+        urlsToTest.push(`${cleanBase}/api/products${authQuery}`);
+        urlsToTest.push(`${cleanBase}/api/v1/products${authQuery}`);
+        urlsToTest.push(`${cleanBase}/products${authQuery}`);
+        urlsToTest.push(`${cleanBase}${authQuery}`);
+      } else {
+        urlsToTest.push(cleanBase);
+        urlsToTest.push(`${cleanBase}/products.json`);
+        urlsToTest.push(`${cleanBase}/wp-json/wc/v3/products`);
+        urlsToTest.push(`${cleanBase}/api/products`);
+      }
+
+      let successUrl = "";
+      let foundCount = 0;
+      let lastErrMessage = "Product Data Not Found";
+
+      for (const targetUrl of urlsToTest) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+          const resp = await fetch(targetUrl, { headers, signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (resp.status === 401 || resp.status === 403) {
+            lastErrMessage = "Invalid API Key or authorization parameters";
+            continue;
+          }
+
+          if (resp.ok) {
+            const data = await resp.json();
+            const items = Array.isArray(data) ? data : (data.products || data.items || data.data || []);
+            if (Array.isArray(items)) {
+              successUrl = targetUrl;
+              foundCount = items.length;
+              break;
+            }
+          }
+        } catch (err: any) {
+          if (err.name === 'AbortError') {
+            lastErrMessage = "Network Error: Request timed out";
+          } else {
+            lastErrMessage = "API Connection Failed: Unable to establish handshake";
+          }
+        }
+      }
+
+      if (successUrl) {
+        return res.json({
+          success: true,
+          message: `Connection successful! Connected to endpoint. Found ${foundCount} products available.`,
+          details: { testedUrl: successUrl, itemCount: foundCount }
+        });
+      } else {
+        return res.status(400).json({
           success: false,
-          httpStatus,
-          statusCode,
-          authStatus,
-          productsCount: 0,
-          responseTimeMs,
-          error: `Supplier API Test Failed (${httpStatus})${errSnippet ? ': ' + errSnippet : ''}`
+          errorReason: lastErrMessage
         });
       }
 
-      const data = await response.json();
-      let productList: any[] = [];
-      if (Array.isArray(data)) {
-        productList = data;
-      } else if (Array.isArray(data.products)) {
-        productList = data.products;
-      } else if (Array.isArray(data.data)) {
-        productList = data.data;
-      } else if (Array.isArray(data.items)) {
-        productList = data.items;
-      } else if (Array.isArray(data.result)) {
-        productList = data.result;
-      } else if (typeof data === 'object' && data !== null) {
-        productList = Object.values(data).filter(v => typeof v === 'object' && v !== null);
-      }
-
-      return res.json({
-        success: true,
-        httpStatus: "200 OK (Connected)",
-        statusCode,
-        authStatus: "✅ Authenticated Successfully",
-        productsCount: productList.length,
-        responseTimeMs,
-        message: `Supplier API Connection Successful! Found ${productList.length} products.`
-      });
     } catch (error: any) {
-      console.error("Supplier Test Connection Error:", error);
-      return res.status(200).json({
-        success: false,
-        httpStatus: "500 Internal Error",
-        statusCode: 500,
-        authStatus: "Execution Exception",
-        productsCount: 0,
-        responseTimeMs: Date.now() - startTime,
-        error: error.message || "Failed to establish connection with Supplier API"
-      });
+      console.error("Error in test-api-connection:", error);
+      res.status(500).json({ success: false, errorReason: "API Connection Failed: Internal server error" });
     }
   });
 
-  // 2. Fetch Products from Supplier API
-  app.post("/api/supplier/fetch-products", async (req, res) => {
+  // API Route to Fetch External Products
+  app.post("/api/fetch-external-products", async (req, res) => {
     try {
-      const { baseUrl, apiKey, secretKey } = req.body;
-      if (!baseUrl) {
-        return res.status(400).json({ success: false, error: "Base URL is required" });
+      let { websiteUrl, apiType, authType, apiKey, apiSecret, customHeaders } = req.body;
+      if (!websiteUrl) {
+        return res.status(400).json({ success: false, errorReason: "Website URL is required" });
+      }
+
+      websiteUrl = websiteUrl.trim();
+      if (!websiteUrl.startsWith("http://") && !websiteUrl.startsWith("https://")) {
+        websiteUrl = "https://" + websiteUrl;
       }
 
       let parsedUrl: URL;
       try {
-        parsedUrl = new URL(baseUrl);
+        parsedUrl = new URL(websiteUrl);
       } catch (e) {
-        return res.status(400).json({ success: false, error: "Invalid Base URL format" });
+        return res.status(400).json({ success: false, errorReason: "Website Not Supported: Invalid URL format" });
+      }
+
+      const hostname = parsedUrl.hostname.toLowerCase();
+      const isInternal = 
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "0.0.0.0" ||
+        hostname === "169.254.169.254" || 
+        hostname.startsWith("10.") ||
+        hostname.startsWith("192.168.") ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+
+      if (isInternal) {
+        return res.status(403).json({ success: false, errorReason: "API Connection Failed: Private network addresses are forbidden" });
       }
 
       const headers: Record<string, string> = {
-        "User-Agent": "BexoBD-SupplierIntegration/1.0",
-        "Accept": "application/json",
-        "Content-Type": "application/json"
+        "User-Agent": "BexoBD-ProductImportCenter/1.0",
+        "Accept": "application/json"
       };
 
-      if (apiKey) {
-        headers["X-API-Key"] = apiKey;
-        headers["Authorization"] = `Bearer ${apiKey}`;
-      }
-      if (secretKey) {
-        headers["X-Secret-Key"] = secretKey;
-      }
-
-      let fetchUrl = baseUrl.trim();
-      if (!fetchUrl.includes('/products') && !fetchUrl.includes('/items') && !fetchUrl.includes('/api')) {
-        fetchUrl = fetchUrl.replace(/\/$/, '') + '/products';
-      }
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-
-      let response;
-      try {
-        response = await fetch(fetchUrl, { method: "GET", headers, signal: controller.signal });
-      } catch (fetchErr: any) {
-        clearTimeout(timeout);
-        return res.status(200).json({
-          success: false,
-          error: `Connection error: ${fetchErr.message || 'Timeout connecting to supplier server'}`
-        });
-      }
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        let errSnippet = "";
+      if (customHeaders) {
         try {
-          const errText = await response.text();
-          errSnippet = errText.slice(0, 200);
+          const parsedHeaders = typeof customHeaders === "string" ? JSON.parse(customHeaders) : customHeaders;
+          Object.assign(headers, parsedHeaders);
         } catch (e) {}
-        return res.status(200).json({
+      }
+
+      if (authType === "bearer" && apiKey) {
+        headers["Authorization"] = `Bearer ${apiKey.trim()}`;
+      } else if (authType === "api_key_header" && apiKey) {
+        headers["X-API-Key"] = apiKey.trim();
+      } else if (authType === "basic_auth" && (apiKey || apiSecret)) {
+        const token = Buffer.from(`${apiKey || ''}:${apiSecret || ''}`).toString('base64');
+        headers["Authorization"] = `Basic ${token}`;
+      }
+
+      const cleanBase = websiteUrl.replace(/\/+$/, "");
+      const targetUrls: string[] = [];
+
+      if (cleanBase.endsWith(".json") || cleanBase.includes("/products") || cleanBase.includes("/api/")) {
+        targetUrls.push(cleanBase);
+      }
+
+      if (apiType === "woocommerce") {
+        let authQuery = "";
+        if (authType === "query_param" || (apiKey && apiSecret)) {
+          authQuery = `?consumer_key=${encodeURIComponent(apiKey || '')}&consumer_secret=${encodeURIComponent(apiSecret || '')}&per_page=100`;
+        } else {
+          authQuery = "?per_page=100";
+        }
+        targetUrls.push(`${cleanBase}/wp-json/wc/v3/products${authQuery}`);
+        targetUrls.push(`${cleanBase}/wp-json/wc/v2/products${authQuery}`);
+      } else if (apiType === "shopify") {
+        targetUrls.push(`${cleanBase}/products.json?limit=250`);
+      } else if (apiType === "rest_api") {
+        let authQuery = "";
+        if (authType === "query_param" && apiKey) {
+          authQuery = `?api_key=${encodeURIComponent(apiKey)}`;
+        }
+        targetUrls.push(`${cleanBase}/products${authQuery}`);
+        targetUrls.push(`${cleanBase}/api/products${authQuery}`);
+        targetUrls.push(`${cleanBase}/api/v1/products${authQuery}`);
+      } else {
+        targetUrls.push(cleanBase);
+        targetUrls.push(`${cleanBase}/products.json`);
+        targetUrls.push(`${cleanBase}/wp-json/wc/v3/products`);
+        targetUrls.push(`${cleanBase}/api/products`);
+      }
+
+      let fetchedItems: any[] = [];
+      let lastErrReason = "Product Data Not Found";
+
+      for (const targetUrl of targetUrls) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+          const resp = await fetch(targetUrl, { headers, signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (resp.status === 401 || resp.status === 403) {
+            lastErrReason = "Invalid API Key or permission denied";
+            continue;
+          }
+
+          if (resp.ok) {
+            const data = await resp.json();
+            const items = Array.isArray(data) ? data : (data.products || data.items || data.data || []);
+            if (Array.isArray(items) && items.length > 0) {
+              fetchedItems = items;
+              break;
+            }
+          }
+        } catch (err: any) {
+          if (err.name === 'AbortError') {
+            lastErrReason = "Network Error: Request timed out while fetching products";
+          } else {
+            lastErrReason = "API Connection Failed: Could not connect to target website";
+          }
+        }
+      }
+
+      if (fetchedItems.length > 0) {
+        return res.json({
+          success: true,
+          products: fetchedItems
+        });
+      } else {
+        return res.status(400).json({
           success: false,
-          error: `Supplier API HTTP ${response.status} ${response.statusText}${errSnippet ? ': ' + errSnippet : ''}`
+          errorReason: lastErrReason
         });
       }
 
-      const rawData = await response.json();
-      let productList: any[] = [];
-      if (Array.isArray(rawData)) {
-        productList = rawData;
-      } else if (Array.isArray(rawData.products)) {
-        productList = rawData.products;
-      } else if (Array.isArray(rawData.data)) {
-        productList = rawData.data;
-      } else if (Array.isArray(rawData.items)) {
-        productList = rawData.items;
-      } else if (Array.isArray(rawData.result)) {
-        productList = rawData.result;
-      } else if (typeof rawData === 'object' && rawData !== null) {
-        productList = Object.values(rawData).filter(v => typeof v === 'object' && v !== null);
-      }
-
-      const normalizedProducts = productList.map((p: any, idx: number) => {
-        const suppId = String(p.supplierProductId || p.id || p.productId || p.product_id || p.sku || p.code || `SUP-${idx + 1}`);
-        const sku = String(p.sku || p.code || suppId);
-        const title = String(p.title || p.name || p.productName || p.product_name || `Imported Item #${suppId}`);
-        const costPrice = Math.round(Number(p.costPrice ?? p.cost_price ?? p.wholesalePrice ?? p.wholesale_price ?? p.supplierPrice ?? p.supplier_price ?? p.price ?? p.amount ?? 0));
-        const stockCount = Math.max(0, Math.round(Number(p.stockCount ?? p.stock ?? p.quantity ?? p.inventory ?? p.stock_quantity ?? 10)));
-        const category = String(p.category || p.cat || p.category_name || "পোশাক");
-        const subCategory = String(p.subCategory || p.sub_category || "নতুন কালেকশন");
-        const details = String(p.details || p.description || p.desc || p.summary || "অফিশিয়াল প্রিমিয়াম সাপ্লায়ার প্রোডাক্ট।");
-
-        let imagesList: string[] = [];
-        if (Array.isArray(p.images) && p.images.length > 0) {
-          imagesList = p.images.map((img: any) => typeof img === 'string' ? img : (img.url || img.src || '')).filter(Boolean);
-        } else if (typeof p.images === 'string' && p.images.trim()) {
-          imagesList = p.images.split(/[\s,]+/).filter(Boolean);
-        } else if (p.image || p.photo || p.thumbnail) {
-          imagesList = [String(p.image || p.photo || p.thumbnail)];
-        }
-
-        if (imagesList.length === 0) {
-          imagesList = [`https://picsum.photos/seed/supp-${suppId}/800/600`];
-        }
-
-        return {
-          supplierProductId: suppId,
-          sku,
-          title,
-          category,
-          subCategory,
-          costPrice,
-          stockCount,
-          details,
-          images: imagesList
-        };
-      });
-
-      return res.json({
-        success: true,
-        count: normalizedProducts.length,
-        products: normalizedProducts
-      });
     } catch (error: any) {
-      console.error("Fetch Supplier Products Error:", error);
-      return res.status(200).json({ success: false, error: error.message || "Failed to fetch supplier products" });
+      console.error("Error in fetch-external-products:", error);
+      res.status(500).json({ success: false, errorReason: "Network Error: Internal server error" });
     }
   });
 
+  
 
 export default app;

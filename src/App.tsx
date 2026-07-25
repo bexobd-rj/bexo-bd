@@ -29,7 +29,8 @@ import {
   Key,
   ShieldAlert,
   Upload,
-  Image
+  Image,
+  DownloadCloud
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from './firebase';
@@ -63,7 +64,7 @@ import { AdminTransferPanel } from './components/AdminTransferPanel';
 import { InvoiceViewer } from './components/InvoiceViewer';
 
 // --- Types & Constants ---
-type View = 'dashboard' | 'profile' | 'products' | 'orders' | 'admin-orders' | 'admin-payouts' | 'admin-products' | 'admin-users' | 'admin-panel' | 'cart' | 'sales' | 'balance' | 'support';
+type View = 'dashboard' | 'profile' | 'products' | 'orders' | 'admin-orders' | 'admin-payouts' | 'admin-products' | 'admin-users' | 'admin-panel' | 'admin-import-center' | 'cart' | 'sales' | 'balance' | 'support';
 
 interface AdminWorkspaceProps {
   allUsers: UserProfile[];
@@ -177,7 +178,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [activeView, _setActiveView] = useState<View>(() => {
     const hash = window.location.hash.replace('#', '') as View;
-    const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'cart', 'sales', 'balance', 'support'];
+    const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'admin-import-center', 'cart', 'sales', 'balance', 'support'];
     return validViews.includes(hash) ? hash : 'dashboard';
   });
 
@@ -190,7 +191,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '') as View;
-      const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'cart', 'sales', 'balance', 'support'];
+      const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'admin-import-center', 'cart', 'sales', 'balance', 'support'];
       if (validViews.includes(hash)) {
         _setActiveView(hash);
       } else {
@@ -644,7 +645,11 @@ export default function App() {
           <NavItem icon={<Package size={20} />} label="All Products" active={activeView === 'products'} onClick={() => { setActiveView('products'); setIsSidebarOpen(false); }} />
           <NavItem icon={<ClipboardList size={20} />} label="Order List" active={activeView === 'orders'} onClick={() => { setActiveView('orders'); setIsSidebarOpen(false); }} />
           {profile?.role === 'admin' && (
-            <NavItem icon={<Key size={20} />} label="🔑 Admin Panel" active={activeView === 'admin-panel'} onClick={() => { setActiveView('admin-panel'); setIsSidebarOpen(false); }} />
+            <>
+              <NavItem icon={<Key size={20} />} label="🔑 Admin Panel" active={activeView === 'admin-panel'} onClick={() => { setActiveView('admin-panel'); setIsSidebarOpen(false); }} />
+              <NavItem icon={<Users size={20} />} label="Manager" active={activeView === 'admin-users'} onClick={() => { setActiveView('admin-users'); setIsSidebarOpen(false); }} />
+              <NavItem icon={<Banknote size={20} />} label="Financial Transactions" active={activeView === 'admin-payouts'} onClick={() => { setActiveView('admin-payouts'); setIsSidebarOpen(false); }} />
+            </>
           )}
           <NavItem icon={<ShoppingCart size={20} />} label="Cart List" active={activeView === 'cart'} onClick={() => { setActiveView('cart'); setIsSidebarOpen(false); }} />
           <div className="pt-4 pb-2 px-3">
@@ -736,7 +741,7 @@ export default function App() {
                   </div>
                 )
               )}
-              {activeView === 'admin-orders' && profile?.role === 'admin' && <AdminOrderList orders={orders} />}
+              {activeView === 'admin-import-center' && (
               {activeView === 'admin-payouts' && profile?.role === 'admin' && <AdminPayoutList transactions={transactions} />}
               {activeView === 'admin-products' && profile?.role === 'admin' && <AdminProductList products={products} />}
               {activeView === 'admin-users' && profile?.role === 'admin' && <AdminUsersList allUsers={allUsers} transactions={transactions} />}
