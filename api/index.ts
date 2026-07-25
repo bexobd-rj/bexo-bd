@@ -16,7 +16,224 @@ app.use(express.json());
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
   // API Route to send verification email
-  app.post("/api/send-verification-email", async (req, res) => {
+  
+  // --- NEW ROUTES REQUESTED BY USER ---
+  app.post("/api/test-connection", async (req, res) => {
+    try {
+      const { baseUrl, apiKey, secretKey, authType } = req.body;
+      if (!baseUrl) {
+        return res.status(400).json({ success: false, error: "Base URL is required" });
+      }
+      
+      let fullUrl = baseUrl.replace(/\/+$/, "");
+      fullUrl += '/products'; // Testing with /products endpoint by default
+
+      let urlObj;
+      try {
+          urlObj = new URL(fullUrl);
+      } catch (e) {
+          return res.status(400).json({ success: false, error: "Invalid URL format" });
+      }
+
+      const headers: Record<string, string> = { "Accept": "application/json" };
+
+      if (authType === "bearer" && apiKey) {
+          headers["Authorization"] = `Bearer ${apiKey}`;
+      } else if (authType === "query" && apiKey) {
+          urlObj.searchParams.append("api_key", apiKey);
+          if (secretKey) {
+              urlObj.searchParams.append("secret_key", secretKey);
+          }
+      } else if (authType === "custom_headers") {
+          if (apiKey) headers["api-key"] = apiKey;
+          if (secretKey) headers["secret-key"] = secretKey;
+          if (apiKey) headers["X-Api-Key"] = apiKey;
+          if (secretKey) headers["X-Secret-Key"] = secretKey;
+      } else if (authType === "basic" && (apiKey || secretKey)) {
+          const token = Buffer.from(`${apiKey || ''}:${secretKey || ''}`).toString('base64');
+          headers["Authorization"] = `Basic ${token}`;
+      }
+
+      const hostname = urlObj.hostname.toLowerCase();
+      const isInternal = 
+        hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" ||
+        hostname.startsWith("10.") || hostname.startsWith("192.168.") || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+
+      if (isInternal) {
+        return res.status(403).json({ success: false, error: "Private network addresses are forbidden" });
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(urlObj.toString(), {
+          method: 'GET',
+          headers: headers,
+          signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+
+      const responseText = await response.text();
+      let responseData = null;
+      try { responseData = JSON.parse(responseText); } catch (e) { responseData = responseText; }
+
+      if (!response.ok) {
+          return res.status(response.status).json({
+              success: false,
+              error: `API Error: ${response.status} ${response.statusText}`,
+              details: responseData
+          });
+      }
+
+      return res.json({ success: true, message: "Connection Successful!", data: responseData });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.name === 'AbortError' ? 'Connection timed out' : err.message });
+    }
+  });
+
+  app.post("/api/import-products", async (req, res) => {
+    try {
+      const { baseUrl, endpoint = '/products', apiKey, secretKey, authType } = req.body;
+      if (!baseUrl) {
+        return res.status(400).json({ success: false, error: "Base URL is required" });
+      }
+      
+      let fullUrl = baseUrl.replace(/\/+$/, "");
+      fullUrl += (endpoint.startsWith('/') ? endpoint : '/' + endpoint);
+
+      let urlObj;
+      try {
+          urlObj = new URL(fullUrl);
+      } catch (e) {
+          return res.status(400).json({ success: false, error: "Invalid URL format" });
+      }
+
+      const headers: Record<string, string> = { "Accept": "application/json" };
+
+      if (authType === "bearer" && apiKey) {
+          headers["Authorization"] = `Bearer ${apiKey}`;
+      } else if (authType === "query" && apiKey) {
+          urlObj.searchParams.append("api_key", apiKey);
+          if (secretKey) {
+              urlObj.searchParams.append("secret_key", secretKey);
+          }
+      } else if (authType === "custom_headers") {
+          if (apiKey) headers["api-key"] = apiKey;
+          if (secretKey) headers["secret-key"] = secretKey;
+          if (apiKey) headers["X-Api-Key"] = apiKey;
+          if (secretKey) headers["X-Secret-Key"] = secretKey;
+      } else if (authType === "basic" && (apiKey || secretKey)) {
+          const token = Buffer.from(`${apiKey || ''}:${secretKey || ''}`).toString('base64');
+          headers["Authorization"] = `Basic ${token}`;
+      }
+
+      const hostname = urlObj.hostname.toLowerCase();
+      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("10.") || hostname.startsWith("192.168.")) {
+        return res.status(403).json({ success: false, error: "Private network addresses are forbidden" });
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(urlObj.toString(), { method: 'GET', headers: headers, signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      const responseText = await response.text();
+      let responseData: any = null;
+      try { responseData = JSON.parse(responseText); } catch (e) { responseData = responseText; }
+
+      if (!response.ok) {
+          return res.status(response.status).json({ success: false, error: `API Error: ${response.status}`, details: responseData });
+      }
+
+      // Extract products array
+      let productsArray = [];
+      if (Array.isArray(responseData)) productsArray = responseData;
+      else if (responseData && Array.isArray(responseData.data)) productsArray = responseData.data;
+      else if (responseData && Array.isArray(responseData.products)) productsArray = responseData.products;
+      else if (responseData && Array.isArray(responseData.items)) productsArray = responseData.items;
+      else return res.status(400).json({ success: false, error: "Could not find an array of products in the API response." });
+
+      // Standardize products
+      const standardizedProducts = productsArray.map((item: any) => {
+          const id = item.id || item._id || item.productId || Math.random().toString(36).substr(2, 9);
+          const name = item.name || item.title || item.productName || 'Unknown Product';
+          const sku = item.sku || item.productCode || item.code || '';
+          const category = item.category || item.categoryName || 'Uncategorized';
+          const stock = item.stock || item.quantity || item.inventory || 0;
+          
+          let img = '';
+          if (item.image && typeof item.image === 'string') img = item.image;
+          else if (item.imageUrl && typeof item.imageUrl === 'string') img = item.imageUrl;
+          else if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+              img = item.images[0].src || item.images[0].url || item.images[0] || '';
+          }
+          
+          let price = 0;
+          if (item.price !== undefined) price = parseFloat(item.price);
+          else if (item.regularPrice !== undefined) price = parseFloat(item.regularPrice);
+          else if (item.salePrice !== undefined) price = parseFloat(item.salePrice);
+          else if (item.regular_price !== undefined) price = parseFloat(item.regular_price);
+          
+          return { originalId: id, name, sku, category, stock, img, sourcePrice: price, rawData: item };
+      });
+
+      return res.json({ success: true, products: standardizedProducts });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.name === 'AbortError' ? 'Connection timed out' : err.message });
+    }
+  });
+
+  app.post("/api/publish-products", async (req, res) => {
+    try {
+      // For this serverless function, we receive the selected products and formatting parameters,
+      // and return the ready-to-save products for the frontend to store in the database.
+      const { selectedProducts, markupValue, markupType } = req.body;
+      
+      if (!Array.isArray(selectedProducts) || selectedProducts.length === 0) {
+        return res.status(400).json({ success: false, error: "No products selected" });
+      }
+
+      const publishedProducts = selectedProducts.map((p, i) => {
+          const sourcePrice = parseFloat(p.sourcePrice) || 0;
+          let finalPrice = sourcePrice;
+          
+          if (markupType === 'percentage') {
+              finalPrice = sourcePrice + (sourcePrice * (parseFloat(markupValue) / 100));
+          } else if (markupType === 'fixed') {
+              finalPrice = sourcePrice + parseFloat(markupValue);
+          }
+
+          return {
+              id: String(Date.now() + i + Math.floor(Math.random() * 10000)),
+              title: p.name,
+              name: p.name,
+              description: p.rawData?.description || p.name,
+              price: Math.round(finalPrice),
+              sourcePrice: sourcePrice,
+              purchasePrice: sourcePrice,
+              category: p.category || 'API Import',
+              images: p.img ? [p.img] : [],
+              img: p.img || '',
+              inStock: p.stock > 0,
+              stockQuantity: p.stock || 0,
+              status: 'active',
+              isPublished: true,
+              createdAt: Date.now(),
+              code: p.sku || `API-${Date.now().toString().slice(-6)}`,
+              sourceApiId: p.originalId,
+              variants: []
+          };
+      });
+
+      return res.json({ success: true, publishedCount: publishedProducts.length, products: publishedProducts });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  // --- END NEW ROUTES ---
+app.post("/api/send-verification-email", async (req, res) => {
     try {
       const { email } = req.body;
       if (!email || !email.includes("@")) {
@@ -347,283 +564,5 @@ app.use(express.json());
     }
   });
 
-  // API Route to Test External API Connection
-  app.post("/api/test-api-connection", async (req, res) => {
-    try {
-      let { websiteUrl, apiType, authType, apiKey, apiSecret, customHeaders } = req.body;
-      if (!websiteUrl) {
-        return res.status(400).json({ success: false, errorReason: "Website URL is required" });
-      }
-
-      websiteUrl = websiteUrl.trim();
-      if (!websiteUrl.startsWith("http://") && !websiteUrl.startsWith("https://")) {
-        websiteUrl = "https://" + websiteUrl;
-      }
-
-      let parsedUrl: URL;
-      try {
-        parsedUrl = new URL(websiteUrl);
-      } catch (e) {
-        return res.status(400).json({ success: false, errorReason: "Website Not Supported: Invalid URL format" });
-      }
-
-      const hostname = parsedUrl.hostname.toLowerCase();
-      const isInternal = 
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "0.0.0.0" ||
-        hostname === "169.254.169.254" || 
-        hostname.startsWith("10.") ||
-        hostname.startsWith("192.168.") ||
-        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
-
-      if (isInternal) {
-        return res.status(403).json({ success: false, errorReason: "API Connection Failed: Private network addresses are forbidden" });
-      }
-
-      const headers: Record<string, string> = {
-        "User-Agent": "BexoBD-ProductImportCenter/1.0",
-        "Accept": "application/json"
-      };
-
-      if (customHeaders) {
-        try {
-          const parsedHeaders = typeof customHeaders === "string" ? JSON.parse(customHeaders) : customHeaders;
-          Object.assign(headers, parsedHeaders);
-        } catch (e) {}
-      }
-
-      if (authType === "bearer" && apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey.trim()}`;
-      } else if (authType === "api_key_header" && apiKey) {
-        headers["X-API-Key"] = apiKey.trim();
-      } else if (authType === "basic_auth" && (apiKey || apiSecret)) {
-        const token = Buffer.from(`${apiKey || ''}:${apiSecret || ''}`).toString('base64');
-        headers["Authorization"] = `Basic ${token}`;
-      }
-
-      const urlsToTest: string[] = [];
-      const cleanBase = websiteUrl.replace(/\/+$/, "");
-
-      if (apiType === "woocommerce") {
-        let authQuery = "";
-        if (authType === "query_param" || (apiKey && apiSecret)) {
-          authQuery = `?consumer_key=${encodeURIComponent(apiKey || '')}&consumer_secret=${encodeURIComponent(apiSecret || '')}`;
-        }
-        urlsToTest.push(`${cleanBase}/wp-json/wc/v3/products${authQuery}`);
-        urlsToTest.push(`${cleanBase}/wp-json/wc/v2/products${authQuery}`);
-        urlsToTest.push(`${cleanBase}/wp-json/wp/v2/posts`);
-      } else if (apiType === "shopify") {
-        urlsToTest.push(`${cleanBase}/products.json`);
-      } else if (apiType === "rest_api") {
-        let authQuery = "";
-        if (authType === "query_param" && apiKey) {
-          authQuery = `?api_key=${encodeURIComponent(apiKey)}`;
-        }
-        urlsToTest.push(`${cleanBase}/api/products${authQuery}`);
-        urlsToTest.push(`${cleanBase}/api/v1/products${authQuery}`);
-        urlsToTest.push(`${cleanBase}/products${authQuery}`);
-        urlsToTest.push(`${cleanBase}${authQuery}`);
-      } else {
-        urlsToTest.push(cleanBase);
-        urlsToTest.push(`${cleanBase}/products.json`);
-        urlsToTest.push(`${cleanBase}/wp-json/wc/v3/products`);
-        urlsToTest.push(`${cleanBase}/api/products`);
-      }
-
-      let successUrl = "";
-      let foundCount = 0;
-      let lastErrMessage = "Product Data Not Found";
-
-      for (const targetUrl of urlsToTest) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-          const resp = await fetch(targetUrl, { headers, signal: controller.signal });
-          clearTimeout(timeoutId);
-
-          if (resp.status === 401 || resp.status === 403) {
-            lastErrMessage = "Invalid API Key or authorization parameters";
-            continue;
-          }
-
-          if (resp.ok) {
-            const data = await resp.json();
-            const items = Array.isArray(data) ? data : (data.products || data.items || data.data || []);
-            if (Array.isArray(items)) {
-              successUrl = targetUrl;
-              foundCount = items.length;
-              break;
-            }
-          }
-        } catch (err: any) {
-          if (err.name === 'AbortError') {
-            lastErrMessage = "Network Error: Request timed out";
-          } else {
-            lastErrMessage = "API Connection Failed: Unable to establish handshake";
-          }
-        }
-      }
-
-      if (successUrl) {
-        return res.json({
-          success: true,
-          message: `Connection successful! Connected to endpoint. Found ${foundCount} products available.`,
-          details: { testedUrl: successUrl, itemCount: foundCount }
-        });
-      } else {
-        return res.status(400).json({
-          success: false,
-          errorReason: lastErrMessage
-        });
-      }
-
-    } catch (error: any) {
-      console.error("Error in test-api-connection:", error);
-      res.status(500).json({ success: false, errorReason: "API Connection Failed: Internal server error" });
-    }
-  });
-
-  // API Route to Fetch External Products
-  app.post("/api/fetch-external-products", async (req, res) => {
-    try {
-      let { websiteUrl, apiType, authType, apiKey, apiSecret, customHeaders } = req.body;
-      if (!websiteUrl) {
-        return res.status(400).json({ success: false, errorReason: "Website URL is required" });
-      }
-
-      websiteUrl = websiteUrl.trim();
-      if (!websiteUrl.startsWith("http://") && !websiteUrl.startsWith("https://")) {
-        websiteUrl = "https://" + websiteUrl;
-      }
-
-      let parsedUrl: URL;
-      try {
-        parsedUrl = new URL(websiteUrl);
-      } catch (e) {
-        return res.status(400).json({ success: false, errorReason: "Website Not Supported: Invalid URL format" });
-      }
-
-      const hostname = parsedUrl.hostname.toLowerCase();
-      const isInternal = 
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "0.0.0.0" ||
-        hostname === "169.254.169.254" || 
-        hostname.startsWith("10.") ||
-        hostname.startsWith("192.168.") ||
-        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
-
-      if (isInternal) {
-        return res.status(403).json({ success: false, errorReason: "API Connection Failed: Private network addresses are forbidden" });
-      }
-
-      const headers: Record<string, string> = {
-        "User-Agent": "BexoBD-ProductImportCenter/1.0",
-        "Accept": "application/json"
-      };
-
-      if (customHeaders) {
-        try {
-          const parsedHeaders = typeof customHeaders === "string" ? JSON.parse(customHeaders) : customHeaders;
-          Object.assign(headers, parsedHeaders);
-        } catch (e) {}
-      }
-
-      if (authType === "bearer" && apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey.trim()}`;
-      } else if (authType === "api_key_header" && apiKey) {
-        headers["X-API-Key"] = apiKey.trim();
-      } else if (authType === "basic_auth" && (apiKey || apiSecret)) {
-        const token = Buffer.from(`${apiKey || ''}:${apiSecret || ''}`).toString('base64');
-        headers["Authorization"] = `Basic ${token}`;
-      }
-
-      const cleanBase = websiteUrl.replace(/\/+$/, "");
-      const targetUrls: string[] = [];
-
-      if (cleanBase.endsWith(".json") || cleanBase.includes("/products") || cleanBase.includes("/api/")) {
-        targetUrls.push(cleanBase);
-      }
-
-      if (apiType === "woocommerce") {
-        let authQuery = "";
-        if (authType === "query_param" || (apiKey && apiSecret)) {
-          authQuery = `?consumer_key=${encodeURIComponent(apiKey || '')}&consumer_secret=${encodeURIComponent(apiSecret || '')}&per_page=100`;
-        } else {
-          authQuery = "?per_page=100";
-        }
-        targetUrls.push(`${cleanBase}/wp-json/wc/v3/products${authQuery}`);
-        targetUrls.push(`${cleanBase}/wp-json/wc/v2/products${authQuery}`);
-      } else if (apiType === "shopify") {
-        targetUrls.push(`${cleanBase}/products.json?limit=250`);
-      } else if (apiType === "rest_api") {
-        let authQuery = "";
-        if (authType === "query_param" && apiKey) {
-          authQuery = `?api_key=${encodeURIComponent(apiKey)}`;
-        }
-        targetUrls.push(`${cleanBase}/products${authQuery}`);
-        targetUrls.push(`${cleanBase}/api/products${authQuery}`);
-        targetUrls.push(`${cleanBase}/api/v1/products${authQuery}`);
-      } else {
-        targetUrls.push(cleanBase);
-        targetUrls.push(`${cleanBase}/products.json`);
-        targetUrls.push(`${cleanBase}/wp-json/wc/v3/products`);
-        targetUrls.push(`${cleanBase}/api/products`);
-      }
-
-      let fetchedItems: any[] = [];
-      let lastErrReason = "Product Data Not Found";
-
-      for (const targetUrl of targetUrls) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-          const resp = await fetch(targetUrl, { headers, signal: controller.signal });
-          clearTimeout(timeoutId);
-
-          if (resp.status === 401 || resp.status === 403) {
-            lastErrReason = "Invalid API Key or permission denied";
-            continue;
-          }
-
-          if (resp.ok) {
-            const data = await resp.json();
-            const items = Array.isArray(data) ? data : (data.products || data.items || data.data || []);
-            if (Array.isArray(items) && items.length > 0) {
-              fetchedItems = items;
-              break;
-            }
-          }
-        } catch (err: any) {
-          if (err.name === 'AbortError') {
-            lastErrReason = "Network Error: Request timed out while fetching products";
-          } else {
-            lastErrReason = "API Connection Failed: Could not connect to target website";
-          }
-        }
-      }
-
-      if (fetchedItems.length > 0) {
-        return res.json({
-          success: true,
-          products: fetchedItems
-        });
-      } else {
-        return res.status(400).json({
-          success: false,
-          errorReason: lastErrReason
-        });
-      }
-
-    } catch (error: any) {
-      console.error("Error in fetch-external-products:", error);
-      res.status(500).json({ success: false, errorReason: "Network Error: Internal server error" });
-    }
-  });
-
   
-
 export default app;

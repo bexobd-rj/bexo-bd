@@ -14598,55 +14598,46 @@ function savePosts() {
                   
                   const btn = event.currentTarget;
                   const originalText = btn.innerHTML;
-                  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publishing...';
+                  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publishing via Backend...';
                   btn.disabled = true;
                   
                   const markup = parseFloat(appSettings.apiMarkup) || 0;
                   const fixedMarkup = parseFloat(appSettings.apiFixedMarkup) || 0;
                   
+                  // Collect selected products from UI
+                  const selectedProducts = [];
+                  for (let i = 0; i < checkboxes.length; i++) {
+                      const index = checkboxes[i].getAttribute('data-index');
+                      const p = window.fetchedApiProducts[index];
+                      // Get possibly updated category
+                      const catSelect = document.querySelector(`.api-prod-cat[data-index="${index}"]`);
+                      if (catSelect) p.category = catSelect.value;
+                      selectedProducts.push(p);
+                  }
+                  
                   try {
-                      let publishedCount = 0;
-                      let newPosts = [];
+                      // We call the backend to format them properly
+                      const response = await fetch('/api/publish-products', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                              selectedProducts: selectedProducts,
+                              markupValue: markup > 0 ? markup : (fixedMarkup > 0 ? fixedMarkup : 0),
+                              markupType: markup > 0 ? 'percentage' : (fixedMarkup > 0 ? 'fixed' : 'none')
+                          })
+                      });
                       
-                      for (let i = 0; i < checkboxes.length; i++) {
-                          const index = checkboxes[i].getAttribute('data-index');
-                          const p = window.fetchedApiProducts[index];
-                          
-                          // Get possibly updated category
-                          const catSelect = document.querySelector(`.api-prod-cat[data-index="${index}"]`);
-                          const category = catSelect ? catSelect.value : p.category;
-                          
-                          let markupAmount = p.sourcePrice * (markup / 100);
-                          let finalPrice = Math.round(p.sourcePrice + markupAmount + fixedMarkup);
-                          
-                          const newProduct = {
-                              id: String(Date.now() + i + Math.floor(Math.random() * 10000)),
-                              title: p.name,
-                              name: p.name,
-                              description: p.rawData.description || p.name,
-                              price: finalPrice,
-                              sourcePrice: p.sourcePrice,
-                              purchasePrice: p.sourcePrice,
-                              category: category,
-                              images: [p.img],
-                              img: p.img,
-                              inStock: p.stock > 0,
-                              stockQuantity: p.stock,
-                              status: 'active',
-                              isPublished: true,
-                              createdAt: Date.now(),
-                              code: p.sku || `API-${Date.now().toString().slice(-6)}`,
-                              sourceApiId: p.originalId,
-                              variants: []
-                          };
-                          
-                          newPosts.push(newProduct);
-                          publishedCount++;
+                      const data = await response.json();
+                      if (!response.ok || !data.success) {
+                          throw new Error(data.error || "Backend publishing failed");
                       }
+                      
+                      const newPosts = data.products;
                       
                       appPosts.unshift(...newPosts);
                       if (typeof savePosts === 'function') savePosts();
                       
+                      // Save to Firestore via frontend
                       if (window.db) {
                           newPosts.forEach(postData => {
                               window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForFirestore(postData))
@@ -14654,7 +14645,7 @@ function savePosts() {
                           });
                       }
                       
-                      showToast(`Successfully published ${publishedCount} products!`, "success");
+                      showToast(`Successfully published ${newPosts.length} products!`, "success");
                       
                       // Refresh product list in background if possible
                       if (typeof syncProductsFromDatabaseSilently === 'function') syncProductsFromDatabaseSilently();
@@ -14665,7 +14656,7 @@ function savePosts() {
                               <div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-4">
                                   <i class="fas fa-check-circle text-2xl"></i>
                               </div>
-                              <p class="text-slate-800 font-bold text-sm">Published ${publishedCount} Products to Catalog</p>
+                              <p class="text-slate-800 font-bold text-sm">Published ${newPosts.length} Products to Catalog</p>
                           </div>
                       `;
                       
