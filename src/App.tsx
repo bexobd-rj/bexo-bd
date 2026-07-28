@@ -39,6 +39,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   sendEmailVerification, 
+  sendPasswordResetEmail,
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut,
@@ -177,6 +178,30 @@ export default function App() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccessMessage, setForgotSuccessMessage] = useState('');
+  const [forgotError, setForgotError] = useState('');
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) {
+      setForgotError('অনুগ্রহ করে আপনার ইমেইল এড্রেস লিখুন');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    setForgotSuccessMessage('');
+    try {
+      await sendPasswordResetEmail(auth, forgotEmail);
+      setForgotSuccessMessage('পাসওয়ার্ড রিসেট লিংক সফলভাবে আপনার ইমেইলে পাঠানো হয়েছে! অনুগ্রহ করে ইনবক্স বা স্প্যাম ফোল্ডার চেক করুন।');
+    } catch (err: any) {
+      setForgotError(err.message || 'পাসওয়ার্ড রিসেট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
   const [activeView, _setActiveView] = useState<View>(() => {
     const hash = window.location.hash.replace('#', '') as View;
     const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'admin-import-center', 'cart', 'sales', 'balance', 'support'];
@@ -517,6 +542,18 @@ export default function App() {
                 required
               />
               
+              {isLoginMode && (
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgotPassword(true); setForgotEmail(email); setForgotError(''); setForgotSuccessMessage(''); }}
+                    className="text-xs font-bold text-primary hover:underline"
+                  >
+                    পাসওয়ার্ড ভুলে গেছেন?
+                  </button>
+                </div>
+              )}
+              
               <button 
                 type="submit"
                 disabled={authLoading}
@@ -525,6 +562,62 @@ export default function App() {
                 {authLoading ? 'Please wait...' : (isLoginMode ? 'Sign In with Email' : 'Sign Up with Email')}
               </button>
             </form>
+
+            {/* Forgot Password Modal */}
+            {showForgotPassword && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-white p-8 rounded-[2rem] shadow-2xl max-w-md w-full border border-slate-100 relative text-left"
+                >
+                  <button 
+                    onClick={() => { setShowForgotPassword(false); setForgotSuccessMessage(''); setForgotError(''); setForgotEmail(''); }}
+                    className="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+
+                  <div className="text-center mb-6">
+                    <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Key size={28} />
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-900">পাসওয়ার্ড ভুলে গেছেন?</h3>
+                    <p className="text-xs text-slate-500 font-medium mt-1">আপনার জিমেইল/ইমেইল দিন</p>
+                  </div>
+
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    {forgotError && (
+                      <div className="p-3 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl text-center">
+                        {forgotError}
+                      </div>
+                    )}
+                    {forgotSuccessMessage && (
+                      <div className="p-3 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                        {forgotSuccessMessage}
+                      </div>
+                    )}
+
+                    <input 
+                      type="email"
+                      placeholder="আপনার জিমেইল/ইমেইল লিখুন"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm transition-colors"
+                      required
+                    />
+
+                    <button 
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="w-full py-4 bg-slate-900 hover:bg-black disabled:opacity-70 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md transition-all"
+                    >
+                      {forgotLoading ? 'পাঠানো হচ্ছে...' : 'কোড পাঠান / রিসেট লিংক পাঠান'}
+                    </button>
+                  </form>
+                </motion.div>
+              </div>
+            )}
 
             <div className="flex items-center justify-center space-x-2 text-xs font-bold text-slate-500">
               <span>{isLoginMode ? "Don't have an account?" : "Already have an account?"}</span>
