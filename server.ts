@@ -7,6 +7,7 @@ import testConnection from "./api/test-connection.ts";
 import importProducts from "./api/import-products.ts";
 import publishProducts from "./api/publish-products.ts";
 import saveSettings from "./api/save-settings.ts";
+import aiChatHandler from "./api/ai-chat.ts";
 
 async function startServer() {
   const app = express();
@@ -19,6 +20,7 @@ async function startServer() {
   app.all("/api/import-products", async (req, res) => await importProducts(req, res));
   app.all("/api/publish-products", async (req, res) => await publishProducts(req, res));
   app.all("/api/save-settings", async (req, res) => await saveSettings(req, res));
+  app.all("/api/ai-chat", async (req, res) => await aiChatHandler(req, res));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

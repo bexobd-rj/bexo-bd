@@ -72,9 +72,39 @@
         "referenceId": { "type": "string" }
       },
       "required": ["userId", "amount", "type", "description", "date"]
+    },
+    "ai_chats": {
+      "title": "AIChat",
+      "description": "AI chat history sessions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "text": { "type": "string" },
+              "sender": { "type": "string", "enum": ["user", "ai"] },
+              "timestamp": { "type": "string" }
+            }
+          }
+        },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "archived": { "type": "boolean" }
+      },
+      "required": ["userId", "title"]
     }
   },
   "firestore": {
+    "/ai_chats/{chatId}": {
+      "schema": "ai_chats",
+      "description": "User specific AI chat sessions"
+    },
     "/products/{productId}": {
       "schema": "Product",
       "description": "Global product catalog"

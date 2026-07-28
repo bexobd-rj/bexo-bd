@@ -62,6 +62,7 @@ import { Product, Order, UserProfile, Transaction } from './types';
 import { AdminUsersList } from './components/AdminUsersList';
 import { AdminTransferPanel } from './components/AdminTransferPanel';
 import { InvoiceViewer } from './components/InvoiceViewer';
+import { AIAssistant } from './components/AIAssistant';
 
 // --- Types & Constants ---
 type View = 'dashboard' | 'profile' | 'products' | 'orders' | 'admin-orders' | 'admin-payouts' | 'admin-products' | 'admin-users' | 'admin-panel' | 'admin-import-center' | 'cart' | 'sales' | 'balance' | 'support';
@@ -297,20 +298,28 @@ export default function App() {
       
       // Sync Google user with the local admin panel database so they appear there.
       const userRef = doc(db, 'users', loggedInUser.uid);
-      const snap = await getDoc(userRef);
-      if (!snap.exists()) {
-        const isSuperAdminEmail = loggedInUser.email === 'bexobd@gmail.com';
-        const newProfile: UserProfile = {
-          uid: loggedInUser.uid,
-          displayName: loggedInUser.displayName || 'Reseller',
-          email: loggedInUser.email || '',
-          balance: 0,
-          role: isSuperAdminEmail ? 'admin' : 'user',
-          shopName: 'My Bexo Shop',
-          phone: ''
-        };
-        await setDoc(userRef, newProfile);
-        setProfile(newProfile);
+      try {
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) {
+          const isSuperAdminEmail = loggedInUser.email === 'bexobd@gmail.com';
+          const newProfile: UserProfile = {
+            uid: loggedInUser.uid,
+            displayName: loggedInUser.displayName || 'Reseller',
+            email: loggedInUser.email || '',
+            balance: 0,
+            role: isSuperAdminEmail ? 'admin' : 'user',
+            shopName: 'My Bexo Shop',
+            phone: ''
+          };
+          try {
+            await setDoc(userRef, newProfile);
+          } catch (writeErr) {
+            console.warn("Firestore write quota exceeded during login sync. Continuing with local profile:", writeErr);
+          }
+          setProfile(newProfile);
+        }
+      } catch (readErr) {
+        console.warn("Firestore read error during login:", readErr);
       }
     } catch (err: any) {
       console.error("Login failed:", err.message);
@@ -559,6 +568,19 @@ export default function App() {
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by Bexo Dropshipping Network</p>
           </div>
         </motion.div>
+
+        {/* Mode 1 Public AI Assistant */}
+        <AIAssistant
+          isLoggedIn={false}
+          userId="public_user"
+          onOpenLogin={() => setIsLoginMode(true)}
+          onOpenRegister={() => setIsLoginMode(false)}
+          onNavigate={(menu) => {
+            if (menu === 'products' || menu === 'support') {
+              // Can preview or switch
+            }
+          }}
+        />
       </div>
     );
   }
@@ -772,6 +794,36 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Mode 2 User Panel AI Assistant */}
+      <AIAssistant
+        isLoggedIn={true}
+        userId={user?.uid}
+        userName={profile?.displayName || user?.displayName || 'Reseller'}
+        userEmail={profile?.email || user?.email || ''}
+        userRole={profile?.role || 'reseller'}
+        balance={profile?.balance || 0}
+        activeView={activeView}
+        orders={orders}
+        products={products}
+        cart={cart ? [cart] : []}
+        onNavigate={(menu) => setActiveView(menu as any)}
+        onOpenLogin={() => {}}
+        onOpenRegister={() => {}}
+        onSearchText={(query) => {
+          setActiveView('products');
+        }}
+        onSearchOrder={(query) => {
+          setActiveView('orders');
+        }}
+        onLogout={handleLogout}
+        onRechargeAction={(params) => {
+          setActiveView('balance');
+        }}
+        onWithdrawAction={(params) => {
+          setActiveView('balance');
+        }}
+      />
     </div>
   );
 }
