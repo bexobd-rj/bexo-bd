@@ -15,7 +15,7 @@ export default async function handler(req: any, res: any) {
   try {
     const settings = req.body || {};
     // Here we could save to a database if we had a backend database configured.
-    // For now, return success to the frontend which will also save to localStorage/Firebase.
+    // For now, return success to the frontend which will also save to localStorage/Supabase.
     return res.json({ success: true, message: "Settings saved successfully" });
   } catch (error: any) {
     console.error("Save settings error:", error);

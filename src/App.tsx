@@ -547,7 +547,7 @@ export default function App() {
     setAuthLoading(true);
     try {
       // Validate that the email address is indeed registered first
-      // We wrap this Firestore lookup in a try-catch to allow bypass on network / Firestore server connectivity issues.
+      // We wrap this Supabase lookup in a try-catch to allow bypass on network / database server connectivity issues.
       let emailExists = true;
       try {
         const { data: userRows, error: userQueryErr } = await supabase
