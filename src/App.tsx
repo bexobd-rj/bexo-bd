@@ -39,7 +39,6 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   sendEmailVerification, 
-  sendPasswordResetEmail,
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut,
@@ -60,10 +59,10 @@ import {
 } from 'firebase/firestore';
 import { cn, useBackButtonModal } from './lib/utils';
 import { Product, Order, UserProfile, Transaction } from './types';
+import { TodosList } from './components/TodosList';
 import { AdminUsersList } from './components/AdminUsersList';
 import { AdminTransferPanel } from './components/AdminTransferPanel';
 import { InvoiceViewer } from './components/InvoiceViewer';
-import { AIAssistant } from './components/AIAssistant';
 
 // --- Types & Constants ---
 type View = 'dashboard' | 'profile' | 'products' | 'orders' | 'admin-orders' | 'admin-payouts' | 'admin-products' | 'admin-users' | 'admin-panel' | 'admin-import-center' | 'cart' | 'sales' | 'balance' | 'support';
@@ -178,30 +177,6 @@ export default function App() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotSuccessMessage, setForgotSuccessMessage] = useState('');
-  const [forgotError, setForgotError] = useState('');
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!forgotEmail) {
-      setForgotError('অনুগ্রহ করে আপনার ইমেইল এড্রেস লিখুন');
-      return;
-    }
-    setForgotLoading(true);
-    setForgotError('');
-    setForgotSuccessMessage('');
-    try {
-      await sendPasswordResetEmail(auth, forgotEmail);
-      setForgotSuccessMessage('পাসওয়ার্ড রিসেট লিংক সফলভাবে আপনার ইমেইলে পাঠানো হয়েছে! অনুগ্রহ করে ইনবক্স বা স্প্যাম ফোল্ডার চেক করুন।');
-    } catch (err: any) {
-      setForgotError(err.message || 'পাসওয়ার্ড রিসেট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
-    } finally {
-      setForgotLoading(false);
-    }
-  };
   const [activeView, _setActiveView] = useState<View>(() => {
     const hash = window.location.hash.replace('#', '') as View;
     const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'admin-import-center', 'cart', 'sales', 'balance', 'support'];
@@ -323,28 +298,20 @@ export default function App() {
       
       // Sync Google user with the local admin panel database so they appear there.
       const userRef = doc(db, 'users', loggedInUser.uid);
-      try {
-        const snap = await getDoc(userRef);
-        if (!snap.exists()) {
-          const isSuperAdminEmail = loggedInUser.email === 'bexobd@gmail.com';
-          const newProfile: UserProfile = {
-            uid: loggedInUser.uid,
-            displayName: loggedInUser.displayName || 'Reseller',
-            email: loggedInUser.email || '',
-            balance: 0,
-            role: isSuperAdminEmail ? 'admin' : 'user',
-            shopName: 'My Bexo Shop',
-            phone: ''
-          };
-          try {
-            await setDoc(userRef, newProfile);
-          } catch (writeErr) {
-            console.warn("Firestore write quota exceeded during login sync. Continuing with local profile:", writeErr);
-          }
-          setProfile(newProfile);
-        }
-      } catch (readErr) {
-        console.warn("Firestore read error during login:", readErr);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        const isSuperAdminEmail = loggedInUser.email === 'bexobd@gmail.com';
+        const newProfile: UserProfile = {
+          uid: loggedInUser.uid,
+          displayName: loggedInUser.displayName || 'Reseller',
+          email: loggedInUser.email || '',
+          balance: 0,
+          role: isSuperAdminEmail ? 'admin' : 'user',
+          shopName: 'My Bexo Shop',
+          phone: ''
+        };
+        await setDoc(userRef, newProfile);
+        setProfile(newProfile);
       }
     } catch (err: any) {
       console.error("Login failed:", err.message);
@@ -542,18 +509,6 @@ export default function App() {
                 required
               />
               
-              {isLoginMode && (
-                <div className="text-right">
-                  <button
-                    type="button"
-                    onClick={() => { setShowForgotPassword(true); setForgotEmail(email); setForgotError(''); setForgotSuccessMessage(''); }}
-                    className="text-xs font-bold text-primary hover:underline"
-                  >
-                    পাসওয়ার্ড ভুলে গেছেন?
-                  </button>
-                </div>
-              )}
-              
               <button 
                 type="submit"
                 disabled={authLoading}
@@ -562,62 +517,6 @@ export default function App() {
                 {authLoading ? 'Please wait...' : (isLoginMode ? 'Sign In with Email' : 'Sign Up with Email')}
               </button>
             </form>
-
-            {/* Forgot Password Modal */}
-            {showForgotPassword && (
-              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white p-8 rounded-[2rem] shadow-2xl max-w-md w-full border border-slate-100 relative text-left"
-                >
-                  <button 
-                    onClick={() => { setShowForgotPassword(false); setForgotSuccessMessage(''); setForgotError(''); setForgotEmail(''); }}
-                    className="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
-                  >
-                    <X size={18} />
-                  </button>
-
-                  <div className="text-center mb-6">
-                    <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <Key size={28} />
-                    </div>
-                    <h3 className="text-2xl font-black text-slate-900">পাসওয়ার্ড ভুলে গেছেন?</h3>
-                    <p className="text-xs text-slate-500 font-medium mt-1">আপনার জিমেইল/ইমেইল দিন</p>
-                  </div>
-
-                  <form onSubmit={handleForgotPassword} className="space-y-4">
-                    {forgotError && (
-                      <div className="p-3 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl text-center">
-                        {forgotError}
-                      </div>
-                    )}
-                    {forgotSuccessMessage && (
-                      <div className="p-3 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                        {forgotSuccessMessage}
-                      </div>
-                    )}
-
-                    <input 
-                      type="email"
-                      placeholder="আপনার জিমেইল/ইমেইল লিখুন"
-                      value={forgotEmail}
-                      onChange={(e) => setForgotEmail(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm transition-colors"
-                      required
-                    />
-
-                    <button 
-                      type="submit"
-                      disabled={forgotLoading}
-                      className="w-full py-4 bg-slate-900 hover:bg-black disabled:opacity-70 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md transition-all"
-                    >
-                      {forgotLoading ? 'পাঠানো হচ্ছে...' : 'কোড পাঠান / রিসেট লিংক পাঠান'}
-                    </button>
-                  </form>
-                </motion.div>
-              </div>
-            )}
 
             <div className="flex items-center justify-center space-x-2 text-xs font-bold text-slate-500">
               <span>{isLoginMode ? "Don't have an account?" : "Already have an account?"}</span>
@@ -661,19 +560,6 @@ export default function App() {
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by Bexo Dropshipping Network</p>
           </div>
         </motion.div>
-
-        {/* Mode 1 Public AI Assistant */}
-        <AIAssistant
-          isLoggedIn={false}
-          userId="public_user"
-          onOpenLogin={() => setIsLoginMode(true)}
-          onOpenRegister={() => setIsLoginMode(false)}
-          onNavigate={(menu) => {
-            if (menu === 'products' || menu === 'support') {
-              // Can preview or switch
-            }
-          }}
-        />
       </div>
     );
   }
@@ -887,36 +773,6 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-
-      {/* Mode 2 User Panel AI Assistant */}
-      <AIAssistant
-        isLoggedIn={true}
-        userId={user?.uid}
-        userName={profile?.displayName || user?.displayName || 'Reseller'}
-        userEmail={profile?.email || user?.email || ''}
-        userRole={profile?.role || 'reseller'}
-        balance={profile?.balance || 0}
-        activeView={activeView}
-        orders={orders}
-        products={products}
-        cart={cart ? [cart] : []}
-        onNavigate={(menu) => setActiveView(menu as any)}
-        onOpenLogin={() => {}}
-        onOpenRegister={() => {}}
-        onSearchText={(query) => {
-          setActiveView('products');
-        }}
-        onSearchOrder={(query) => {
-          setActiveView('orders');
-        }}
-        onLogout={handleLogout}
-        onRechargeAction={(params) => {
-          setActiveView('balance');
-        }}
-        onWithdrawAction={(params) => {
-          setActiveView('balance');
-        }}
-      />
     </div>
   );
 }
@@ -1020,6 +876,10 @@ function Dashboard({ orders, products, profile }: { orders: Order[], products: P
             <div className="p-10 text-center text-text-muted text-sm font-semibold">No recent activity detected.</div>
           )}
         </div>
+      </div>
+
+      <div className="space-y-6">
+        <TodosList />
       </div>
     </div>
   );

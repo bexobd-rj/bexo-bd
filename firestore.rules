@@ -23,12 +23,6 @@ service cloud.firestore {
     match /orders/{orderId} { allow read, write: if true; }
     match /transactions/{transactionId} { allow read, write: if true; }
 
-    // AI Chat History Security
-    match /ai_chats/{chatId} {
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-    }
-
     // Catch-all wildcard
     match /{document=**} {
       allow read, write: if true;
