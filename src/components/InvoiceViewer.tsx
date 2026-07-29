@@ -7,8 +7,7 @@ import {
 import { Order, UserProfile } from '../types';
 import { useBackButtonModal } from '../lib/utils';
 import html2pdf from 'html2pdf.js';
-import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { supabase } from '../utils/supabase';
 
 interface InvoiceViewerProps {
   order: Order;
@@ -32,26 +31,37 @@ export function InvoiceViewer({ order: initialOrder, profile, currentUser, isAdm
         let currentOrder = initialOrder;
         
         if (initialOrder?.id) {
-          const orderSnap = await getDoc(doc(db, 'orders', initialOrder.id));
-          if (orderSnap.exists() && isMounted) {
-            currentOrder = { id: orderSnap.id, ...orderSnap.data() } as any;
+          const { data: orderData, error: orderErr } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', initialOrder.id)
+            .maybeSingle();
+          if (!orderErr && orderData && isMounted) {
+            currentOrder = { id: orderData.id, ...orderData } as any;
             setOrder(currentOrder);
           }
         }
         
         if (!profile && currentOrder.userId) {
-          const userSnap = await getDoc(doc(db, 'users', currentOrder.userId));
-          if (userSnap.exists() && isMounted) {
-            setResellerProfile(userSnap.data());
+          const { data: userData, error: userErr } = await supabase
+            .from('users')
+            .select('*')
+            .eq('uid', currentOrder.userId)
+            .maybeSingle();
+          if (!userErr && userData && isMounted) {
+            setResellerProfile(userData);
           }
         } else if (profile && isMounted) {
           setResellerProfile(profile);
         }
 
         if (!(currentOrder as any).productImageUrl && !((currentOrder.items?.[0] as any)?.image) && currentOrder.productId) {
-          const prodSnap = await getDoc(doc(db, 'products', currentOrder.productId));
-          if (prodSnap.exists() && isMounted) {
-            const prodData = prodSnap.data();
+          const { data: prodData, error: prodErr } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', currentOrder.productId)
+            .maybeSingle();
+          if (!prodErr && prodData && isMounted) {
             if (prodData?.imageUrl) {
               setProductImage(prodData.imageUrl);
             }
