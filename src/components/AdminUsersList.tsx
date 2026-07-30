@@ -16,7 +16,8 @@ import {
   Settings
 } from 'lucide-react';
 import { UserProfile, Transaction } from '../types';
-import { supabase } from '../utils/supabase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { cn } from '../lib/utils';
 
 interface AdminUsersListProps {
@@ -73,7 +74,7 @@ export function AdminUsersList({ allUsers, transactions }: AdminUsersListProps) 
 
   const handleRoleChange = async (userId: string, targetRole: UserProfile['role']) => {
     try {
-      await supabase.from('users').update({ role: targetRole }).eq('uid', userId);
+      await updateDoc(doc(db, 'users', userId), { role: targetRole });
       alert(`User role updated to ${targetRole} successfully!`);
     } catch (err) {
       console.error(err);
@@ -91,7 +92,7 @@ export function AdminUsersList({ allUsers, transactions }: AdminUsersListProps) 
         setIsSavingBalance(false);
         return;
       }
-      await supabase.from('users').update({ balance: parsed }).eq('uid', editingUser.uid);
+      await updateDoc(doc(db, 'users', editingUser.uid), { balance: parsed });
       setEditingUser(null);
       setNewBalance('');
       alert('Reseller balance updated successfully!');

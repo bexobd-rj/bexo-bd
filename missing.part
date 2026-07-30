@@ -1,0 +1,132 @@
+                                  >
+                              </div>
+
+                              <div class="flex flex-col gap-3">
+                                  <button 
+                                      type="button" 
+                                      id="verification-submit-btn"
+                                      class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-600/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+                                  >
+                                      ${currentStep === 1 ? 'ইমেইল ভেরিফাই করুন (পরবর্তী ধাপ)' : 'ওটিপি ভেরিফাই ও অ্যাকাউন্ট তৈরি করুন'}
+                                  </button>
+                                  <div class="flex justify-between items-center text-xs mt-1">
+                                      <button 
+                                          type="button" 
+                                          id="verification-resend-btn"
+                                          class="text-indigo-600 hover:text-indigo-800 font-bold transition-all cursor-pointer"
+                                      >
+                                          কোড আবার পাঠান (Resend)
+                                      </button>
+                                      <button 
+                                          type="button" 
+                                          id="verification-cancel-btn"
+                                          class="text-slate-400 hover:text-slate-600 font-semibold transition-all cursor-pointer"
+                                      >
+                                          বাতিল করুন
+                                      </button>
+                                  </div>
+                              </div>
+                          </div>
+                      `;
+                  };
+
+                  const attachEvents = () => {
+                      const codeInput = modal.querySelector('#verification-code-input');
+                      const submitBtn = modal.querySelector('#verification-submit-btn');
+                      const resendBtn = modal.querySelector('#verification-resend-btn');
+                      const cancelBtn = modal.querySelector('#verification-cancel-btn');
+
+                      cancelBtn.onclick = () => {
+                          modal.remove();
+                          showToast("ভেরিফিকেশন বাতিল করা হয়েছে।", "error");
+                      };
+
+                      resendBtn.onclick = async () => {
+                          resendBtn.disabled = true;
+                          resendBtn.innerText = "পাঠানো হচ্ছে...";
+                          try {
+                              if (currentStep === 1) {
+                                  await onEmailResend();
+                              } else {
+                                  await onPhoneResend();
+                              }
+                              modal.innerHTML = renderStepContent();
+                              attachEvents();
+                              showToast("নতুন কোড পাঠানো হয়েছে!", "success");
+                          } catch(e) {
+                              console.error(e);
+                              showToast("কোড পুনরায় পাঠাতে সমস্যা হয়েছে।", "error");
+                          } finally {
+                              resendBtn.disabled = false;
+                              resendBtn.innerText = "কোড আবার পাঠান (Resend)";
+                          }
+                      };
+
+                      submitBtn.onclick = async () => {
+                          const code = codeInput.value.trim();
+                          if (code.length !== 6) {
+                              showToast("অনুগ্রহ করে সঠিক ৬-ডিজিটের কোড দিন!", "error");
+                              return;
+                          }
+                          submitBtn.disabled = true;
+                          const originalText = submitBtn.innerHTML;
+                          submitBtn.innerHTML = `ভেরিফাই করা হচ্ছে...`;
+                          
+                          try {
+                              if (currentStep === 1) {
+                                  const verified = await onEmailVerify(code);
+                                  if (verified) {
+                                      // Email verified successfully! Transition to Step 2
+                                      currentStep = 2;
+                                      submitBtn.innerHTML = `ওটিপি পাঠানো হচ্ছে...`;
+                                      await onPhoneResend();
+                                      modal.innerHTML = renderStepContent();
+                                      attachEvents();
+                                  }
+                              } else {
+                                  const verified = await onPhoneVerify(code);
+                                  if (verified) {
+                                      modal.remove();
+                                  }
+                              }
+                          } catch(e) {
+                              console.error(e);
+                              showToast("ভেরিফিকেশন সম্পূর্ণ করা সম্ভব হয়নি।", "error");
+                          } finally {
+                              submitBtn.disabled = false;
+                              submitBtn.innerHTML = originalText;
+                          }
+                      };
+                  };
+
+                  modal.innerHTML = renderStepContent();
+                  document.body.appendChild(modal);
+                  attachEvents();
+              }
+
+              function handleRegister() {
+                  try {
+                      const shopField = document.getElementById('regShop');
+                      const nameField = document.getElementById('regName');
+                      const phoneField = document.getElementById('regPhone');
+                      const emailField = document.getElementById('regEmail');
+                      const addrField = document.getElementById('regAddress');
+                      const passField = document.getElementById('regPass');
+                      const confirmField = document.getElementById('regConfirmPass');
+                      const refCodeField = document.getElementById('regReferral');
+                      const termsField = document.getElementById('terms');
+
+                      if (!shopField || !nameField || !phoneField || !passField || !termsField) {
+                          throw new Error("Required registration fields missing in DOM");
+                      }
+
+                      const shop = shopField.value.trim();
+                      const name = nameField.value.trim();
+                      
+                      // Convert and normalize phone and password numbers
+                      let phone = phoneField.value.trim();
+                      let pass = passField.value;
+                      let confirm = confirmField ? confirmField.value : '';
+                      const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+                      phone = phone.replace(/[০-৯]/g, d => bMap[d] || d);
+                      pass = pass.replace(/[০-৯]/g, d => bMap[d] || d);

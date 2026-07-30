@@ -9,7 +9,12 @@ import {
   ArrowUpRight 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { supabase } from '../utils/supabase';
+import { db } from '../firebase';
+import { 
+  doc, 
+  runTransaction, 
+  collection 
+} from 'firebase/firestore';
 import { Order, Transaction } from '../types';
 import { useBackButtonModal } from '../lib/utils';
 
@@ -61,32 +66,23 @@ export function AdminTransferPanel({ orders }: AdminTransferPanelProps) {
     setIsSubmitting(true);
 
     try {
-      // 1. Fetch current reseller balance
-      const { data: userData, error: userErr } = await supabase
-        .from('users')
-        .select('balance')
-        .eq('uid', selectedOrder.userId)
-        .maybeSingle();
-      
-      if (userErr) throw userErr;
-      
-      const currentBalance = userData?.balance || 0;
-      const newBalance = currentBalance + transferAmount;
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', selectedOrder.userId);
+        const userSnap = await transaction.get(userRef);
 
-      // 2. Update reseller's balance
-      const { error: balanceErr } = await supabase
-        .from('users')
-        .update({ balance: newBalance })
-        .eq('uid', selectedOrder.userId);
-      
-      if (balanceErr) throw balanceErr;
+        let currentBalance = 0;
+        if (userSnap.exists()) {
+          currentBalance = userSnap.data().balance || 0;
+        }
 
-      // 3. Add transaction record
-      const transId = 't_' + Math.random().toString(36).substring(2, 15);
-      const { error: transErr } = await supabase
-        .from('transactions')
-        .insert({
-          id: transId,
+        const newBalance = currentBalance + transferAmount;
+
+        // 1. Update reseller's balance
+        transaction.update(userRef, { balance: newBalance });
+
+        // 2. Add transaction record
+        const transRef = doc(collection(db, 'transactions'));
+        transaction.set(transRef, {
           userId: selectedOrder.userId,
           amount: transferAmount,
           type: 'income',
@@ -95,16 +91,12 @@ export function AdminTransferPanel({ orders }: AdminTransferPanelProps) {
           date: new Date().toISOString(),
           referenceId: selectedOrder.id
         });
-      
-      if (transErr) throw transErr;
 
-      // 4. Mark profit status as completed
-      const { error: orderErr } = await supabase
-        .from('orders')
-        .update({ profitStatus: 'completed' })
-        .eq('id', selectedOrder.id);
-      
-      if (orderErr) throw orderErr;
+        // 3. Mark profit status as completed
+        transaction.update(doc(db, 'orders', selectedOrder.id), { 
+          profitStatus: 'completed' 
+        });
+      });
 
       alert('সফলভাবে টাকা ট্রান্সফার হয়েছে! ইউজারের ব্যালেন্স এবং অর্ডারের স্ট্যাটাস আপডেট করা হয়েছে।');
       handleCloseModal();

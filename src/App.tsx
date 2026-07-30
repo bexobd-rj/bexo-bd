@@ -33,12 +33,37 @@ import {
   DownloadCloud
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { auth, db } from './firebase';
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  sendEmailVerification, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut,
+  onAuthStateChanged
+} from "firebase/auth";
+import { 
+  collection, 
+  addDoc, 
+  query, 
+  where, 
+  onSnapshot, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  orderBy,
+  updateDoc,
+  runTransaction
+} from 'firebase/firestore';
 import { cn, useBackButtonModal } from './lib/utils';
+import { supabase } from './supabase';
 import { Product, Order, UserProfile, Transaction } from './types';
 import { AdminUsersList } from './components/AdminUsersList';
 import { AdminTransferPanel } from './components/AdminTransferPanel';
 import { InvoiceViewer } from './components/InvoiceViewer';
-import { supabase } from './utils/supabase';
+import AuthFlow from './components/AuthFlow';
 
 // --- Types & Constants ---
 type View = 'dashboard' | 'profile' | 'products' | 'orders' | 'admin-orders' | 'admin-payouts' | 'admin-products' | 'admin-users' | 'admin-panel' | 'admin-import-center' | 'cart' | 'sales' | 'balance' | 'support';
@@ -147,37 +172,6 @@ export default function App() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   
-  // --- New Custom Supabase Auth State Machine ---
-  type AuthFlowType = 'signin' | 'signup_email' | 'signup_otp' | 'signup_complete' | 'forgot_email' | 'forgot_otp' | 'forgot_reset';
-  const [authFlow, setAuthFlow] = useState<AuthFlowType>('signin');
-  
-  // Specific Form States
-  // Sign In
-  const [loginIdentifier, setLoginIdentifier] = useState(''); // Email or Phone
-  const [loginPassword, setLoginPassword] = useState('');
-  
-  // Sign Up
-  const [signUpEmail, setSignUpEmail] = useState('');
-  const [signUpOtp, setSignUpOtp] = useState('');
-  const [signUpShopName, setSignUpShopName] = useState('');
-  const [signUpDisplayName, setSignUpDisplayName] = useState('');
-  const [signUpPhone, setSignUpPhone] = useState('');
-  const [signUpAddress, setSignUpAddress] = useState('');
-  const [signUpReferralName, setSignUpReferralName] = useState('');
-  const [signUpPassword, setSignUpPassword] = useState('');
-  const [signUpConfirmPassword, setSignUpConfirmPassword] = useState('');
-  
-  // Forgot Password
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotOtp, setForgotOtp] = useState('');
-  const [forgotPassword, setForgotPassword] = useState('');
-  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
-  
-  // Status message info
-  const [authStatusMessage, setAuthStatusMessage] = useState('');
-  const [authError, setAuthError] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
-
   const [activeView, _setActiveView] = useState<View>(() => {
     const hash = window.location.hash.replace('#', '') as View;
     const validViews: View[] = ['dashboard', 'profile', 'products', 'orders', 'admin-orders', 'admin-payouts', 'admin-products', 'admin-users', 'admin-panel', 'admin-import-center', 'cart', 'sales', 'balance', 'support'];
@@ -222,447 +216,86 @@ export default function App() {
   useBackButtonModal(isCheckoutOpen, () => setIsCheckoutOpen(false));
   useBackButtonModal(isSidebarOpen, () => setIsSidebarOpen(false));
 
-  // Helper to handle profile syncing when authenticated via Supabase
-  const handleUserAuthenticated = async (supabaseUser: any) => {
-    // Attach uid field to the user object to preserve downstream listener code
-    const mappedUser = {
-      ...supabaseUser,
-      uid: supabaseUser.id
-    };
-    setUser(mappedUser);
-
-    let profileData: UserProfile | null = null;
-    let fetchError = false;
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('uid', supabaseUser.id)
-        .maybeSingle();
-      if (error) throw error;
-      profileData = data as any;
-    } catch (err) {
-      console.error("Failed to fetch user profile, offline or sluggish connection:", err);
-      fetchError = true;
-    }
-    const isSuperAdminEmail = supabaseUser.email === 'bexobd@gmail.com';
-    
-    if (profileData) {
-      if (isSuperAdminEmail && profileData.role !== 'admin') {
-        const updatedProfile = { ...profileData, role: 'admin' as const };
-        try {
-          await supabase.from('users').update({ role: 'admin' }).eq('uid', supabaseUser.id);
-        } catch (updErr) {
-          console.warn("Could not update admin role on server (local update only):", updErr);
-        }
-        setProfile(updatedProfile);
-      } else {
-        setProfile(profileData);
-      }
-    } else {
-      const fallbackProfile: UserProfile = {
-        uid: supabaseUser.id,
-        displayName: supabaseUser.user_metadata?.displayName || supabaseUser.email?.split('@')[0] || 'Reseller',
-        email: supabaseUser.email || '',
-        balance: 0,
-        role: isSuperAdminEmail ? 'admin' : 'user',
-        shopName: supabaseUser.user_metadata?.shopName || 'My Bexo Shop',
-        phone: supabaseUser.phone || supabaseUser.user_metadata?.phone || '',
-        // Store our extra custom fields
-        address: supabaseUser.user_metadata?.address || '',
-        referralName: supabaseUser.user_metadata?.referralName || ''
-      } as any;
-      if (!fetchError) {
-        try {
-          await supabase.from('users').upsert(fallbackProfile);
-        } catch (setErr) {
-          console.warn("Could not write new profile to server (local update only):", setErr);
-        }
-      }
-      setProfile(fallbackProfile);
-    }
-  };
-
-  // --- Supabase Auth Core Listener ---
+  // --- Auth & Profile ---
   useEffect(() => {
-    async function checkSession() {
+    let mounted = true;
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
       setIsLoadingAuth(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          await handleUserAuthenticated(session.user);
+          const currentUser = session.user;
+          setUser(currentUser);
+          
+          const isSuperAdminEmail = currentUser.email === 'bexobd@gmail.com';
+
+          // Fetch profile from Supabase
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('uid', currentUser.id)
+            .single();
+
+          if (userData) {
+            const mappedProfile: UserProfile = {
+              uid: userData.uid,
+              displayName: userData.display_name || currentUser.user_metadata?.full_name || 'Reseller',
+              email: userData.email || currentUser.email || '',
+              balance: userData.balance || 0,
+              role: userData.role || 'user',
+              shopName: userData.shop_name || 'My Bexo Shop',
+              phone: userData.mobile || ''
+            };
+            
+            if (isSuperAdminEmail && mappedProfile.role !== 'admin') {
+              mappedProfile.role = 'admin';
+              await supabase.from('users').update({ role: 'admin' }).eq('uid', currentUser.id);
+            }
+            
+            setProfile(mappedProfile);
+          } else {
+            const fallbackProfile = {
+              uid: currentUser.id,
+              display_name: currentUser.user_metadata?.full_name || 'Reseller',
+              email: currentUser.email || '',
+              balance: 0,
+              role: isSuperAdminEmail ? 'admin' : 'user',
+              shop_name: 'My Bexo Shop',
+              mobile: ''
+            };
+            
+            await supabase.from('users').insert([fallbackProfile]);
+            
+            setProfile({
+              uid: fallbackProfile.uid,
+              displayName: fallbackProfile.display_name,
+              email: fallbackProfile.email,
+              balance: fallbackProfile.balance,
+              role: fallbackProfile.role as 'admin' | 'user',
+              shopName: fallbackProfile.shop_name,
+              phone: fallbackProfile.mobile
+            });
+          }
         } else {
           setUser(null);
           setProfile(null);
         }
       } catch (err) {
-        console.error("Error checking Supabase session:", err);
+        console.error("Auth status sync sequence exception:", err);
       } finally {
         setIsLoadingAuth(false);
-      }
-    }
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Supabase Auth Change Event:", event, session?.user?.email);
-      if (session?.user) {
-        await handleUserAuthenticated(session.user);
-      } else {
-        setUser(null);
-        setProfile(null);
       }
     });
 
     return () => {
-      subscription.unsubscribe();
+      mounted = false;
+      authListener.subscription.unsubscribe();
     };
   }, []);
 
-  const handleGoogleLogin = async () => {
-    try {
-      setAuthError('');
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-      if (error) throw error;
-    } catch (err: any) {
-      console.error("Google login failed:", err.message);
-      setAuthError(`Login failed: ${err.message}`);
-    }
-  };
-
-  // --- Auth Flow Handlers ---
-  
-  // Registration Step 1: Send OTP
-  const handleSendSignUpOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!signUpEmail) {
-      setAuthError('Please enter a valid email address.');
-      return;
-    }
-    setAuthError('');
-    setAuthStatusMessage('');
-    setAuthLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: signUpEmail,
-        options: {
-          shouldCreateUser: true
-        }
-      });
-      if (error) throw error;
-      setAuthStatusMessage('A 6-digit verification code has been sent to your email address.');
-      setAuthFlow('signup_otp');
-    } catch (err: any) {
-      console.error("Registration OTP send failed:", err);
-      setAuthError(err.message || 'Failed to send OTP code. Please try again.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // Registration Step 2: Verify OTP
-  const handleVerifySignUpOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!signUpOtp || signUpOtp.length !== 6) {
-      setAuthError('Please enter a valid 6-digit verification code.');
-      return;
-    }
-    setAuthError('');
-    setAuthStatusMessage('');
-    setAuthLoading(true);
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: signUpEmail,
-        token: signUpOtp,
-        type: 'email'
-      });
-      if (error) {
-        // Try signup type fallback
-        const { error: errSignup } = await supabase.auth.verifyOtp({
-          email: signUpEmail,
-          token: signUpOtp,
-          type: 'signup'
-        });
-        if (errSignup) throw error;
-      }
-      setAuthStatusMessage('Email verified successfully! Please complete your shop and profile details below.');
-      setAuthFlow('signup_complete');
-    } catch (err: any) {
-      console.error("OTP verification failed:", err);
-      setAuthError(err.message || 'Incorrect or expired verification code. Please try again.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // Registration Step 3: Fill other details and save
-  const handleCompleteSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!signUpShopName.trim() || !signUpDisplayName.trim() || !signUpPhone.trim() || !signUpAddress.trim() || !signUpPassword.trim()) {
-      setAuthError('Please fill out all required fields.');
-      return;
-    }
-    if (signUpPassword !== signUpConfirmPassword) {
-      setAuthError('Passwords do not match.');
-      return;
-    }
-    if (signUpPassword.length < 6) {
-      setAuthError('Password must be at least 6 characters.');
-      return;
-    }
-    setAuthError('');
-    setAuthStatusMessage('');
-    setAuthLoading(true);
-    try {
-      const { data: { user: currentUser }, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !currentUser) {
-        throw new Error("No verified session found. Please verify your email first.");
-      }
-
-      // Update password & metadata in Supabase
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: signUpPassword,
-        phone: signUpPhone,
-        data: {
-          displayName: signUpDisplayName,
-          shopName: signUpShopName,
-          address: signUpAddress,
-          referralName: signUpReferralName,
-          phone: signUpPhone
-        }
-      });
-      if (updateError) throw updateError;
-
-      // Write complete profile to Supabase users database
-      const newProfile: UserProfile = {
-        uid: currentUser.id,
-        displayName: signUpDisplayName,
-        email: signUpEmail,
-        balance: 0,
-        role: signUpEmail === 'bexobd@gmail.com' ? 'admin' : 'user',
-        shopName: signUpShopName,
-        phone: signUpPhone,
-        address: signUpAddress,
-        referralName: signUpReferralName
-      } as any;
-
-      const { error: upsertErr } = await supabase.from('users').upsert(newProfile);
-      if (upsertErr) throw upsertErr;
-      setProfile(newProfile);
-      
-      const mappedUser = {
-        ...currentUser,
-        uid: currentUser.id
-      };
-      setUser(mappedUser);
-
-      setAuthStatusMessage('');
-      alert('Your registration has been completed successfully!');
-      setAuthFlow('signin');
-    } catch (err: any) {
-      console.error("Registration finalization failed:", err);
-      setAuthError(err.message || 'Failed to complete registration profile. Please try again.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // Sign In: Email or Phone + Password
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!loginIdentifier || !loginPassword) {
-      setAuthError('Please enter your email or phone number and password.');
-      return;
-    }
-    setAuthError('');
-    setAuthStatusMessage('');
-    setAuthLoading(true);
-    try {
-      let emailToUse = loginIdentifier;
-      const isEmail = loginIdentifier.includes('@');
-
-      if (!isEmail) {
-        console.log("Identifying login as phone number, looking up associated email...");
-        try {
-          const { data: userRows, error: userQueryErr } = await supabase
-            .from('users')
-            .select('email')
-            .eq('phone', loginIdentifier);
-          
-          if (!userQueryErr && userRows && userRows.length > 0) {
-            emailToUse = userRows[0].email;
-            console.log("Found email matching phone:", emailToUse);
-          } else {
-            console.log("No matching phone number found in user base, trying direct phone sign-in...");
-            const { error: phoneErr } = await supabase.auth.signInWithPassword({
-              phone: loginIdentifier,
-              password: loginPassword
-            });
-            if (phoneErr) throw phoneErr;
-            setAuthLoading(false);
-            return;
-          }
-        } catch (dbErr: any) {
-          console.warn("Supabase phone lookup failed or offline, trying direct phone sign-in via Supabase Auth:", dbErr);
-          const { error: phoneErr } = await supabase.auth.signInWithPassword({
-            phone: loginIdentifier,
-            password: loginPassword
-          });
-          if (phoneErr) {
-            throw new Error('সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না অথবা মোবাইল নম্বর/পাসওয়ার্ড ভুল। (Unable to connect to the server or incorrect phone/password.)');
-          }
-          setAuthLoading(false);
-          return;
-        }
-      }
-
-      // Login using email and password
-      const { error } = await supabase.auth.signInWithPassword({
-        email: emailToUse,
-        password: loginPassword
-      });
-      if (error) throw error;
-      console.log("Successfully logged in:", emailToUse);
-    } catch (err: any) {
-      console.error("Sign-in error:", err);
-      setAuthError(err.message || 'Invalid email/phone or password. Please try again.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // Forgot Password Step 1: Send Reset OTP
-  const handleSendForgotOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!forgotEmail) {
-      setAuthError('Please enter your email address.');
-      return;
-    }
-    setAuthError('');
-    setAuthStatusMessage('');
-    setAuthLoading(true);
-    try {
-      // Validate that the email address is indeed registered first
-      // We wrap this Supabase lookup in a try-catch to allow bypass on network / database server connectivity issues.
-      let emailExists = true;
-      try {
-        const { data: userRows, error: userQueryErr } = await supabase
-          .from('users')
-          .select('email')
-          .eq('email', forgotEmail);
-        
-        if (userQueryErr || !userRows || userRows.length === 0) {
-          emailExists = false;
-        }
-      } catch (dbErr: any) {
-        console.warn("Supabase email validation check bypassed due to connection or server offline status:", dbErr);
-        // Do not throw; proceed to Supabase OTP reset directly
-      }
-
-      if (!emailExists) {
-        throw new Error('This email address is not registered in our records. (এই ইমেইল এড্রেসটি রেজিস্টার্ড নয়।)');
-      }
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email: forgotEmail,
-        options: {
-          shouldCreateUser: false
-        }
-      });
-      if (error) throw error;
-      setAuthStatusMessage('A 6-digit password reset code has been sent to your email.');
-      setAuthFlow('forgot_otp');
-    } catch (err: any) {
-      console.error("Forgot password OTP send failure:", err);
-      const errMsg = err.message || '';
-      if (errMsg.includes('offline') || errMsg.includes('network') || errMsg.includes('Failed to get document')) {
-        setAuthError('সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। দয়া করে ইন্টারনেট কানেকশন চেক করুন এবং আবার চেষ্টা করুন। (Unable to connect to the server. Please check your internet connection and try again.)');
-      } else {
-        setAuthError(err.message || 'Failed to send reset code. Please try again.');
-      }
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // Forgot Password Step 2: Verify Reset OTP
-  const handleVerifyForgotOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!forgotOtp || forgotOtp.length !== 6) {
-      setAuthError('Please enter the 6-digit reset code.');
-      return;
-    }
-    setAuthError('');
-    setAuthStatusMessage('');
-    setAuthLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: forgotEmail,
-        token: forgotOtp,
-        type: 'email'
-      });
-      if (error) {
-        const { error: errorRec } = await supabase.auth.verifyOtp({
-          email: forgotEmail,
-          token: forgotOtp,
-          type: 'recovery'
-        });
-        if (errorRec) throw error;
-      }
-      setAuthStatusMessage('Email verified! Please choose your new secure password below.');
-      setAuthFlow('forgot_reset');
-    } catch (err: any) {
-      console.error("Reset OTP verification failure:", err);
-      setAuthError(err.message || 'Invalid or expired reset code. Please check and try again.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // Forgot Password Step 3: Save New Password
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!forgotPassword || !forgotConfirmPassword) {
-      setAuthError('Please fill out both password fields.');
-      return;
-    }
-    if (forgotPassword !== forgotConfirmPassword) {
-      setAuthError('Passwords do not match.');
-      return;
-    }
-    if (forgotPassword.length < 6) {
-      setAuthError('Password must be at least 6 characters.');
-      return;
-    }
-    setAuthError('');
-    setAuthStatusMessage('');
-    setAuthLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: forgotPassword
-      });
-      if (error) throw error;
-      alert('Your password has been reset successfully! You are now logged in.');
-      setAuthStatusMessage('');
-      setAuthFlow('signin');
-    } catch (err: any) {
-      console.error("Password change failed:", err);
-      setAuthError(err.message || 'Failed to update password. Please try again.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.warn("Supabase sign out error:", err);
-    }
+    await supabase.auth.signOut();
     setActiveView('dashboard');
   };
 
@@ -670,578 +303,112 @@ export default function App() {
   useEffect(() => {
     if (!user?.uid || !profile) return;
 
-    const fetchProfile = async () => {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('uid', user.uid)
-        .maybeSingle();
-      if (!error && data) {
-        setProfile(data as any);
+    // Listen for current user profile changes
+    const unsubProfile = onSnapshot(
+      doc(db, 'users', user.uid),
+      (snap) => {
+        if (snap.exists()) {
+          setProfile({ uid: snap.id, ...snap.data() } as UserProfile);
+        }
+      },
+      (err) => {
+        console.error("Profile onSnapshot error:", err);
       }
-    };
+    );
 
-    const fetchProducts = async () => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*');
-      if (!error && data) {
-        setProducts(data as any);
+    // Listen for products
+    const qProducts = query(collection(db, 'products'));
+    const unsubProducts = onSnapshot(
+      qProducts, 
+      (snap) => {
+        const p = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+        console.log("Real-time products update received from Firestore, count:", p.length);
+        setProducts(p);
+      },
+      (err) => {
+        console.error("Products onSnapshot error:", err);
       }
-    };
+    );
 
-    const fetchOrders = async () => {
-      let queryBuilder = supabase.from('orders').select('*');
-      if (profile.role !== 'admin') {
-        queryBuilder = queryBuilder.eq('userId', user.uid);
-      }
-      const { data, error } = await queryBuilder;
-      if (!error && data) {
-        const sorted = [...data].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setOrders(sorted as any);
-      }
-    };
-
-    const fetchTransactions = async () => {
-      let queryBuilder = supabase.from('transactions').select('*');
-      if (profile.role !== 'admin') {
-        queryBuilder = queryBuilder.eq('userId', user.uid);
-      }
-      const { data, error } = await queryBuilder;
-      if (!error && data) {
-        const sorted = [...data].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setTransactions(sorted as any);
-      }
-    };
-
-    const fetchAllUsers = async () => {
-      if (profile.role !== 'admin') return;
-      const { data, error } = await supabase
-        .from('users')
-        .select('*');
-      if (!error && data) {
-        setAllUsers(data as any);
-      }
-    };
-
-    // Initial Fetch
-    fetchProfile();
-    fetchProducts();
-    fetchOrders();
-    fetchTransactions();
+    // Listen for orders
+    console.log("Setting up orders listener for", user.uid, "Role:", profile.role);
+    let qOrders;
     if (profile.role === 'admin') {
-      fetchAllUsers();
+      qOrders = query(collection(db, 'orders'), orderBy('date', 'desc'));
+    } else {
+      qOrders = query(collection(db, 'orders'), where('userId', '==', user.uid));
     }
 
-    // Polling backup
-    const interval = setInterval(() => {
-      fetchProfile();
-      fetchProducts();
-      fetchOrders();
-      fetchTransactions();
-      if (profile.role === 'admin') {
-        fetchAllUsers();
-      }
-    }, 5000);
-
-    // Real-time listener
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        console.log("Supabase real-time update received!");
-        fetchProfile();
-        fetchProducts();
-        fetchOrders();
-        fetchTransactions();
-        if (profile.role === 'admin') {
-          fetchAllUsers();
+    const unsubOrders = onSnapshot(qOrders, 
+      (snap) => {
+        const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        if (profile.role !== 'admin') {
+          items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         }
-      })
-      .subscribe();
+        setOrders(items);
+      },
+      (err) => {
+        console.error("Orders listener error:", err);
+      }
+    );
+
+    // Listen for transactions
+    let qTrans;
+    if (profile.role === 'admin') {
+      qTrans = query(collection(db, 'transactions'), orderBy('date', 'desc'));
+    } else {
+      qTrans = query(collection(db, 'transactions'), where('userId', '==', user.uid));
+    }
+    
+    const unsubTrans = onSnapshot(qTrans, 
+      (snap) => {
+        const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+        if (profile.role !== 'admin') {
+          items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        }
+        setTransactions(items);
+      },
+      (err) => {
+        console.error("Transactions listener error:", err);
+      }
+    );
+
+    // Listen for all users if admin
+    let unsubUsers = () => {};
+    if (profile.role === 'admin') {
+      const qUsers = query(collection(db, 'users'));
+      unsubUsers = onSnapshot(qUsers, 
+        (snap) => {
+          setAllUsers(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+        },
+        (err) => {
+          console.error("Users listener error:", err);
+        }
+      );
+    }
 
     return () => {
-      clearInterval(interval);
-      channel.unsubscribe();
+      unsubProfile();
+      unsubProducts();
+      unsubOrders();
+      unsubTrans();
+      unsubUsers();
     };
   }, [user?.uid, profile?.role]);
 
   if (isLoadingAuth) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
-        <div className="w-20 h-20 bg-primary/10 text-primary rounded-[2rem] flex items-center justify-center mb-6">
+        <div className="w-20 h-20 bg-primary/10 text-primary rounded-[2rem] flex items-center justify-center mb-6 ">
           <Package size={40} />
         </div>
-        <h2 className="text-xl font-black text-text-main">Initializing Portal...</h2>
+        <h2 className="text-xl font-black text-text-main ">Initializing Portal...</h2>
       </div>
     );
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 bg-gradient-to-br from-orange-50 to-white">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full border border-white relative overflow-hidden"
-        >
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary text-white rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-xl shadow-orange-100 rotate-3">
-              <Package size={32} strokeWidth={2.5} />
-            </div>
-            <h1 className="text-3xl font-black text-text-main tracking-tighter mb-1">BEXO <span className="text-primary italic">BD</span></h1>
-            <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Supplier & Reseller Portal</p>
-          </div>
-
-          <div className="space-y-6">
-            {/* Success Status Message */}
-            {authStatusMessage && (
-              <div className="p-3 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded-xl text-center">
-                {authStatusMessage}
-              </div>
-            )}
-
-            {/* Error Status Message */}
-            {authError && (
-              <div className="p-3 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl text-center">
-                {authError}
-              </div>
-            )}
-
-            {/* CASE 1: SIGN IN FLOW */}
-            {authFlow === 'signin' && (
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email or Phone Number</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. name@email.com or 017XXXXXXXX"
-                    value={loginIdentifier}
-                    onChange={(e) => setLoginIdentifier(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm transition-colors"
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Password</label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthError('');
-                        setAuthStatusMessage('');
-                        setAuthFlow('forgot_email');
-                      }}
-                      className="text-xs font-bold text-primary hover:underline"
-                    >
-                      Forgot Password?
-                    </button>
-                  </div>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm transition-colors"
-                    required
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-4 bg-slate-900 hover:bg-black disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md transition-all mt-2"
-                >
-                  {authLoading ? 'Signing In...' : 'Sign In with Credentials'}
-                </button>
-
-                <div className="flex items-center justify-center space-x-2 text-xs font-bold text-slate-500 pt-2">
-                  <span>Don't have an account?</span>
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      setAuthError('');
-                      setAuthStatusMessage('');
-                      setAuthFlow('signup_email');
-                    }}
-                    className="text-primary hover:underline"
-                  >
-                    Sign Up
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* CASE 2: SIGN UP STEP 1 - EMAIL INPUT */}
-            {authFlow === 'signup_email' && (
-              <form onSubmit={handleSendSignUpOtp} className="space-y-4">
-                <div className="text-center pb-2">
-                  <h3 className="text-lg font-black text-slate-800">Verify Your Email First</h3>
-                  <p className="text-xs text-slate-500 font-medium">Enter your email to receive a 6-digit registration OTP code.</p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email Address</label>
-                  <input
-                    type="email"
-                    placeholder="yourname@domain.com"
-                    value={signUpEmail}
-                    onChange={(e) => setSignUpEmail(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm transition-colors"
-                    required
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-4 bg-slate-900 hover:bg-black disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md transition-all mt-2"
-                >
-                  {authLoading ? 'Sending OTP...' : 'Send Verification OTP'}
-                </button>
-
-                <div className="flex items-center justify-center space-x-2 text-xs font-bold text-slate-500 pt-2">
-                  <span>Already have an account?</span>
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      setAuthError('');
-                      setAuthStatusMessage('');
-                      setAuthFlow('signin');
-                    }}
-                    className="text-primary hover:underline"
-                  >
-                    Sign In
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* CASE 3: SIGN UP STEP 2 - OTP VERIFICATION */}
-            {authFlow === 'signup_otp' && (
-              <form onSubmit={handleVerifySignUpOtp} className="space-y-4">
-                <div className="text-center pb-2">
-                  <h3 className="text-lg font-black text-slate-800">Enter Verification Code</h3>
-                  <p className="text-xs text-slate-500 font-medium">Please enter the 6-digit OTP code sent to <span className="font-bold text-slate-700">{signUpEmail}</span>.</p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">6-Digit OTP Code</label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="123456"
-                    value={signUpOtp}
-                    onChange={(e) => setSignUpOtp(e.target.value.replace(/\D/g, ''))}
-                    className="w-full text-center tracking-[0.5em] font-mono py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-bold text-lg transition-colors"
-                    required
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-4 bg-slate-900 hover:bg-black disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md transition-all mt-2"
-                >
-                  {authLoading ? 'Verifying...' : 'Verify OTP Code'}
-                </button>
-
-                <div className="flex items-center justify-center space-x-2 text-xs font-bold text-slate-500 pt-2">
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      setAuthError('');
-                      setAuthStatusMessage('');
-                      setAuthFlow('signup_email');
-                    }}
-                    className="text-primary hover:underline"
-                  >
-                    Change Email / Re-send
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* CASE 4: SIGN UP STEP 3 - COMPLETE REGISTRATION DETAILS */}
-            {authFlow === 'signup_complete' && (
-              <form onSubmit={handleCompleteSignUp} className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
-                <div className="text-center pb-2">
-                  <h3 className="text-lg font-black text-slate-800">Complete Profile</h3>
-                  <p className="text-xs text-slate-500 font-medium">Setup your dropshipping shop and account details.</p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email Address</label>
-                  <input
-                    type="email"
-                    value={signUpEmail}
-                    className="w-full px-4 py-2.5 bg-slate-100 border border-border rounded-xl font-medium text-sm text-slate-500 focus:outline-none"
-                    disabled
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Shop Name *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. My Bexo Shop"
-                    value={signUpShopName}
-                    onChange={(e) => setSignUpShopName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">User Full Name *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Kabir Hossain"
-                    value={signUpDisplayName}
-                    onChange={(e) => setSignUpDisplayName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Phone Number *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 01711223344"
-                    value={signUpPhone}
-                    onChange={(e) => setSignUpPhone(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Address *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Dhanmondi, Dhaka"
-                    value={signUpAddress}
-                    onChange={(e) => setSignUpAddress(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Referral Name (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Karim Ahmed"
-                    value={signUpReferralName}
-                    onChange={(e) => setSignUpReferralName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Choose Password *</label>
-                  <input
-                    type="password"
-                    placeholder="At least 6 characters"
-                    value={signUpPassword}
-                    onChange={(e) => setSignUpPassword(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Confirm Password *</label>
-                  <input
-                    type="password"
-                    placeholder="Repeat chosen password"
-                    value={signUpConfirmPassword}
-                    onChange={(e) => setSignUpConfirmPassword(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm"
-                    required
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-4 bg-slate-900 hover:bg-black disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md transition-all mt-4"
-                >
-                  {authLoading ? 'Completing...' : 'Complete Registration'}
-                </button>
-              </form>
-            )}
-
-            {/* CASE 5: FORGOT PASSWORD STEP 1 - EMAIL INPUT */}
-            {authFlow === 'forgot_email' && (
-              <form onSubmit={handleSendForgotOtp} className="space-y-4">
-                <div className="text-center pb-2">
-                  <h3 className="text-lg font-black text-slate-800">Reset Password</h3>
-                  <p className="text-xs text-slate-500 font-medium">Enter your registered email to receive a password reset code.</p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email Address</label>
-                  <input
-                    type="email"
-                    placeholder="yourname@domain.com"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm transition-colors"
-                    required
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-4 bg-slate-900 hover:bg-black disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md transition-all mt-2"
-                >
-                  {authLoading ? 'Sending Code...' : 'Send Reset OTP'}
-                </button>
-
-                <div className="flex items-center justify-center space-x-2 text-xs font-bold text-slate-500 pt-2">
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      setAuthError('');
-                      setAuthStatusMessage('');
-                      setAuthFlow('signin');
-                    }}
-                    className="text-primary hover:underline"
-                  >
-                    Back to Sign In
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* CASE 6: FORGOT PASSWORD STEP 2 - OTP INPUT */}
-            {authFlow === 'forgot_otp' && (
-              <form onSubmit={handleVerifyForgotOtp} className="space-y-4">
-                <div className="text-center pb-2">
-                  <h3 className="text-lg font-black text-slate-800">Enter Reset Code</h3>
-                  <p className="text-xs text-slate-500 font-medium">Please enter the 6-digit password reset OTP sent to <span className="font-bold text-slate-700">{forgotEmail}</span>.</p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">6-Digit Reset Code</label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="123456"
-                    value={forgotOtp}
-                    onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
-                    className="w-full text-center tracking-[0.5em] font-mono py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-bold text-lg transition-colors"
-                    required
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-4 bg-slate-900 hover:bg-black disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md transition-all mt-2"
-                >
-                  {authLoading ? 'Verifying...' : 'Verify Reset Code'}
-                </button>
-
-                <div className="flex items-center justify-center space-x-2 text-xs font-bold text-slate-500 pt-2">
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      setAuthError('');
-                      setAuthStatusMessage('');
-                      setAuthFlow('forgot_email');
-                    }}
-                    className="text-primary hover:underline"
-                  >
-                    Change Email / Re-send
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* CASE 7: FORGOT PASSWORD STEP 3 - PASSWORD UPDATE */}
-            {authFlow === 'forgot_reset' && (
-              <form onSubmit={handleResetPassword} className="space-y-4">
-                <div className="text-center pb-2">
-                  <h3 className="text-lg font-black text-slate-800">Set New Password</h3>
-                  <p className="text-xs text-slate-500 font-medium">Please enter your new secure password below.</p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">New Password</label>
-                  <input
-                    type="password"
-                    placeholder="At least 6 characters"
-                    value={forgotPassword}
-                    onChange={(e) => setForgotPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm transition-colors"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Confirm New Password</label>
-                  <input
-                    type="password"
-                    placeholder="Repeat new password"
-                    value={forgotConfirmPassword}
-                    onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-border rounded-xl focus:outline-none focus:border-primary font-medium text-sm transition-colors"
-                    required
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-4 bg-slate-900 hover:bg-black disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md transition-all mt-2"
-                >
-                  {authLoading ? 'Updating...' : 'Update Password'}
-                </button>
-              </form>
-            )}
-
-            {/* Standard Social Sign In option on basic screen only */}
-            {authFlow === 'signin' && (
-              <>
-                <div className="relative flex items-center justify-center my-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-200"></div>
-                  </div>
-                  <div className="relative px-4 bg-white text-xs text-slate-400 font-bold uppercase tracking-widest">
-                    OR
-                  </div>
-                </div>
-
-                <button 
-                  onClick={handleGoogleLogin}
-                  className="w-full py-3.5 bg-white hover:bg-slate-50 text-slate-700 border-2 border-slate-200 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-3"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                  </svg>
-                  SIGN IN WITH GOOGLE
-                </button>
-              </>
-            )}
-            
-            <p className="text-[9px] text-center font-bold text-slate-300 uppercase tracking-widest mt-4">
-              Official BEXO Network Access
-            </p>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-slate-50 text-center">
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Powered by Bexo Dropshipping Network</p>
-          </div>
-        </motion.div>
-      </div>
-    );
+    return <AuthFlow />;
   }
 
   if (profile?.role === 'admin' && !isAdminUnlocked) {
@@ -1557,41 +724,8 @@ function Dashboard({ orders, products, profile }: { orders: Order[], products: P
           )}
         </div>
       </div>
-
-      <SupabaseTodosTest />
     </div>
   );
-}
-
-function SupabaseTodosTest() {
-  const [todos, setTodos] = useState<any[]>([])
-
-  useEffect(() => {
-    async function getTodos() {
-      const { data: todos } = await supabase.from('todos').select()
-
-      if (todos) {
-        setTodos(todos)
-      }
-    }
-
-    getTodos()
-  }, [])
-
-  if (todos.length === 0) return null;
-
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-extrabold text-text-main">Supabase Data (todos)</h3>
-      <div className="bg-surface rounded-xl border border-border shadow-sm p-4">
-        <ul className="list-disc pl-5">
-          {todos.map((todo) => (
-            <li key={todo.id} className="text-sm text-text-main">{todo.name}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
 }
 
 function ProductGrid({ products, onAdd }: { products: Product[], onAdd: (p: Product) => void }) {
@@ -1817,42 +951,30 @@ function CheckoutModal({ product, onClose, userId, profile, orders }: { product:
         profitStatus: 'not_added'
       };
       
-      // Stock check and update via Supabase
-      const { data: currentProduct, error: prodErr } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', product.id)
-        .maybeSingle();
-
-      if (prodErr) throw prodErr;
-      if (!currentProduct) throw new Error('প্রোডাক্টটি পাওয়া যায়নি।');
-
-      if (currentProduct.stockStatus === 'out_of_stock' || (currentProduct.stock !== undefined && currentProduct.stock <= 0)) {
-        throw new Error('এই প্রোডাক্টটি বর্তমানে স্টক আউট রয়েছে!');
-      }
-
-      if (currentProduct.stock !== undefined) {
-        const newStock = currentProduct.stock - 1;
-        const updateObj: any = { stock: newStock };
-        if (newStock <= 0) {
-          updateObj.stockStatus = 'out_of_stock';
+      await runTransaction(db, async (transaction) => {
+        const productRef = doc(db, 'products', product.id);
+        const productSnap = await transaction.get(productRef);
+        
+        if (productSnap.exists()) {
+          const currentProduct = productSnap.data() as Product;
+          
+          if (currentProduct.stockStatus === 'out_of_stock' || (currentProduct.stock !== undefined && currentProduct.stock <= 0)) {
+            throw new Error('এই প্রোডাক্টটি বর্তমানে স্টক আউট রয়েছে!');
+          }
+          
+          if (currentProduct.stock !== undefined) {
+            const newStock = currentProduct.stock - 1;
+            const updateObj: any = { stock: newStock };
+            if (newStock <= 0) {
+              updateObj.stockStatus = 'out_of_stock';
+            }
+            transaction.update(productRef, updateObj);
+          }
         }
-        const { error: stockUpdateErr } = await supabase
-          .from('products')
-          .update(updateObj)
-          .eq('id', product.id);
-        if (stockUpdateErr) throw stockUpdateErr;
-      }
-
-      // Create new order record in Supabase
-      const newOrderId = 'o_' + Math.random().toString(36).substring(2, 15);
-      const { error: orderInsertErr } = await supabase
-        .from('orders')
-        .insert({
-          id: newOrderId,
-          ...orderData
-        });
-      if (orderInsertErr) throw orderInsertErr;
+        
+        const newOrderRef = doc(collection(db, 'orders'));
+        transaction.set(newOrderRef, orderData);
+      });
       
       onClose();
     } catch (err: any) {
@@ -2317,14 +1439,10 @@ function AdminOrderList({ orders }: { orders: Order[] }) {
         ...(oldHistory || []),
         { status: newStatus, date: new Date().toISOString(), note: `Status updated to ${newStatus} by admin.` }
       ];
-      const { error } = await supabase
-        .from('orders')
-        .update({ 
-          status: newStatus,
-          statusHistory: historyUpdate
-        })
-        .eq('id', orderId);
-      if (error) throw error;
+      await updateDoc(doc(db, 'orders', orderId), { 
+        status: newStatus,
+        statusHistory: historyUpdate
+      });
       if (selectedOrder?.id === orderId) {
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus, statusHistory: historyUpdate } : null);
       }
@@ -2336,11 +1454,7 @@ function AdminOrderList({ orders }: { orders: Order[] }) {
 
   const handleUpdateTracking = async (orderId: string, link: string) => {
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ trackingLink: link })
-        .eq('id', orderId);
-      if (error) throw error;
+      await updateDoc(doc(db, 'orders', orderId), { trackingLink: link });
     } catch (err) {
       console.error(err);
     }
@@ -2348,39 +1462,26 @@ function AdminOrderList({ orders }: { orders: Order[] }) {
 
   const handleApproveProfit = async (order: Order) => {
     try {
-      const { data: userProfile, error: userFetchErr } = await supabase
-        .from('users')
-        .select('*')
-        .eq('uid', order.userId)
-        .maybeSingle();
-      if (userFetchErr) throw userFetchErr;
-
-      let newBalance = order.profit;
-      if (userProfile) {
-        newBalance = (userProfile.balance || 0) + order.profit;
-        const { error: userUpdErr } = await supabase
-          .from('users')
-          .update({ balance: newBalance })
-          .eq('uid', order.userId);
-        if (userUpdErr) throw userUpdErr;
-      } else {
-        const { error: userInsertErr } = await supabase
-          .from('users')
-          .insert({
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', order.userId);
+        const userSnap = await transaction.get(userRef);
+        
+        if (!userSnap.exists()) {
+          transaction.set(userRef, { 
+            balance: order.profit,
             uid: order.userId,
-            balance: newBalance,
             displayName: order.resellerName || 'User',
             email: order.resellerEmail || '',
             role: 'user'
-          });
-        if (userInsertErr) throw userInsertErr;
-      }
-
-      const transId = 't_' + Math.random().toString(36).substring(2, 15);
-      const { error: transErr } = await supabase
-        .from('transactions')
-        .insert({
-          id: transId,
+          }, { merge: true });
+        } else {
+          const newBalance = (userSnap.data().balance || 0) + order.profit;
+          transaction.update(userRef, { balance: newBalance });
+        }
+        
+        // Add transaction record
+        const transRef = doc(collection(db, 'transactions'));
+        transaction.set(transRef, {
           userId: order.userId,
           amount: order.profit,
           type: 'income',
@@ -2389,14 +1490,9 @@ function AdminOrderList({ orders }: { orders: Order[] }) {
           date: new Date().toISOString(),
           referenceId: order.id
         });
-      if (transErr) throw transErr;
-
-      const { error: orderUpdErr } = await supabase
-        .from('orders')
-        .update({ profitStatus: 'completed' })
-        .eq('id', order.id);
-      if (orderUpdErr) throw orderUpdErr;
-
+        
+        transaction.update(doc(db, 'orders', order.id), { profitStatus: 'completed' });
+      });
       alert('Profit added to reseller account!');
     } catch (err) {
       console.error(err);
@@ -2658,15 +1754,12 @@ function ProfileView({ user, profile, transactions, orders }: { user: any, profi
     if (!profile) return;
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          phone: editForm.phone,
-          shopName: editForm.shopName,
-          website: editForm.website
-        })
-        .eq('uid', profile.uid);
-      if (error) throw error;
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, {
+        phone: editForm.phone,
+        shopName: editForm.shopName,
+        website: editForm.website
+      });
       setIsEditing(false);
     } catch (err) {
       console.error("Error updating profile:", err);
@@ -2954,29 +2047,19 @@ function WithdrawalModal({ profile, onClose }: { profile: UserProfile, onClose: 
 
     setIsLoading(true);
     try {
-      const { data: userData, error: fetchErr } = await supabase
-        .from('users')
-        .select('balance')
-        .eq('uid', profile.uid)
-        .maybeSingle();
-      if (fetchErr) throw fetchErr;
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', profile.uid);
+        const userSnap = await transaction.get(userRef);
+        
+        const currentBalance = userSnap.data()?.balance || 0;
+        if (currentBalance < amount) throw new Error('Insufficient balance');
 
-      const currentBalance = userData?.balance || 0;
-      if (currentBalance < amount) throw new Error('Insufficient balance');
+        // Deduct balance
+        transaction.update(userRef, { balance: currentBalance - amount });
 
-      // Deduct balance
-      const { error: balanceErr } = await supabase
-        .from('users')
-        .update({ balance: currentBalance - amount })
-        .eq('uid', profile.uid);
-      if (balanceErr) throw balanceErr;
-
-      // Add transaction record
-      const transId = 't_' + Math.random().toString(36).substring(2, 15);
-      const { error: transErr } = await supabase
-        .from('transactions')
-        .insert({
-          id: transId,
+        // Add transaction record
+        const transRef = doc(collection(db, 'transactions'));
+        transaction.set(transRef, {
           userId: profile.uid,
           amount,
           type: 'withdrawal',
@@ -2984,8 +2067,7 @@ function WithdrawalModal({ profile, onClose }: { profile: UserProfile, onClose: 
           description: `Withdrawal via ${paymentMethod} to ${accountNumber}`,
           date: new Date().toISOString()
         });
-      if (transErr) throw transErr;
-
+      });
       alert('Withdrawal request submitted successfully!');
       onClose();
     } catch (err: any) {
@@ -3178,11 +2260,7 @@ function AdminPayoutList({ transactions }: { transactions: Transaction[] }) {
 
   const handleApprovePayout = async (transId: string) => {
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .update({ status: 'completed' })
-        .eq('id', transId);
-      if (error) throw error;
+      await updateDoc(doc(db, 'transactions', transId), { status: 'completed' });
       alert('Payout marked as completed!');
     } catch (err) {
       console.error(err);
@@ -3192,26 +2270,17 @@ function AdminPayoutList({ transactions }: { transactions: Transaction[] }) {
 
   const handleRejectPayout = async (trans: Transaction) => {
     try {
-      const { data: userData, error: fetchErr } = await supabase
-        .from('users')
-        .select('balance')
-        .eq('uid', trans.userId)
-        .maybeSingle();
-      if (fetchErr) throw fetchErr;
-
-      const currentBalance = userData?.balance || 0;
-      const { error: balanceErr } = await supabase
-        .from('users')
-        .update({ balance: currentBalance + trans.amount })
-        .eq('uid', trans.userId);
-      if (balanceErr) throw balanceErr;
-
-      const { error: transErr } = await supabase
-        .from('transactions')
-        .update({ status: 'failed' })
-        .eq('id', trans.id);
-      if (transErr) throw transErr;
-
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', trans.userId);
+        const userSnap = await transaction.get(userRef);
+        
+        // Return money to balance
+        const currentBalance = userSnap.data()?.balance || 0;
+        transaction.update(userRef, { balance: currentBalance + trans.amount });
+        
+        // Update transaction status
+        transaction.update(doc(db, 'transactions', trans.id), { status: 'failed' });
+      });
       alert('Payout rejected and amount returned to reseller balance.');
     } catch (err) {
       console.error(err);
@@ -3397,19 +2466,11 @@ function AdminProductList({ products }: { products: Product[] }) {
     setIsLoading(true);
     try {
       for (const item of INITIAL_PRODUCTS) {
-        const prodId = 'p_' + Math.random().toString(36).substring(2, 15);
-        const { error } = await supabase
-          .from('products')
-          .insert({
-            id: prodId,
-            title: item.title,
-            basePrice: item.basePrice,
-            imageUrl: item.imageUrl,
-            description: item.description,
-            stockStatus: 'in_stock',
-            stock: 50 // seed with initial 50 stock count
-          });
-        if (error) throw error;
+        await addDoc(collection(db, 'products'), {
+          ...item,
+          stockStatus: 'in_stock',
+          stock: 50 // seed with initial 50 stock count
+        });
       }
       alert('ডিফল্ট প্রোডাক্টস সফলতার সাথে ডাটাবেজে যুক্ত হয়েছে!');
     } catch (err) {
@@ -3454,26 +2515,18 @@ function AdminProductList({ products }: { products: Product[] }) {
     try {
       if (editingProduct) {
         // Edit existing product
+        const prRef = doc(db, 'products', editingProduct.id);
         const updateData = { ...payload };
         if (updateData.stock === null) {
-          const { error } = await supabase
-            .from('products')
-            .update({
-              title: payload.title,
-              basePrice: payload.basePrice,
-              imageUrl: payload.imageUrl,
-              description: payload.description,
-              stockStatus: payload.stockStatus,
-              stock: null
-            })
-            .eq('id', editingProduct.id);
-          if (error) throw error;
+          await setDoc(prRef, {
+            title: payload.title,
+            basePrice: payload.basePrice,
+            imageUrl: payload.imageUrl,
+            description: payload.description,
+            stockStatus: payload.stockStatus
+          });
         } else {
-          const { error } = await supabase
-            .from('products')
-            .update(updateData)
-            .eq('id', editingProduct.id);
-          if (error) throw error;
+          await updateDoc(prRef, updateData);
         }
         alert('প্রোডাক্ট সফলভাবে আপডেট করা হয়েছে!');
       } else {
@@ -3482,14 +2535,7 @@ function AdminProductList({ products }: { products: Product[] }) {
         if (cleanPayload.stock === null) {
           delete cleanPayload.stock;
         }
-        const prodId = 'p_' + Math.random().toString(36).substring(2, 15);
-        const { error } = await supabase
-          .from('products')
-          .insert({
-            id: prodId,
-            ...cleanPayload
-          });
-        if (error) throw error;
+        await addDoc(collection(db, 'products'), cleanPayload);
         alert('প্রোডাক্ট সফলভাবে তৈরি করা হয়েছে!');
       }
       setIsFormOpen(false);
@@ -3504,14 +2550,10 @@ function AdminProductList({ products }: { products: Product[] }) {
   const handleDelete = async (prodId: string) => {
     if (!confirm('আপনি কি নিশ্চিত যে এই প্রোডাক্টটি ডিলেট করতে চান?')) return;
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({
-          stockStatus: 'out_of_stock',
-          stock: 0
-        })
-        .eq('id', prodId);
-      if (error) throw error;
+      await updateDoc(doc(db, 'products', prodId), {
+        stockStatus: 'out_of_stock',
+        stock: 0
+      });
       alert('প্রোডাক্টটি স্টক আউট করে দেয়া হয়েছে।');
     } catch (err) {
       console.error(err);
