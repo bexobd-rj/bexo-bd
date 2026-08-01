@@ -58,6 +58,7 @@
         }];
 
         let isSyncingFromUI = false;
+        let isNavigatingViaBack = false;
         let lastExitAttemptTime = 0;
 
         // Initialize history state on load
@@ -69,7 +70,7 @@
 
         // Push new state frame onto stack and browser history
         window.bexoPushNavState = function(type, id, extra) {
-          if (isSyncingFromUI) return;
+          if (isSyncingFromUI || isNavigatingViaBack) return;
           const top = navStack[navStack.length - 1];
           
           // Avoid duplicate pushing of the exact same state
@@ -291,16 +292,27 @@
           // Step back from stack if we have items
           if (navStack.length > 1) {
             const topFrame = navStack.pop();
-            const closed = performCloseForFrame(topFrame);
-            if (!closed) {
-              closeAnyVisibleOverlay();
+            isNavigatingViaBack = true;
+            try {
+              const closed = performCloseForFrame(topFrame);
+              if (!closed) {
+                closeAnyVisibleOverlay();
+              }
+            } finally {
+              isNavigatingViaBack = false;
             }
             return;
           }
 
           // Stack length is 1 (Root frame):
           // First check if there's any visible overlay that wasn't in stack
-          const closedFallback = closeAnyVisibleOverlay();
+          isNavigatingViaBack = true;
+          let closedFallback = false;
+          try {
+            closedFallback = closeAnyVisibleOverlay();
+          } finally {
+            isNavigatingViaBack = false;
+          }
           if (closedFallback) {
             try { window.history.pushState({ bexoNavIndex: 0, bexoNavGuard: true }, '', window.location.href); } catch(err) {}
             return;
