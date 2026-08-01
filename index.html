@@ -386,22 +386,42 @@
       }
     </style>
   
-    <!-- Supabase CDN -->
+        <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module">
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      if (!supabaseUrl || !supabaseKey) {
-          throw new Error("Supabase environment variables are missing! Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.");
-      }
-      
-      // Wait for window.supabase to be available from the CDN script
-      const initSupabase = setInterval(() => {
-          if (window.supabase && typeof window.supabase.createClient === 'function') {
-              window.supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-              clearInterval(initSupabase);
+      window.getSupabase = function() {
+          if (window.supabaseClient && window.supabaseClient.auth) {
+              return window.supabaseClient;
           }
+          if (window.supabase && window.supabase.auth) {
+              return window.supabase;
+          }
+          let supabaseUrl = "";
+          let supabaseKey = "";
+          try {
+              if (typeof import.meta !== 'undefined' && import.meta.env) {
+                  supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+                  supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+              }
+          } catch(e) {}
+
+          if (supabaseUrl && supabaseKey && window.supabase && typeof window.supabase.createClient === 'function') {
+              try {
+                  const client = window.supabase.createClient(supabaseUrl, supabaseKey);
+                  window.supabaseClient = client;
+                  window.supabase = client;
+                  return client;
+              } catch(e) {
+                  console.error("[Supabase Init Error]:", e);
+              }
+          }
+          return null;
+      };
+
+      // Auto-init loop
+      const initSupabaseTimer = setInterval(() => {
+          const client = window.getSupabase();
+          if (client) clearInterval(initSupabaseTimer);
       }, 50);
     </script>
 </head>
@@ -3625,13 +3645,12 @@ function savePosts() {
                       
                       // Wait for Supabase to be available on window
                       let attempts = 0;
-                      while (!window.supabase && attempts < 10) {
+                      while (!window.getSupabase() && attempts < 10) {
                           await new Promise(r => setTimeout(r, 500));
                           attempts++;
                       }
                       
-                      if (!window.supabase) {
-                          throw new Error("window.supabase not found");
+                      if (!window.getSupabase()) {
                       }
                       
                       window.db = {
@@ -4786,10 +4805,11 @@ function savePosts() {
                   `;
                   document.body.appendChild(modal);
 
-                  if (!window.supabase) {
-                      return alert("Supabase is not initialized. Check your environment variables.");
+                  const sb = window.getSupabase();
+                  if (!sb || !sb.auth) {
+                      return alert("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel environment variables.");
                   }
-                  window.supabase.auth.signInWithOtp({
+                  sb.auth.signInWithOtp({
                       email: email,
                       options: { shouldCreateUser: true }
                   }).then(res => {
@@ -4806,8 +4826,9 @@ function savePosts() {
                   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ভেরিফাই হচ্ছে...';
                   btn.disabled = true;
 
-                  if (!window.supabase) return alert("Supabase is not initialized.");
-                  window.supabase.auth.verifyOtp({
+                  const sb = window.getSupabase();
+                  if (!sb || !sb.auth) return alert("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel environment variables.");
+                  sb.auth.verifyOtp({
                           email: email,
                           token: otp,
                           type: 'email'
@@ -4845,8 +4866,9 @@ function savePosts() {
                   if (isEmail) creds.email = identifier;
                   else creds.phone = identifier;
 
-                  if (!window.supabase) return showToast("Supabase is not initialized.", "error");
-                  window.supabase.auth.signInWithPassword(creds)
+                  const sb = window.getSupabase();
+                  if (!sb || !sb.auth) return showToast("Supabase setup incomplete. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.", "error", 6000);
+                  sb.auth.signInWithPassword(creds)
                   .then(({ data, error }) => {
                       if (error) {
                           showToast('লগইন ব্যর্থ: ' + error.message, 'error');
@@ -4955,8 +4977,9 @@ function savePosts() {
                               btn.disabled = true;
 
                               try {
-                                  if (!window.supabase) throw new Error("Supabase is not initialized.");
-                                  const { error } = await window.supabase.auth.resetPasswordForEmail(identifier);
+                                  const sb = window.getSupabase();
+                                  if (!sb || !sb.auth) throw new Error("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.");
+                                  const { error } = await sb.auth.resetPasswordForEmail(identifier);
                                   
                                   if (error) {
                                       throw new Error(error.message || "কোড পাঠানো ব্যর্থ হয়েছে");
@@ -4981,8 +5004,9 @@ function savePosts() {
                               btn.disabled = true;
 
                               try {
-                                  if (!window.supabase) throw new Error("Supabase is not initialized.");
-                                  const { error } = await window.supabase.auth.verifyOtp({
+                                  const sb = window.getSupabase();
+                                  if (!sb || !sb.auth) throw new Error("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.");
+                                  const { error } = await sb.auth.verifyOtp({
                                       email: identifier,
                                       token: code,
                                       type: 'recovery'
@@ -5014,8 +5038,9 @@ function savePosts() {
                               btn.disabled = true;
 
                               try {
-                                  if (!window.supabase) throw new Error("Supabase is not initialized.");
-                                  const { data, error } = await window.supabase.auth.updateUser({ password: np });
+                                  const sb = window.getSupabase();
+                                  if (!sb || !sb.auth) throw new Error("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.");
+                                  const { data, error } = await sb.auth.updateUser({ password: np });
 
                                   if (error) {
                                       throw new Error(error.message || "পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে");
@@ -5714,7 +5739,9 @@ function savePosts() {
                       
                       showToast("Google সাইন-ইন উইন্ডো খোলা হচ্ছে...", "info");
                       try {
-                          const { data, error } = await window.supabase.auth.signInWithOAuth({
+                          const sb = window.getSupabase();
+                          if (!sb || !sb.auth) return showToast("Supabase is not initialized.", "error");
+                          const { data, error } = await sb.auth.signInWithOAuth({
                               provider: 'google',
                               options: {
                                   queryParams: {
@@ -5730,7 +5757,7 @@ function savePosts() {
                           // If skipBrowserRedirect is true, we might need to handle the session manually.
                           // Let's use the standard redirect for now, which is more reliable in AI Studio.
                           
-                          window.supabase.auth.signInWithOAuth({
+                          if (sb && sb.auth) sb.auth.signInWithOAuth({
                               provider: 'google',
                               options: {
                                   redirectTo: window.location.origin
