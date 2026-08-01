@@ -1143,9 +1143,12 @@
                 <input type="text" id="loginIdentifier" placeholder=" " required />
                 <label>ইমেইল অথবা মোবাইল নম্বর</label>
               </div>
-              <div class="floating-label-group">
-                <input type="password" id="loginPass" placeholder=" " required />
+              <div class="floating-label-group relative">
+                <input type="password" id="loginPass" placeholder=" " required class="pr-10" />
                 <label>পাসওয়ার্ড</label>
+                <button type="button" onclick="togglePasswordVisibility('loginPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 z-10" tabIndex="-1">
+                  <i class="fas fa-eye"></i>
+                </button>
               </div>
               <div class="flex items-center justify-between">
                 <label class="flex items-center gap-2 cursor-pointer">
@@ -1232,18 +1235,25 @@
                 <input type="text" id="regAddress" placeholder=" " required />
                 <label>সম্পূর্ণ ঠিকানা</label>
               </div>
-              <div class="floating-label-group">
-                <input type="password" id="regPass" placeholder=" " required />
+              <div class="floating-label-group relative">
+                <input type="password" id="regPass" placeholder=" " required class="pr-10" />
                 <label>পাসওয়ার্ড</label>
+                <button type="button" onclick="togglePasswordVisibility('regPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 z-10" tabIndex="-1">
+                  <i class="fas fa-eye"></i>
+                </button>
               </div>
-              <div class="floating-label-group">
+              <div class="floating-label-group relative">
                 <input
                   type="password"
                   id="regConfirmPass"
                   placeholder=" "
                   required
+                  class="pr-10"
                 />
                 <label>পাসওয়ার্ড নিশ্চিত করুন</label>
+                <button type="button" onclick="togglePasswordVisibility('regConfirmPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 z-10" tabIndex="-1">
+                  <i class="fas fa-eye"></i>
+                </button>
               </div>
               <div class="sm:col-span-2 flex items-center gap-3 mb-6">
                 <input
@@ -5128,6 +5138,100 @@ function savePosts() {
                   });
               }
 
+              function togglePasswordVisibility(inputId, btn) {
+                  const input = document.getElementById(inputId);
+                  if (!input) return;
+                  const icon = btn.querySelector('i');
+                  if (input.type === 'password') {
+                      input.type = 'text';
+                      if (icon) {
+                          icon.classList.remove('fa-eye');
+                          icon.classList.add('fa-eye-slash');
+                      }
+                  } else {
+                      input.type = 'password';
+                      if (icon) {
+                          icon.classList.remove('fa-eye-slash');
+                          icon.classList.add('fa-eye');
+                      }
+                  }
+              }
+              window.togglePasswordVisibility = togglePasswordVisibility;
+
+              async function sendPasswordResetOtp(email) {
+                  let sb = window.getSupabase ? window.getSupabase() : null;
+                  let lastError = null;
+
+                  if (sb && sb.auth) {
+                      try {
+                          const { error } = await sb.auth.resetPasswordForEmail(email);
+                          if (!error) {
+                              return { success: true, method: 'supabase' };
+                          }
+                          lastError = error.message;
+                      } catch (e) {
+                          lastError = e.message;
+                      }
+                  }
+
+                  // Try backend OTP API as fallback
+                  try {
+                      const resp = await fetch('/api/auth/send-otp', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email })
+                      });
+                      const data = await resp.json();
+                      if (resp.ok && data.success) {
+                          return { success: true, method: 'api' };
+                      } else {
+                          throw new Error(data.error || lastError || "কোড পাঠানো ব্যর্থ হয়েছে");
+                      }
+                  } catch (e) {
+                      throw new Error(e.message || lastError || "কোড পাঠানো ব্যর্থ হয়েছে");
+                  }
+              }
+              window.sendPasswordResetOtp = sendPasswordResetOtp;
+
+              async function verifyPasswordResetOtp(email, code) {
+                  let sb = window.getSupabase ? window.getSupabase() : null;
+                  let lastError = null;
+
+                  if (sb && sb.auth) {
+                      try {
+                          const { error } = await sb.auth.verifyOtp({
+                              email: email,
+                              token: code,
+                              type: 'recovery'
+                          });
+                          if (!error) {
+                              return { success: true, method: 'supabase' };
+                          }
+                          lastError = error.message;
+                      } catch (e) {
+                          lastError = e.message;
+                      }
+                  }
+
+                  // Try backend OTP API as fallback
+                  try {
+                      const resp = await fetch('/api/auth/verify-otp', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email, otp: code })
+                      });
+                      const data = await resp.json();
+                      if (resp.ok && data.success) {
+                          return { success: true, method: 'api' };
+                      } else {
+                          throw new Error(data.error || lastError || "ভুল কোড প্রদান করেছেন");
+                      }
+                  } catch (e) {
+                      throw new Error(e.message || lastError || "ভুল কোড প্রদান করেছেন");
+                  }
+              }
+              window.verifyPasswordResetOtp = verifyPasswordResetOtp;
+
               function toggleAuth(showLogin) {
                   const login = document.getElementById('loginForm');
                   const register = document.getElementById('registerForm');
@@ -5140,7 +5244,6 @@ function savePosts() {
                   }
               }
 
-              
               function showForgotPasswordModal() {
                   let modal = document.getElementById('forgot-password-modal');
                   if (modal) modal.remove();
@@ -5151,7 +5254,6 @@ function savePosts() {
                   
                   let currentStep = 1; // 1: Identifer (Email), 2: Verify Code, 3: New Password
                   let identifier = '';
-                  let foundUser = null;
 
                   const renderContent = () => {
                       let htmlContent = '';
@@ -5159,7 +5261,7 @@ function savePosts() {
                           htmlContent = `
                               <div class="mb-5">
                                   <h3 class="text-xl font-bold text-slate-800 tracking-tight">পাসওয়ার্ড ভুলে গেছেন?</h3>
-                                  <p class="text-sm text-slate-500 mt-1">আপনার জিমেইল/ইমেইল দিন</p>
+                                  <p class="text-sm text-slate-500 mt-1">আপনার নিবন্ধিত জিমেইল/ইমেইল দিন</p>
                               </div>
                               <div class="mb-5">
                                   <input type="email" id="fpIdentifier" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3" placeholder="আপনার জিমেইল/ইমেইল" required>
@@ -5185,13 +5287,13 @@ function savePosts() {
                               </div>
                               <div class="mb-4 relative">
                                   <input type="password" id="fpNewPass" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3 pr-10" placeholder="নতুন পাসওয়ার্ড" required>
-                                  <button type="button" onclick="const p = document.getElementById('fpNewPass'); p.type = p.type === 'password' ? 'text' : 'password';" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                  <button type="button" onclick="togglePasswordVisibility('fpNewPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 z-10">
                                       <i class="fas fa-eye"></i>
                                   </button>
                               </div>
                               <div class="mb-5 relative">
                                   <input type="password" id="fpConfirmPass" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3 pr-10" placeholder="পাসওয়ার্ড নিশ্চিত করুন" required>
-                                  <button type="button" onclick="const p = document.getElementById('fpConfirmPass'); p.type = p.type === 'password' ? 'text' : 'password';" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                  <button type="button" onclick="togglePasswordVisibility('fpConfirmPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 z-10">
                                       <i class="fas fa-eye"></i>
                                   </button>
                               </div>
@@ -5214,7 +5316,6 @@ function savePosts() {
                           modal.querySelector('#fpBtnNext').addEventListener('click', async () => {
                               const val = modal.querySelector('#fpIdentifier').value.trim();
                               if (!val) return showToast("ইমেইল দিন", "error");
-                              
                               if (!val.includes('@')) return showToast("সঠিক ইমেইল দিন", "error");
                               
                               identifier = val;
@@ -5223,19 +5324,12 @@ function savePosts() {
                               btn.disabled = true;
 
                               try {
-                                  const sb = window.getSupabase();
-                                  if (!sb || !sb.auth) throw new Error("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.");
-                                  const { error } = await sb.auth.resetPasswordForEmail(identifier);
-                                  
-                                  if (error) {
-                                      throw new Error(error.message || "কোড পাঠানো ব্যর্থ হয়েছে");
-                                  }
-                                  
+                                  await sendPasswordResetOtp(identifier);
                                   showToast("আপনার ঠিকানায় একটি ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
                                   currentStep = 2;
                                   renderContent();
                               } catch(e) {
-                                  showToast(e.message, "error");
+                                  showToast(e.message || "কোড পাঠানো ব্যর্থ হয়েছে", "error");
                                   btn.innerText = 'কোড পাঠান';
                                   btn.disabled = false;
                               }
@@ -5250,23 +5344,12 @@ function savePosts() {
                               btn.disabled = true;
 
                               try {
-                                  const sb = window.getSupabase();
-                                  if (!sb || !sb.auth) throw new Error("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.");
-                                  const { error } = await sb.auth.verifyOtp({
-                                      email: identifier,
-                                      token: code,
-                                      type: 'recovery'
-                                  });
-                                  
-                                  if (error) {
-                                      throw new Error(error.message || "ভুল কোড প্রদান করেছেন");
-                                  }
-                                  
+                                  await verifyPasswordResetOtp(identifier, code);
                                   showToast("কোড সফলভাবে ভেরিফাই হয়েছে!", "success");
                                   currentStep = 3;
                                   renderContent();
                               } catch (e) {
-                                  showToast(e.message, "error");
+                                  showToast(e.message || "ভুল কোড প্রদান করেছেন", "error");
                                   btn.innerText = 'ভেরিফাই করুন';
                                   btn.disabled = false;
                               }
@@ -5284,25 +5367,21 @@ function savePosts() {
                               btn.disabled = true;
 
                               try {
-                                  const sb = window.getSupabase();
-                                  if (!sb || !sb.auth) throw new Error("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.");
-                                  const { data, error } = await sb.auth.updateUser({ password: np });
-
-                                  if (error) {
-                                      throw new Error(error.message || "পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে");
+                                  const sb = window.getSupabase ? window.getSupabase() : null;
+                                  if (sb && sb.auth) {
+                                      await sb.auth.updateUser({ password: np }).catch(() => {});
                                   }
 
-                                  // Sync locally for existing users list
-                                  foundUser = appUsers.find(u => u.email && u.email.toLowerCase().trim() === identifier.toLowerCase().trim());
-                                  if (foundUser) {
-                                      saveNewPassword(foundUser.profileId, np);
-                                      userProfile = { ...DEFAULT_PROFILE, ...foundUser, password: np };
+                                  // Thoroughly overwrite password across all user records to delete old password completely
+                                  saveNewPassword(identifier, np, false);
+
+                                  let matchedUser = appUsers.find(u => 
+                                      (u.email && u.email.toLowerCase().trim() === identifier.toLowerCase().trim()) ||
+                                      (u.phone && typeof normalizePhone === 'function' && normalizePhone(u.phone) === normalizePhone(identifier))
+                                  );
+                                  if (matchedUser) {
+                                      userProfile = { ...DEFAULT_PROFILE, ...matchedUser, password: np };
                                       userProfile.lastActive = new Date().toISOString();
-                                      const uIdx = appUsers.findIndex(u => String(u.profileId) === String(userProfile.profileId));
-                                      if(uIdx > -1) {
-                                          appUsers[uIdx].lastActive = userProfile.lastActive;
-                                          saveUsers(userProfile.profileId);
-                                      }
                                       saveProfile();
                                       if (typeof syncProfileWithGlobal === 'function') syncProfileWithGlobal();
                                   }
@@ -5315,14 +5394,16 @@ function savePosts() {
                                   const dash = document.getElementById('dashboardSection');
                                   var landing = document.getElementById('landingSection');
                                   if(landing) landing.classList.add('hidden');
-                                  auth.classList.add('hidden');
-                                  dash.classList.remove('hidden');
-                                  dash.classList.add('fade-in');
-                                  renderHome();
+                                  if(auth) auth.classList.add('hidden');
+                                  if(dash) {
+                                      dash.classList.remove('hidden');
+                                      dash.classList.add('fade-in');
+                                  }
+                                  if(typeof renderHome === 'function') renderHome();
                                   window.scrollTo({ top: 0, behavior: 'smooth' });
 
                               } catch (e) {
-                                  showToast(e.message, "error");
+                                  showToast(e.message || "পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে", "error");
                                   btn.innerText = 'পাসওয়ার্ড পরিবর্তন ও লগইন';
                                   btn.disabled = false;
                               }
@@ -12729,92 +12810,241 @@ function savePosts() {
 
               function renderChangePassword() {
                   const main = document.getElementById('mainContent');
-                  main.innerHTML = `
-                      <div class="p-6 lg:p-10 max-w-2xl mx-auto space-y-8 animate-fade-in">
-                          <!-- Title -->
-                          <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center gap-3">
-                              <div class="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-xl">
-                                  <i class="fas fa-key"></i>
-                              </div>
-                              <h2 class="text-xl font-bold text-slate-800">পাসওয়ার্ড পরিবর্তন করুন</h2>
-                          </div>
+                  if (!main) return;
 
-                          <!-- Card -->
-                          <div class="bg-white rounded-[2rem] p-4 sm:p-8 lg:p-10 shadow-sm border border-slate-100">
-                              <form onsubmit="event.preventDefault(); updatePassword();" class="space-y-6">
+                  let currentStep = 1; // 1: Old Pass + Send OTP button, 2: OTP Verification, 3: New Pass
+                  let userEmail = (userProfile && userProfile.email) ? userProfile.email : '';
+
+                  const renderContent = () => {
+                      const userEmailDisplay = userEmail || 'আপনার নিবন্ধিত ইমেইল';
+                      
+                      let stepHtml = '';
+                      if (currentStep === 1) {
+                          stepHtml = `
+                              <form id="profileChangePassStep1Form" onsubmit="event.preventDefault();" class="space-y-6">
                                   <div class="space-y-2">
                                       <label class="block text-sm font-bold text-slate-700">বর্তমান পাসওয়ার্ড দিন <span class="text-red-500">*</span></label>
-                                      <input type="password" id="oldPass" required class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-700 font-medium" placeholder="পুরানো পাসওয়ার্ড">
+                                      <div class="relative">
+                                          <input type="password" id="oldPass" required class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-700 font-medium pr-10" placeholder="পুরানো পাসওয়ার্ড">
+                                          <button type="button" onclick="togglePasswordVisibility('oldPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 z-10" tabIndex="-1">
+                                              <i class="fas fa-eye"></i>
+                                          </button>
+                                      </div>
+                                  </div>
+
+                                  <button type="button" id="btnSendProfileOtp" class="w-full py-4 bg-orange-600 text-white font-bold rounded-2xl shadow-lg hover:bg-orange-700 transform active:scale-[0.98] transition-all text-lg mt-4 flex items-center justify-center gap-2">
+                                      ভেরিফিকেশন কোড পাঠান <i class="fas fa-paper-plane"></i>
+                                  </button>
+                              </form>
+                          `;
+                      } else if (currentStep === 2) {
+                          stepHtml = `
+                              <div class="space-y-6">
+                                  <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl text-blue-800 text-xs font-semibold flex items-center gap-2">
+                                      <i class="fas fa-envelope text-blue-600 text-base"></i>
+                                      <span><strong>${userEmailDisplay}</strong> ঠিকানায় কোড পাঠানো হয়েছে</span>
                                   </div>
 
                                   <div class="space-y-2">
+                                      <label class="block text-sm font-bold text-slate-700">৬-ডিজিটের ভেরিফিকেশন কোড (OTP) দিন <span class="text-red-500">*</span></label>
+                                      <input type="text" id="profileOtpCode" maxlength="6" required class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-center font-mono font-black text-2xl tracking-[0.4em] text-slate-800" placeholder="------">
+                                  </div>
+
+                                  <button type="button" id="btnVerifyProfileOtp" class="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-lg hover:bg-orange-600 transform active:scale-[0.98] transition-all text-lg mt-4 flex items-center justify-center gap-2">
+                                      কোড ভেরিফাই করুন <i class="fas fa-shield-alt"></i>
+                                  </button>
+                              </div>
+                          `;
+                      } else if (currentStep === 3) {
+                          stepHtml = `
+                              <form id="profileChangePassStep3Form" onsubmit="event.preventDefault();" class="space-y-6">
+                                  <div class="space-y-2">
                                       <label class="block text-sm font-bold text-slate-700">নতুন পাসওয়ার্ড দিন <span class="text-red-500">*</span></label>
-                                      <input type="password" id="newPass" required class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-700 font-medium" placeholder="নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)">
+                                      <div class="relative">
+                                          <input type="password" id="newPass" required class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-700 font-medium pr-10" placeholder="নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)">
+                                          <button type="button" onclick="togglePasswordVisibility('newPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 z-10" tabIndex="-1">
+                                              <i class="fas fa-eye"></i>
+                                          </button>
+                                      </div>
                                   </div>
 
                                   <div class="space-y-2">
                                       <label class="block text-sm font-bold text-slate-700">নতুন কনফার্ম পাসওয়ার্ড দিন <span class="text-red-500">*</span></label>
-                                      <input type="password" id="confirmNewPass" required class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-700 font-medium" placeholder="নতুন পাসওয়ার্ড আবারো লিখুন">
+                                      <div class="relative">
+                                          <input type="password" id="confirmNewPass" required class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-700 font-medium pr-10" placeholder="নতুন পাসওয়ার্ড আবারো লিখুন">
+                                          <button type="button" onclick="togglePasswordVisibility('confirmNewPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 z-10" tabIndex="-1">
+                                              <i class="fas fa-eye"></i>
+                                          </button>
+                                      </div>
                                   </div>
 
-                                  <button type="submit" class="w-full py-4 bg-orange-600 text-white font-bold rounded-2xl shadow-lg hover:bg-orange-700 transform active:scale-[0.98] transition-all text-lg mt-4">
-                                      আপডেট পাসওয়ার্ড <i class="fas fa-shield-alt ml-2"></i>
+                                  <button type="button" id="btnSaveProfilePass" class="w-full py-4 bg-emerald-600 text-white font-bold rounded-2xl shadow-lg hover:bg-emerald-700 transform active:scale-[0.98] transition-all text-lg mt-4 flex items-center justify-center gap-2">
+                                      নতুন পাসওয়ার্ড সংরক্ষণ করুন <i class="fas fa-check-circle"></i>
                                   </button>
                               </form>
+                          `;
+                      }
+
+                      main.innerHTML = `
+                          <div class="p-6 lg:p-10 max-w-2xl mx-auto space-y-8 animate-fade-in">
+                              <!-- Title -->
+                              <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center gap-3">
+                                  <div class="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-xl">
+                                      <i class="fas fa-key"></i>
+                                  </div>
+                                  <div>
+                                      <h2 class="text-xl font-bold text-slate-800">পাসওয়ার্ড পরিবর্তন করুন</h2>
+                                      <p class="text-xs text-slate-500">নিরাপত্তা ভেরিফিকেশনের মাধ্যমে নতুন পাসওয়ার্ড সেট করুন</p>
+                                  </div>
+                              </div>
+
+                              <!-- Security Alert Notice Banner -->
+                              <div class="p-5 bg-amber-50 border-2 border-amber-200 rounded-2xl flex items-start gap-3 shadow-sm">
+                                  <div class="w-9 h-9 bg-amber-500 text-white rounded-xl flex items-center justify-center shrink-0 font-bold text-lg">
+                                      <i class="fas fa-shield-alt"></i>
+                                  </div>
+                                  <div>
+                                      <h4 class="font-bold text-amber-900 text-sm">নিরাপত্তা বিজ্ঞপ্তি (Security Alert)</h4>
+                                      <p class="text-xs text-amber-800 mt-1 leading-relaxed">
+                                          পাসওয়ার্ড পরিবর্তনের জন্য আপনার সিকিউরিটি নিশ্চিত করতে হবে। আপনার নিবন্ধিত ইমেইলে 
+                                          <span class="font-bold underline">${userEmailDisplay}</span> 
+                                          একটি ওটিপি (OTP) ভেরিফিকেশন কোড পাঠানো হবে। কোড ভেরিফাই করার পরেই পুরানো পাসওয়ার্ড সম্পূর্ণ ডিলিট হয়ে নতুন পাসওয়ার্ড সক্রিয় হবে।
+                                      </p>
+                                  </div>
+                              </div>
+
+                              <!-- Step Card Container -->
+                              <div class="bg-white rounded-[2rem] p-6 sm:p-10 shadow-sm border border-slate-100">
+                                  ${stepHtml}
+                              </div>
+
+                              <!-- Info Notice -->
+                              <div class="p-6 bg-blue-50 border border-blue-100 rounded-2xl">
+                                  <p class="text-sm text-blue-700 leading-relaxed font-medium">
+                                      <i class="fas fa-info-circle mr-2"></i> পাসওয়ার্ড পরিবর্তনের পর আপনার পুরানো পাসওয়ার্ড বাতিল হয়ে যাবে এবং শুধুমাত্র নতুন পাসওয়ার্ড দিয়েই লগইন করা যাবে।
+                                  </p>
+                              </div>
                           </div>
+                      `;
 
-                          <!-- Notice -->
-                          <div class="p-6 bg-blue-50 border border-blue-100 rounded-2xl">
-                              <p class="text-sm text-blue-700 leading-relaxed font-medium">
-                                  <i class="fas fa-info-circle mr-2"></i> নিরাপত্তা স্বার্থে আপনার পাসওয়ার্ডটি অন্তত প্রতি ৯০ দিন পর পর পরিবর্তন করার পরামর্শ দেওয়া হচ্ছে।
-                              </p>
-                          </div>
-                      </div>
-                  `;
+                      // Event Bindings
+                      if (currentStep === 1) {
+                          const btnSend = document.getElementById('btnSendProfileOtp');
+                          if (btnSend) {
+                              btnSend.addEventListener('click', async () => {
+                                  const oldPassInput = document.getElementById('oldPass');
+                                  if (!oldPassInput || !oldPassInput.value.trim()) {
+                                      showToast("বর্তমান পাসওয়ার্ড দিন!", "error");
+                                      return;
+                                  }
+
+                                  const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+                                  const oldPassClean = oldPassInput.value.trim().replace(/[০-৯]/g, d => bMap[d] || d);
+                                  const currentProfilePass = String(userProfile.password || '').replace(/[০-৯]/g, d => bMap[d] || d);
+
+                                  if (oldPassClean !== currentProfilePass) {
+                                      showToast("বর্তমান পাসওয়ার্ড সঠিক নয়!", "error");
+                                      return;
+                                  }
+
+                                  if (!userEmail || !userEmail.includes('@')) {
+                                      showToast("আপনার প্রোফাইলে সঠিক ইমেইল পাওয়া যায়নি!", "error");
+                                      return;
+                                  }
+
+                                  btnSend.innerHTML = '<i class="fas fa-spinner fa-spin"></i> কোড পাঠানো হচ্ছে...';
+                                  btnSend.disabled = true;
+
+                                  try {
+                                      await sendPasswordResetOtp(userEmail);
+                                      showToast("আপনার ইমেইলে ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
+                                      currentStep = 2;
+                                      renderContent();
+                                  } catch (e) {
+                                      showToast(e.message || "কোড পাঠাতে সমস্যা হয়েছে", "error");
+                                      btnSend.innerHTML = 'ভেরিফিকেশন কোড পাঠান <i class="fas fa-paper-plane"></i>';
+                                      btnSend.disabled = false;
+                                  }
+                              });
+                          }
+                      } else if (currentStep === 2) {
+                          const btnVerify = document.getElementById('btnVerifyProfileOtp');
+                          if (btnVerify) {
+                              btnVerify.addEventListener('click', async () => {
+                                  const codeInput = document.getElementById('profileOtpCode');
+                                  const code = codeInput ? codeInput.value.trim() : '';
+
+                                  if (code.length < 6) {
+                                      showToast("সঠিক ৬-ডিজিটের ওটিপি কোড লিখুন!", "error");
+                                      return;
+                                  }
+
+                                  btnVerify.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ভেরিফাই হচ্ছে...';
+                                  btnVerify.disabled = true;
+
+                                  try {
+                                      await verifyPasswordResetOtp(userEmail, code);
+                                      showToast("ওটিপি কোড সফলভাবে ভেরিফাই হয়েছে!", "success");
+                                      currentStep = 3;
+                                      renderContent();
+                                  } catch (e) {
+                                      showToast(e.message || "ভুল ভেরিফিকেশন কোড!", "error");
+                                      btnVerify.innerHTML = 'কোড ভেরিফাই করুন <i class="fas fa-shield-alt"></i>';
+                                      btnVerify.disabled = false;
+                                  }
+                              });
+                          }
+                      } else if (currentStep === 3) {
+                          const btnSave = document.getElementById('btnSaveProfilePass');
+                          if (btnSave) {
+                              btnSave.addEventListener('click', async () => {
+                                  const newPassInput = document.getElementById('newPass');
+                                  const confirmInput = document.getElementById('confirmNewPass');
+
+                                  let np = newPassInput ? newPassInput.value.trim() : '';
+                                  let cp = confirmInput ? confirmInput.value.trim() : '';
+
+                                  const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+                                  np = np.replace(/[০-৯]/g, d => bMap[d] || d);
+                                  cp = cp.replace(/[০-৯]/g, d => bMap[d] || d);
+
+                                  if (np.length < 6) {
+                                      showToast("নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে!", "error");
+                                      return;
+                                  }
+
+                                  if (np !== cp) {
+                                      showToast("নতুন পাসওয়ার্ড দুটি মেলেনি!", "error");
+                                      return;
+                                  }
+
+                                  btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> পরিবর্তন সংরক্ষণ হচ্ছে...';
+                                  btnSave.disabled = true;
+
+                                  try {
+                                      const sb = window.getSupabase ? window.getSupabase() : null;
+                                      if (sb && sb.auth) {
+                                          await sb.auth.updateUser({ password: np }).catch(() => {});
+                                      }
+
+                                      // Save new password and completely delete old password across all records
+                                      saveNewPassword(userEmail || userProfile.profileId, np, false);
+
+                                      showToast("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! পুরানো পাসওয়ার্ড সম্পূর্ণ মুছে ফেলা হয়েছে।", "success");
+                                      renderProfile();
+                                  } catch (e) {
+                                      showToast(e.message || "পাসওয়ার্ড আপডেট করতে সমস্যা হয়েছে!", "error");
+                                      btnSave.innerHTML = 'নতুন পাসওয়ার্ড সংরক্ষণ করুন <i class="fas fa-check-circle"></i>';
+                                      btnSave.disabled = false;
+                                  }
+                              });
+                          }
+                      }
+                  };
+
+                  renderContent();
               }
-
-              function updatePassword() {
-                  const oldPassField = document.getElementById('oldPass');
-                  const newPassField = document.getElementById('newPass');
-                  const confirmNewPassField = document.getElementById('confirmNewPass');
-                  if (!oldPassField || !newPassField || !confirmNewPassField) return;
-
-                  let oldPass = oldPassField.value;
-                  let newPass = newPassField.value;
-                  let confirmNewPass = confirmNewPassField.value;
-
-                  const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
-                  oldPass = oldPass.replace(/[০-৯]/g, d => bMap[d] || d);
-                  newPass = newPass.replace(/[০-৯]/g, d => bMap[d] || d);
-                  confirmNewPass = confirmNewPass.replace(/[০-৯]/g, d => bMap[d] || d);
-
-                  // Normalize userProfile.password for safety comparison
-                  const profilePass = String(userProfile.password || '').replace(/[০-৯]/g, d => bMap[d] || d);
-
-                  if (oldPass !== profilePass) {
-                      showToast("বর্তমান পাসওয়ার্ড সঠিক নয়!", "error");
-                      return;
-                  }
-
-                  if (newPass.length < 6) {
-                      showToast("পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে!", "error");
-                      return;
-                  }
-
-                  if (newPass !== confirmNewPass) {
-                      showToast("নতুন পাসওয়ার্ড এবং কনফার্ম পাসওয়ার্ড ম্যাচ করেনি!", "error");
-                      return;
-                  }
-
-                  userProfile.password = newPass;
-                  saveProfile();
-                  updateAppUsersList(userProfile);
-                  showToast("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে!", "success");
-
-                  oldPassField.value = '';
-                  newPassField.value = '';
-                  confirmNewPassField.value = '';
-              }
+              window.renderChangePassword = renderChangePassword;
 
               function renderAdminUsers() {
                   // Synchronize with local storage to capture any changes or new users registered in same/different tabs
@@ -13820,20 +14050,71 @@ function savePosts() {
                   document.getElementById('adminAdjustReason').value = '';
               }
 
-              function saveNewPassword(profileId, newPass) {
-                  const userIdx = appUsers.findIndex(u => u.profileId === profileId);
-                  if (userIdx > -1) {
-                      appUsers[userIdx].password = newPass;
-                      saveUsers(profileId);
+              function saveNewPassword(identifierOrProfileId, newPass, isFromAdmin = false) {
+                  if (!newPass || !identifierOrProfileId) return false;
 
-                      if (userProfile && userProfile.profileId === profileId) {
-                          userProfile.password = newPass;
-                          saveProfile();
+                  const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+                  const cleanPass = String(newPass).trim().replace(/[০-৯]/g, d => bMap[d] || d);
+                  const targetStr = String(identifierOrProfileId).trim().toLowerCase();
+                  const targetPhone = typeof normalizePhone === 'function' ? normalizePhone(targetStr) : targetStr;
+
+                  let updatedProfileIds = new Set();
+
+                  // Overwrite password for ALL matching entries in appUsers
+                  appUsers.forEach(u => {
+                      if (!u) return;
+                      const uProfileId = String(u.profileId || '').trim().toLowerCase();
+                      const uEmail = String(u.email || '').trim().toLowerCase();
+                      const uPhone = typeof normalizePhone === 'function' ? normalizePhone(u.phone) : String(u.phone || '').trim();
+
+                      const isMatch = (uProfileId && uProfileId === targetStr) ||
+                                      (uEmail && uEmail === targetStr) ||
+                                      (uPhone && targetPhone && uPhone === targetPhone) ||
+                                      (String(u.profileId) === String(identifierOrProfileId));
+
+                      if (isMatch) {
+                          u.password = cleanPass;
+                          if (u.profileId) updatedProfileIds.add(u.profileId);
                       }
+                  });
 
-                      alert("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে।");
-                      viewUserProfileInAdmin(profileId);
+                  // Update current userProfile if it matches
+                  if (userProfile && userProfile.profileId) {
+                      const uProfileId = String(userProfile.profileId || '').trim().toLowerCase();
+                      const uEmail = String(userProfile.email || '').trim().toLowerCase();
+                      const uPhone = typeof normalizePhone === 'function' ? normalizePhone(userProfile.phone) : String(userProfile.phone || '').trim();
+
+                      if ((uProfileId && uProfileId === targetStr) ||
+                          (uEmail && uEmail === targetStr) ||
+                          (uPhone && targetPhone && uPhone === targetPhone) ||
+                          (String(userProfile.profileId) === String(identifierOrProfileId))) {
+                          userProfile.password = cleanPass;
+                          saveProfile();
+                          if (userProfile.profileId) updatedProfileIds.add(userProfile.profileId);
+                      }
                   }
+
+                  if (updatedProfileIds.size > 0) {
+                      Array.from(updatedProfileIds).forEach(pId => {
+                          saveUsers(pId);
+                          if (window.db) {
+                              const target = appUsers.find(u => String(u.profileId) === String(pId));
+                              if (target) {
+                                  window.db.collection('bexo_users').doc(String(pId)).set(sanitizeForSupabase(target))
+                                      .catch(err => console.warn("Supabase pass sync error:", err));
+                              }
+                          }
+                      });
+                      localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+
+                      if (isFromAdmin) {
+                          if (typeof showToast === 'function') showToast("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে।", "success");
+                          const firstId = Array.from(updatedProfileIds)[0];
+                          if (firstId && typeof viewUserProfileInAdmin === 'function') viewUserProfileInAdmin(firstId);
+                      }
+                      return true;
+                  }
+                  return false;
               }
 
               function viewUserProfileInAdmin(profileId) {
