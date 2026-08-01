@@ -54,7 +54,7 @@
         const navStack = [{
           id: 'root',
           type: 'root',
-          menuKey: window.currentMenu || 'catalog'
+          menuKey: window.currentMenu || 'dashboard'
         }];
 
         let isSyncingFromUI = false;
@@ -160,7 +160,7 @@
               if (frame.prevCategory && typeof window.renderProductList === 'function') {
                 window.renderProductList(frame.prevCategory, frame.prevSubCategory || '');
               } else if (typeof window.switchMenu === 'function') {
-                window.switchMenu(frame.prevMenuKey || window.currentMenu || 'catalog');
+                window.switchMenu(frame.prevMenuKey || window.currentMenu || 'dashboard');
               } else {
                 postDetail.remove();
               }
@@ -250,7 +250,7 @@
 
           const postDetail = document.getElementById('postDetailContainer');
           if (postDetail) {
-            if (typeof window.switchMenu === 'function') window.switchMenu(window.currentMenu || 'catalog');
+            if (typeof window.switchMenu === 'function') window.switchMenu(window.currentMenu || 'dashboard');
             else postDetail.remove();
             return true;
           }
@@ -264,9 +264,9 @@
             return true;
           }
 
-          if (window.currentMenu && window.currentMenu !== 'home' && window.currentMenu !== 'catalog') {
+          if (window.currentMenu && window.currentMenu !== 'home' && window.currentMenu !== 'dashboard' && window.currentMenu !== 'catalog') {
             if (typeof window.switchMenu === 'function') {
-              window.switchMenu('catalog');
+              window.switchMenu('dashboard');
               return true;
             }
           }
@@ -383,7 +383,7 @@
           if (typeof window.renderPostDetail === 'function' && !window.renderPostDetail.__bexoHooked) {
             const origPostDetail = window.renderPostDetail;
             window.renderPostDetail = function(postId, ...args) {
-              const prevMenu = window.currentMenu || 'catalog';
+              const prevMenu = window.currentMenu || 'dashboard';
               const p = (window.appPosts || []).find(item => String(item.id) === String(postId));
               const res = origPostDetail.apply(this, [postId, ...args]);
               window.bexoPushNavState('postDetail', 'post_' + postId, {
@@ -401,7 +401,7 @@
           if (typeof window.switchMenu === 'function' && !window.switchMenu.__bexoHooked) {
             const origSwitchMenu = window.switchMenu;
             window.switchMenu = function(menuKey) {
-              const prevMenu = window.currentMenu || 'catalog';
+              const prevMenu = window.currentMenu || 'dashboard';
               const res = origSwitchMenu.apply(this, arguments);
               if (menuKey !== prevMenu) {
                 window.bexoPushNavState('menu', 'menu_' + menuKey, {
@@ -11272,7 +11272,7 @@ function savePosts() {
                       handleBalanceStatement();
                   } else if (menuKey === 'cart-list') {
                       renderCart();
-                  } else if(menuKey === 'dashboard') {
+                  } else if (menuKey === 'dashboard' || menuKey === 'catalog' || menuKey === 'home') {
                       renderHome();
                   } else if (menuKey === 'stockout') {
                       renderStockOutProducts();
