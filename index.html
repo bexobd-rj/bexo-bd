@@ -44,6 +44,252 @@
       }, true);
     </script>
     
+    <!-- Mobile Hardware/Browser Back Button Navigation Handler -->
+    <script>
+      (function() {
+        if (window.__bexoBackNavInitialized) return;
+        window.__bexoBackNavInitialized = true;
+
+        let bexoPushedDepth = 0;
+        let isClosingViaUI = false;
+
+        // Push state into history when entering a function/modal/view
+        window.bexoPushHistoryState = function(type, id) {
+          if (isClosingViaUI) return;
+          try {
+            bexoPushedDepth++;
+            window.history.pushState({ bexoNav: true, type: type || 'modal', id: id || Date.now() }, '', window.location.href);
+          } catch(e) { console.error("Error pushing state:", e); }
+        };
+
+        // Pop state from history when closing via UI button (X button, backdrop click)
+        window.bexoPopHistoryStateOnUIClose = function() {
+          if (window.history.state && window.history.state.bexoNav) {
+            isClosingViaUI = true;
+            if (bexoPushedDepth > 0) bexoPushedDepth--;
+            try {
+              window.history.back();
+            } catch(e) {}
+            setTimeout(() => { isClosingViaUI = false; }, 120);
+          }
+        };
+
+        // Core function to handle back button press (popstate)
+        function handleBackNavigation() {
+          if (isClosingViaUI) return true;
+
+          // 1. Check for visible modals / overlays
+          const modalsToClose = [
+            { id: 'developerModal', close: () => typeof window.closeDeveloperModal === 'function' ? window.closeDeveloperModal() : document.getElementById('developerModal')?.classList.add('hidden') },
+            { id: 'supportModal', close: () => document.getElementById('supportModal')?.remove() },
+            { id: 'serviceModal', close: () => document.getElementById('serviceModal')?.remove() },
+            { id: 'orderModal', close: () => typeof window.closeOrderModal === 'function' ? window.closeOrderModal() : document.getElementById('orderModal')?.classList.add('hidden') },
+            { id: 'confirmCancelModal', close: () => typeof window.closeConfirmationModal === 'function' ? window.closeConfirmationModal() : document.getElementById('confirmCancelModal')?.classList.add('hidden') },
+            { id: 'ticketModal', close: () => typeof window.closeTicketModal === 'function' ? window.closeTicketModal() : document.getElementById('ticketModal')?.classList.add('hidden') },
+            { id: 'forgot-password-modal', close: () => document.getElementById('forgot-password-modal')?.remove() },
+            { id: 'regOtpModal', close: () => document.getElementById('regOtpModal')?.remove() },
+            { id: 'dualVerificationModal', close: () => document.getElementById('dualVerificationModal')?.remove() },
+            { id: 'googleFallbackModal', close: () => document.getElementById('googleFallbackModal')?.remove() },
+            { id: 'categoryManageModal', close: () => document.getElementById('categoryManageModal')?.remove() },
+            { id: 'adminCreateUserModal', close: () => document.getElementById('adminCreateUserModal')?.classList.add('hidden') },
+            { id: 'adminUserDetailView', close: () => document.getElementById('adminUserDetailView')?.classList.add('hidden') },
+            { id: 'rechargeModal', close: () => document.getElementById('rechargeModal')?.classList.add('hidden') },
+            { id: 'adminPasswordModal', close: () => typeof window.closeAdminLoginModal === 'function' ? window.closeAdminLoginModal() : document.getElementById('adminPasswordModal')?.classList.add('hidden') }
+          ];
+
+          for (const m of modalsToClose) {
+            const el = document.getElementById(m.id);
+            if (el && !el.classList.contains('hidden') && el.style.display !== 'none' && el.offsetHeight > 0) {
+              m.close();
+              return true;
+            }
+          }
+
+          // Generic check for dynamic modals (e.g. addBalanceModal*, imagePreview, fixed overlay)
+          const dynamicModals = document.querySelectorAll('div[id^="addBalanceModal"], div[id*="Modal"], div.fixed.inset-0.z-\\[100\\], div.fixed.inset-0.z-\\[200\\], div.fixed.inset-0.z-\\[1000\\], div.fixed.inset-0.z-\\[2000\\], div.fixed.inset-0.z-\\[10000\\]');
+          for (const el of dynamicModals) {
+            if (el && !el.classList.contains('hidden') && el.style.display !== 'none' && el.offsetHeight > 0 && el.id !== 'landingSection' && el.id !== 'authSection') {
+              const closeBtn = el.querySelector('button i.fa-times, button i.fa-xmark, button.close-modal, button[onclick*="close"], button[onclick*="remove"]');
+              if (closeBtn) {
+                closeBtn.click();
+              } else {
+                el.remove();
+              }
+              return true;
+            }
+          }
+
+          // 2. Check for Open Mobile Menu or Sidebars
+          const mobileMenu = document.getElementById('mobileMenu');
+          if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
+            if (typeof window.toggleMobileMenu === 'function') window.toggleMobileMenu();
+            else mobileMenu.classList.add('hidden');
+            return true;
+          }
+
+          const sidebar = document.getElementById('sidebar');
+          const sidebarOverlay = document.getElementById('sidebarOverlay');
+          if ((sidebar && sidebar.classList.contains('mobile-active')) || (sidebarOverlay && sidebarOverlay.classList.contains('active'))) {
+            if (typeof window.toggleSidebar === 'function') window.toggleSidebar();
+            else {
+              sidebar?.classList.remove('mobile-active');
+              sidebarOverlay?.classList.remove('active');
+            }
+            return true;
+          }
+
+          const adminSidebar = document.querySelector('#adminSection aside');
+          if (adminSidebar && adminSidebar.classList.contains('translate-x-0') && window.innerWidth < 1024) {
+            if (typeof window.toggleAdminSidebar === 'function') window.toggleAdminSidebar();
+            return true;
+          }
+
+          // 3. Check for Post / Product Detail View
+          const postDetail = document.getElementById('postDetailContainer');
+          if (postDetail) {
+            if (typeof window.switchMenu === 'function') {
+              window.switchMenu(window.currentMenu || 'catalog');
+            }
+            return true;
+          }
+
+          // 4. Check for Auth Section vs Landing Section
+          const authSection = document.getElementById('authSection');
+          const landingSection = document.getElementById('landingSection');
+          if (authSection && !authSection.classList.contains('hidden')) {
+            authSection.classList.add('hidden');
+            authSection.classList.remove('flex');
+            if (landingSection) landingSection.classList.remove('hidden');
+            return true;
+          }
+
+          // 5. Check for Non-Home Main Menu Section
+          if (window.currentMenu && window.currentMenu !== 'home' && window.currentMenu !== 'catalog') {
+            if (typeof window.switchMenu === 'function') {
+              window.switchMenu('catalog');
+              return true;
+            }
+          }
+
+          // 6. Check for Non-Dashboard Admin Subview
+          const currentAdminSub = localStorage.getItem('bexo_admin_subview');
+          if (currentAdminSub && currentAdminSub !== 'dashboard') {
+            if (typeof window.switchAdminSubView === 'function') {
+              window.switchAdminSubView('dashboard');
+              return true;
+            }
+          }
+
+          return false;
+        }
+
+        // Intercept window popstate (hardware / browser back button)
+        window.addEventListener('popstate', function(event) {
+          if (isClosingViaUI) return;
+          const handled = handleBackNavigation();
+          if (handled) {
+            if (bexoPushedDepth > 0) bexoPushedDepth--;
+          }
+        });
+
+        // Functions to wrap for auto-pushing history state on open
+        const functionsToWrap = [
+          'showDeveloperModal',
+          'showSupportModal',
+          'showServiceModal',
+          'openOrderModal',
+          'showOrderConfirmationModal',
+          'openCategoryManagementModal',
+          'openAddSubCategoryModal',
+          'openCategoryQuickEdit',
+          'openAddBalanceModal',
+          'openAdminCreateUserModal',
+          'showRegOtpModal',
+          'showForgotPasswordModal',
+          'showDualVerificationModal',
+          'showGoogleFallbackModal',
+          'toggleMobileMenu',
+          'renderPostDetail',
+          'showAuth'
+        ];
+
+        function wrapOpeningFunctions() {
+          functionsToWrap.forEach(fnName => {
+            if (typeof window[fnName] === 'function' && !window[fnName].__bexoWrapped) {
+              const orig = window[fnName];
+              window[fnName] = function(...args) {
+                window.bexoPushHistoryState('function', fnName);
+                return orig.apply(this, args);
+              };
+              window[fnName].__bexoWrapped = true;
+            }
+          });
+
+          if (typeof window.switchMenu === 'function' && !window.switchMenu.__bexoWrapped) {
+            const origSwitchMenu = window.switchMenu;
+            window.switchMenu = function(menuKey) {
+              if (menuKey !== 'home' && menuKey !== 'catalog' && menuKey !== window.currentMenu) {
+                window.bexoPushHistoryState('menuView', menuKey);
+              }
+              return origSwitchMenu.apply(this, arguments);
+            };
+            window.switchMenu.__bexoWrapped = true;
+          }
+
+          if (typeof window.switchAdminSubView === 'function' && !window.switchAdminSubView.__bexoWrapped) {
+            const origSwitchAdmin = window.switchAdminSubView;
+            window.switchAdminSubView = function(viewId) {
+              if (viewId !== 'dashboard' && viewId !== localStorage.getItem('bexo_admin_subview')) {
+                window.bexoPushHistoryState('adminSubView', viewId);
+              }
+              return origSwitchAdmin.apply(this, arguments);
+            };
+            window.switchAdminSubView.__bexoWrapped = true;
+          }
+        }
+
+        // Functions to wrap for auto-popping history state on close
+        const closeFunctionsToWrap = [
+          'closeDeveloperModal',
+          'closeOrderModal',
+          'closeConfirmationModal',
+          'closeTicketModal',
+          'closeAdminLoginModal'
+        ];
+
+        function wrapCloseFunctions() {
+          closeFunctionsToWrap.forEach(fnName => {
+            if (typeof window[fnName] === 'function' && !window[fnName].__bexoCloseWrapped) {
+              const origClose = window[fnName];
+              window[fnName] = function(...args) {
+                const res = origClose.apply(this, args);
+                window.bexoPopHistoryStateOnUIClose();
+                return res;
+              };
+              window[fnName].__bexoCloseWrapped = true;
+            }
+          });
+        }
+
+        // Periodically verify function wrappers in case functions are re-defined dynamically
+        setInterval(function() {
+          wrapOpeningFunctions();
+          wrapCloseFunctions();
+        }, 500);
+
+        // Global click listener for UI close buttons
+        document.addEventListener('click', function(e) {
+          const target = e.target.closest('button, [role="button"], i.fa-times, i.fa-xmark');
+          if (!target) return;
+          const closeAttr = target.getAttribute('onclick') || '';
+          if (closeAttr.includes('.remove()') || closeAttr.includes('classList.add(\'hidden\')') || closeAttr.includes('closeDeveloperModal') || closeAttr.includes('closeOrderModal') || closeAttr.includes('closeConfirmationModal') || closeAttr.includes('closeTicketModal')) {
+            window.bexoPopHistoryStateOnUIClose();
+          }
+        }, true);
+
+      })();
+    </script>
+    
     
 
     <!-- Visual Search Utility -->
