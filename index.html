@@ -12812,18 +12812,90 @@ function savePosts() {
                   const main = document.getElementById('mainContent');
                   if (!main) return;
 
-                  let currentStep = 1; // 1: Old Pass + Send OTP button, 2: OTP Verification, 3: New Pass
+                  let currentStep = 1; // 1: Old Pass or Forgot Pass option, 2: OTP Verification, 3: New Pass (2 boxes)
                   let userEmail = (userProfile && userProfile.email) ? userProfile.email : '';
+
+                  const openForgotPassPopup = () => {
+                      let existingModal = document.getElementById('profile-fp-security-modal');
+                      if (existingModal) existingModal.remove();
+
+                      const userEmailDisplay = userEmail || 'আপনার নিবন্ধিত ইমেইল';
+
+                      const modal = document.createElement('div');
+                      modal.id = 'profile-fp-security-modal';
+                      modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in';
+                      modal.innerHTML = `
+                          <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 relative">
+                              <button type="button" onclick="document.getElementById('profile-fp-security-modal')?.remove()" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-all">
+                                  <i class="fas fa-times"></i>
+                              </button>
+
+                              <div class="text-center mb-6">
+                                  <div class="w-16 h-16 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
+                                      <i class="fas fa-shield-alt"></i>
+                                  </div>
+                                  <h3 class="text-xl font-bold text-slate-800">সিকিউরিটি ভেরিফিকেশন</h3>
+                                  <p class="text-xs text-slate-500 mt-1">পাসওয়ার্ড পুনরুদ্ধারের জন্য ওটিপি কোড পাঠানো হবে</p>
+                              </div>
+
+                              <div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl mb-6 text-left">
+                                  <p class="text-xs text-amber-900 leading-relaxed font-medium">
+                                      <i class="fas fa-lock text-amber-600 mr-1.5"></i>
+                                      নিরাপত্তার স্বার্থে আপনার নিবন্ধিত ইমেইল address: <br>
+                                      <span class="font-bold text-orange-600 text-sm break-all underline">${userEmailDisplay}</span>-এ একটি ওটিপি (OTP) ভেরিফিকেশন কোড পাঠানো হবে।
+                                  </p>
+                              </div>
+
+                              <button type="button" id="btnSendProfileFpOtp" class="w-full py-3.5 bg-orange-600 text-white font-bold rounded-xl shadow-lg hover:bg-orange-700 transform active:scale-[0.98] transition-all text-base flex items-center justify-center gap-2">
+                                  ওটিপি কোড পাঠান <i class="fas fa-paper-plane"></i>
+                              </button>
+                          </div>
+                      `;
+
+                      document.body.appendChild(modal);
+
+                      document.getElementById('btnSendProfileFpOtp')?.addEventListener('click', async () => {
+                          if (!userEmail || !userEmail.includes('@')) {
+                              showToast("আপনার প্রোফাইলে সঠিক ইমেইল পাওয়া যায়নি!", "error");
+                              return;
+                          }
+
+                          const btn = document.getElementById('btnSendProfileFpOtp');
+                          if (btn) {
+                              btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> কোড পাঠানো হচ্ছে...';
+                              btn.disabled = true;
+                          }
+
+                          try {
+                              await sendPasswordResetOtp(userEmail);
+                              showToast("আপনার ইমেইলে ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
+                              modal.remove();
+                              currentStep = 2;
+                              renderContent();
+                          } catch (e) {
+                              showToast(e.message || "কোড পাঠাতে সমস্যা হয়েছে", "error");
+                              if (btn) {
+                                  btn.innerHTML = 'ওটিপি কোড পাঠান <i class="fas fa-paper-plane"></i>';
+                                  btn.disabled = false;
+                              }
+                          }
+                      });
+                  };
 
                   const renderContent = () => {
                       const userEmailDisplay = userEmail || 'আপনার নিবন্ধিত ইমেইল';
-                      
+
                       let stepHtml = '';
                       if (currentStep === 1) {
                           stepHtml = `
                               <form id="profileChangePassStep1Form" onsubmit="event.preventDefault();" class="space-y-6">
                                   <div class="space-y-2">
-                                      <label class="block text-sm font-bold text-slate-700">বর্তমান পাসওয়ার্ড দিন <span class="text-red-500">*</span></label>
+                                      <div class="flex items-center justify-between">
+                                          <label class="block text-sm font-bold text-slate-700">বর্তমান পাসওয়ার্ড দিন <span class="text-red-500">*</span></label>
+                                          <button type="button" id="btnTriggerForgotPass" class="text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline flex items-center gap-1">
+                                              <i class="fas fa-question-circle"></i> পাসওয়ার্ড ভুলে গেছেন?
+                                          </button>
+                                      </div>
                                       <div class="relative">
                                           <input type="password" id="oldPass" required class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all text-slate-700 font-medium pr-10" placeholder="পুরানো পাসওয়ার্ড">
                                           <button type="button" onclick="togglePasswordVisibility('oldPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 z-10" tabIndex="-1">
@@ -12832,8 +12904,8 @@ function savePosts() {
                                       </div>
                                   </div>
 
-                                  <button type="button" id="btnSendProfileOtp" class="w-full py-4 bg-orange-600 text-white font-bold rounded-2xl shadow-lg hover:bg-orange-700 transform active:scale-[0.98] transition-all text-lg mt-4 flex items-center justify-center gap-2">
-                                      ভেরিফিকেশন কোড পাঠান <i class="fas fa-paper-plane"></i>
+                                  <button type="button" id="btnVerifyCurrentPass" class="w-full py-4 bg-orange-600 text-white font-bold rounded-2xl shadow-lg hover:bg-orange-700 transform active:scale-[0.98] transition-all text-lg mt-4 flex items-center justify-center gap-2">
+                                      পাসওয়ার্ড যাচাই করুন ও নতুন পাসওয়ার্ড দিন <i class="fas fa-arrow-right"></i>
                                   </button>
                               </form>
                           `;
@@ -12894,22 +12966,7 @@ function savePosts() {
                                   </div>
                                   <div>
                                       <h2 class="text-xl font-bold text-slate-800">পাসওয়ার্ড পরিবর্তন করুন</h2>
-                                      <p class="text-xs text-slate-500">নিরাপত্তা ভেরিফিকেশনের মাধ্যমে নতুন পাসওয়ার্ড সেট করুন</p>
-                                  </div>
-                              </div>
-
-                              <!-- Security Alert Notice Banner -->
-                              <div class="p-5 bg-amber-50 border-2 border-amber-200 rounded-2xl flex items-start gap-3 shadow-sm">
-                                  <div class="w-9 h-9 bg-amber-500 text-white rounded-xl flex items-center justify-center shrink-0 font-bold text-lg">
-                                      <i class="fas fa-shield-alt"></i>
-                                  </div>
-                                  <div>
-                                      <h4 class="font-bold text-amber-900 text-sm">নিরাপত্তা বিজ্ঞপ্তি (Security Alert)</h4>
-                                      <p class="text-xs text-amber-800 mt-1 leading-relaxed">
-                                          পাসওয়ার্ড পরিবর্তনের জন্য আপনার সিকিউরিটি নিশ্চিত করতে হবে। আপনার নিবন্ধিত ইমেইলে 
-                                          <span class="font-bold underline">${userEmailDisplay}</span> 
-                                          একটি ওটিপি (OTP) ভেরিফিকেশন কোড পাঠানো হবে। কোড ভেরিফাই করার পরেই পুরানো পাসওয়ার্ড সম্পূর্ণ ডিলিট হয়ে নতুন পাসওয়ার্ড সক্রিয় হবে।
-                                      </p>
+                                      <p class="text-xs text-slate-500">বর্তমান পাসওয়ার্ড বা সিকিউরিটি ওটিপি ভেরিফিকেশনের মাধ্যমে নতুন পাসওয়ার্ড সেট করুন</p>
                                   </div>
                               </div>
 
@@ -12921,7 +12978,7 @@ function savePosts() {
                               <!-- Info Notice -->
                               <div class="p-6 bg-blue-50 border border-blue-100 rounded-2xl">
                                   <p class="text-sm text-blue-700 leading-relaxed font-medium">
-                                      <i class="fas fa-info-circle mr-2"></i> পাসওয়ার্ড পরিবর্তনের পর আপনার পুরানো পাসওয়ার্ড বাতিল হয়ে যাবে এবং শুধুমাত্র নতুন পাসওয়ার্ড দিয়েই লগইন করা যাবে।
+                                      <i class="fas fa-info-circle mr-2"></i> পাসওয়ার্ড পরিবর্তনের পর আপনার পুরানো পাসওয়ার্ড সম্পূর্ণ ডিলিট হয়ে বাতিল হয়ে যাবে এবং শুধুমাত্র নতুন পাসওয়ার্ড দিয়েই লগইন করা যাবে।
                                   </p>
                               </div>
                           </div>
@@ -12929,9 +12986,9 @@ function savePosts() {
 
                       // Event Bindings
                       if (currentStep === 1) {
-                          const btnSend = document.getElementById('btnSendProfileOtp');
-                          if (btnSend) {
-                              btnSend.addEventListener('click', async () => {
+                          const btnVerifyCurrent = document.getElementById('btnVerifyCurrentPass');
+                          if (btnVerifyCurrent) {
+                              btnVerifyCurrent.addEventListener('click', () => {
                                   const oldPassInput = document.getElementById('oldPass');
                                   if (!oldPassInput || !oldPassInput.value.trim()) {
                                       showToast("বর্তমান পাসওয়ার্ড দিন!", "error");
@@ -12947,24 +13004,16 @@ function savePosts() {
                                       return;
                                   }
 
-                                  if (!userEmail || !userEmail.includes('@')) {
-                                      showToast("আপনার প্রোফাইলে সঠিক ইমেইল পাওয়া যায়নি!", "error");
-                                      return;
-                                  }
+                                  showToast("বর্তমান পাসওয়ার্ড সফলভাবে মিল পাওয়া গেছে!", "success");
+                                  currentStep = 3;
+                                  renderContent();
+                              });
+                          }
 
-                                  btnSend.innerHTML = '<i class="fas fa-spinner fa-spin"></i> কোড পাঠানো হচ্ছে...';
-                                  btnSend.disabled = true;
-
-                                  try {
-                                      await sendPasswordResetOtp(userEmail);
-                                      showToast("আপনার ইমেইলে ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
-                                      currentStep = 2;
-                                      renderContent();
-                                  } catch (e) {
-                                      showToast(e.message || "কোড পাঠাতে সমস্যা হয়েছে", "error");
-                                      btnSend.innerHTML = 'ভেরিফিকেশন কোড পাঠান <i class="fas fa-paper-plane"></i>';
-                                      btnSend.disabled = false;
-                                  }
+                          const btnTriggerForgot = document.getElementById('btnTriggerForgotPass');
+                          if (btnTriggerForgot) {
+                              btnTriggerForgot.addEventListener('click', () => {
+                                  openForgotPassPopup();
                               });
                           }
                       } else if (currentStep === 2) {
@@ -13030,7 +13079,7 @@ function savePosts() {
                                       // Save new password and completely delete old password across all records
                                       saveNewPassword(userEmail || userProfile.profileId, np, false);
 
-                                      showToast("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! পুরানো পাসওয়ার্ড সম্পূর্ণ মুছে ফেলা হয়েছে।", "success");
+                                      showToast("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! পুরানো পাসওয়ার্ড বাতিল করে নতুনটি সক্রিয় করা হলো।", "success");
                                       renderProfile();
                                   } catch (e) {
                                       showToast(e.message || "পাসওয়ার্ড আপডেট করতে সমস্যা হয়েছে!", "error");
