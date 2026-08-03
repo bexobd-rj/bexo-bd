@@ -5347,36 +5347,135 @@ function savePosts() {
               }
 
               
-              function handleLogin() {
-                  const identifier = document.getElementById('loginIdentifier').value.trim();
-                  const pass = document.getElementById('loginPass').value;
+              async function handleLogin() {
+                  const identifierEl = document.getElementById('loginIdentifier');
+                  const passEl = document.getElementById('loginPass');
                   const btn = document.getElementById('btnLoginSubmit');
 
-                  if (!identifier || !pass) return showToast('সব তথ্য দিন', 'error');
+                  if (!identifierEl || !passEl) return showToast('সব তথ্য দিন', 'error');
+
+                  const rawIdentifier = identifierEl.value.trim();
+                  const rawPass = passEl.value;
+
+                  if (!rawIdentifier || !rawPass) return showToast('সব তথ্য দিন', 'error');
 
                   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> অপেক্ষা করুন...';
                   btn.disabled = true;
 
-                  const isEmail = identifier.includes('@');
-                  const creds = { password: pass };
-                  if (isEmail) creds.email = identifier;
-                  else creds.phone = identifier;
+                  const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+                  const cleanPass = String(rawPass).trim().replace(/[০-৯]/g, d => bMap[d] || d);
+                  let cleanIdentifier = String(rawIdentifier).trim().replace(/[০-৯]/g, d => bMap[d] || d);
+                  const isEmail = cleanIdentifier.includes('@');
 
-                  const sb = window.getSupabase();
-                  if (!sb || !sb.auth) return showToast("Supabase setup incomplete. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.", "error", 6000);
-                  sb.auth.signInWithPassword(creds)
-                  .then(({ data, error }) => {
-                      if (error) {
-                          showToast('লগইন ব্যর্থ: ' + error.message, 'error');
-                          btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> প্রবেশ করুন';
-                          btn.disabled = false;
+                  // Refresh local user list
+                  if (typeof syncGlobalStateWithLocalStorage === 'function') {
+                      syncGlobalStateWithLocalStorage();
+                  }
+
+                  const normPhone = typeof normalizePhone === 'function' ? normalizePhone(cleanIdentifier) : cleanIdentifier;
+
+                  // Find user in appUsers or local storage
+                  const userList = (typeof appUsers !== 'undefined' && Array.isArray(appUsers) && appUsers.length > 0) 
+                      ? appUsers 
+                      : (typeof safeParse === 'function' ? safeParse('bexo_users', []) : []);
+
+                  let matchedUser = userList.find(u => {
+                      if (!u) return false;
+                      const uEmail = String(u.email || '').trim().toLowerCase();
+                      const uPhone = typeof normalizePhone === 'function' ? normalizePhone(u.phone) : String(u.phone || '').trim();
+                      const uProfileId = String(u.profileId || '').trim().toLowerCase();
+
+                      if (isEmail) {
+                          return uEmail === cleanIdentifier.toLowerCase();
                       } else {
-                          showToast('সফলভাবে লগইন হয়েছে!', 'success');
-                          document.getElementById('authSection').classList.add('hidden');
-                          document.getElementById('dashboardSection').classList.remove('hidden');
+                          return (uPhone && normPhone && uPhone === normPhone) || (uProfileId && uProfileId === cleanIdentifier.toLowerCase());
                       }
                   });
+
+                  let authSuccess = false;
+                  const sb = window.getSupabase ? window.getSupabase() : null;
+
+                  if (sb && sb.auth) {
+                      const creds = { password: cleanPass };
+                      if (isEmail) creds.email = cleanIdentifier;
+                      else creds.phone = cleanIdentifier;
+
+                      try {
+                          const { data, error } = await sb.auth.signInWithPassword(creds);
+                          if (!error && data) {
+                              authSuccess = true;
+                          }
+                      } catch (e) {
+                          console.warn('Supabase auth login exception:', e);
+                      }
+                  }
+
+                  // Check local password match
+                  let localPassMatch = false;
+                  if (matchedUser && matchedUser.password) {
+                      const uPassClean = String(matchedUser.password).trim().replace(/[০-৯]/g, d => bMap[d] || d);
+                      if (uPassClean === cleanPass) {
+                          localPassMatch = true;
+                      }
+                  }
+
+                  if (authSuccess || localPassMatch) {
+                      if (matchedUser) {
+                          matchedUser.password = cleanPass;
+                          matchedUser.lastActive = new Date().toISOString();
+                          userProfile = { ...DEFAULT_PROFILE, ...matchedUser };
+                      } else if (isEmail) {
+                          userProfile = {
+                              ...DEFAULT_PROFILE,
+                              email: cleanIdentifier,
+                              fullName: cleanIdentifier.split('@')[0],
+                              password: cleanPass,
+                              profileId: 'BX-' + Math.floor(100000 + Math.random() * 900000)
+                          };
+                          if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
+                              appUsers.push(userProfile);
+                          }
+                      }
+
+                      if (typeof saveProfile === 'function') saveProfile();
+                      if (typeof saveUsers === 'function') saveUsers();
+
+                      // Background sync to Supabase auth if needed
+                      if (sb && sb.auth && localPassMatch && !authSuccess) {
+                          sb.auth.updateUser({ password: cleanPass }).catch(() => {});
+                      }
+
+                      showToast('সফলভাবে লগইন হয়েছে!', 'success');
+                      btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> প্রবেশ করুন';
+                      btn.disabled = false;
+
+                      const authSection = document.getElementById('authSection');
+                      const dashboardSection = document.getElementById('dashboardSection');
+                      const landingSection = document.getElementById('landingSection');
+
+                      if (landingSection) landingSection.classList.add('hidden');
+                      if (authSection) authSection.classList.add('hidden');
+                      if (dashboardSection) {
+                          dashboardSection.classList.remove('hidden');
+                          dashboardSection.classList.add('fade-in');
+                      }
+
+                      if (typeof renderHome === 'function') renderHome();
+                      if (typeof updateHeaderUI === 'function') updateHeaderUI();
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      return;
+                  }
+
+                  btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> প্রবেশ করুন';
+                  btn.disabled = false;
+
+                  if (matchedUser && !localPassMatch) {
+                      showToast('লগইন ব্যর্থ: পাসওয়ার্ড ভুল প্রদান করেছেন!', 'error');
+                  } else {
+                      showToast('লগইন ব্যর্থ: Invalid login credentials', 'error');
+                  }
               }
+              window.handleLogin = handleLogin;
 
               function togglePasswordVisibility(inputId, btn) {
                   const input = document.getElementById(inputId);
@@ -5596,8 +5695,11 @@ function savePosts() {
                           });
                       } else if (currentStep === 3) {
                           modal.querySelector('#fpBtnSave').addEventListener('click', async () => {
-                              const np = modal.querySelector('#fpNewPass').value.trim();
-                              const cp = modal.querySelector('#fpConfirmPass').value.trim();
+                              const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+                              const rawNp = modal.querySelector('#fpNewPass').value.trim();
+                              const rawCp = modal.querySelector('#fpConfirmPass').value.trim();
+                              const np = rawNp.replace(/[০-৯]/g, d => bMap[d] || d);
+                              const cp = rawCp.replace(/[০-৯]/g, d => bMap[d] || d);
                               
                               if (np.length < 6) return showToast("পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে", "error");
                               if (np !== cp) return showToast("পাসওয়ার্ড দুটি মিলছে না", "error");
