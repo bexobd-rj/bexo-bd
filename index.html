@@ -874,6 +874,13 @@
               }
           } catch(e) {}
 
+          if (!supabaseUrl) {
+              try { supabaseUrl = localStorage.getItem('bexo_supabase_url') || ""; } catch(e) {}
+          }
+          if (!supabaseKey) {
+              try { supabaseKey = localStorage.getItem('bexo_supabase_anon_key') || ""; } catch(e) {}
+          }
+
           if (supabaseUrl && supabaseKey && window.supabase && typeof window.supabase.createClient === 'function') {
               try {
                   const client = window.supabase.createClient(supabaseUrl, supabaseKey);
@@ -4024,22 +4031,32 @@ function savePosts() {
                   badgeIds.forEach(id => {
                       const el = document.getElementById(id);
                       if (el) {
+                          el.setAttribute('onclick', 'window.showSupabaseConnectionInfo()');
                           if (isLive && !errMsg) {
-                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-emerald-500 rounded-full "></span> Cloud Live';
-                              el.className = "flex items-center gap-1 text-[8px] font-bold text-emerald-500 tracking-wider uppercase mt-1 cursor-pointer";
-                              el.title = "ক্লাউড ডাটাবেজ সফলভাবে সংযুক্ত আছে";
+                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Cloud Live';
+                              el.className = "flex items-center gap-1 text-[8px] font-bold text-emerald-500 tracking-wider uppercase mt-1 cursor-pointer hover:underline";
+                              el.title = "ক্লাউড ডাটাবেজ সফলভাবে সংযুক্ত আছে (বিস্তারিত জানতে ক্লিক করুন)";
                           } else if (errMsg) {
-                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-amber-500 rounded-full "></span> Sync Error';
-                              el.className = "flex items-center gap-1 text-[8px] font-bold text-amber-500 tracking-wider uppercase mt-1 cursor-pointer";
-                              el.title = "সিঙ্ক ত্রুটি: " + errMsg;
+                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> Local Active';
+                              el.className = "flex items-center gap-1 text-[8px] font-bold text-amber-500 tracking-wider uppercase mt-1 cursor-pointer hover:underline";
+                              el.title = "লোকাল মেমরি মোড সক্রিয় (স্ট্যাটাস: " + errMsg + ") - বিস্তারিত দেখতে ক্লিক করুন";
                           } else {
-                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Connection Offline';
-                              el.className = "flex items-center gap-1 text-[8px] font-bold text-rose-500 tracking-wider uppercase mt-1 cursor-pointer";
-                              el.title = "ইন্টারনেট বা ক্লাউড সংযোগ বিচ্ছিন্ন";
+                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span> Offline Mode';
+                              el.className = "flex items-center gap-1 text-[8px] font-bold text-slate-400 tracking-wider uppercase mt-1 cursor-pointer hover:underline";
+                              el.title = "অফলাইন মোড সক্রিয় - বিস্তারিত দেখতে ক্লিক করুন";
                           }
                       }
                   });
               }
+
+              window.showSupabaseConnectionInfo = function() {
+                  const client = window.getSupabase();
+                  const isConfigured = !!client;
+                  const message = isConfigured 
+                      ? "✅ Supabase ক্লাউড ডাটাবেজের সাথে সফলভাবে সংযুক্ত রয়েছে। আপনার ডাটা ক্লাউডে সুরক্ষিত ও সিঙ্ক হচ্ছে।"
+                      : "ℹ️ বর্তমানে অ্যাপটি লোকাল মেমরি মোডে (Local Active) চলছে।\n\nSupabase ক্লাউডে সরাসরি কানেক্ট করতে চাইলে:\n১. প্রজেক্টের .env ফাইলে VITE_SUPABASE_URL এবং VITE_SUPABASE_ANON_KEY যোগ করুন,\n২. অথবা এডমিন প্যানেলের 'API & Database Config' সেকশনে Supabase ক্রেডেনশিয়াল সেট করুন।\n\nবর্তমানে আপনার লোকাল ডাটা পুরোপুরি সুরক্ষিত রয়েছে।";
+                  alert(message);
+              };
 
               window.supabaseErrors = [];
               
