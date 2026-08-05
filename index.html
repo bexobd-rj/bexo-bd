@@ -5476,30 +5476,46 @@ function savePosts() {
 
                    let matchedUser = typeof findUserByEmailOrPhone === 'function' ? findUserByEmailOrPhone(cleanIdentifier) : null;
 
-                   // If not found in memory, query cloud Supabase database
-                   if (!matchedUser && window.db) {
+                   // If not found in memory, query cloud Supabase database efficiently
+                   if (!matchedUser && window.supabase) {
                        try {
-                           const snap = await window.db.collection('bexo_users').get();
-                           snap.forEach(doc => {
-                               const data = doc.data();
-                               if (data) {
+                           let query = window.supabase.from('bexo_users').select('*');
+                           if (isEmail) {
+                               query = query.ilike('email', cleanIdentifier);
+                           } else if (cleanIdentifier.toLowerCase().startsWith('bx-')) {
+                               query = query.ilike('profileId', cleanIdentifier);
+                           } else {
+                               let p = cleanIdentifier;
+                               let p2 = p.startsWith('01') ? '+88' + p : p.replace('+88', '');
+                               query = query.or(`phone.eq.${p},phone.eq.${p2}`);
+                           }
+                           
+                           const { data: dbUsers, error } = await query.limit(10); // Check multiple in case of duplicates
+                           
+                           if (!error && dbUsers && dbUsers.length > 0) {
+                               // verify locally to be safe
+                               const targetStr = cleanIdentifier.toLowerCase();
+                               const normPhone = typeof normalizePhone === 'function' ? normalizePhone(targetStr) : targetStr;
+                               
+                               for (let data of dbUsers) {
                                    const uEmail = String(data.email || '').trim().toLowerCase();
                                    const uPhone = typeof normalizePhone === 'function' ? normalizePhone(data.phone) : String(data.phone || '').trim();
                                    const uProfileId = String(data.profileId || '').trim().toLowerCase();
-                                   const targetStr = cleanIdentifier.toLowerCase();
-                                   const normPhone = typeof normalizePhone === 'function' ? normalizePhone(targetStr) : targetStr;
-
+                                   
                                    if ((isEmail && uEmail === targetStr) || (!isEmail && ((uPhone && normPhone && uPhone === normPhone) || (uProfileId && uProfileId === targetStr)))) {
                                        matchedUser = data;
+                                       break;
                                    }
                                }
-                           });
+                           }
 
                            if (matchedUser) {
-                               const idx = appUsers.findIndex(u => u.profileId === matchedUser.profileId);
-                               if (idx > -1) appUsers[idx] = matchedUser;
-                               else appUsers.push(matchedUser);
-                               localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                               if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
+                                   const idx = appUsers.findIndex(u => u.profileId === matchedUser.profileId);
+                                   if (idx > -1) appUsers[idx] = matchedUser;
+                                   else appUsers.push(matchedUser);
+                                   localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                               }
                            }
                        } catch(e) {
                            console.warn('Cloud user lookup during login failed:', e);
@@ -5526,51 +5542,48 @@ function savePosts() {
                    }
 
                    
+
                    if (authSuccess && window._tempAuthUser && !matchedUser) {
                        try {
                            const targetEmail = isEmail ? cleanIdentifier : window._tempAuthUser.email;
                            let query = sb.from('bexo_users').select('*');
-                           if (isEmail) query = query.eq('email', cleanIdentifier);
-                           else query = query.eq('phone', cleanIdentifier);
                            
-                           const { data: dbUser } = await query.maybeSingle();
-                           if (dbUser) {
-                               matchedUser = dbUser;
+                           if (isEmail) {
+                               query = query.ilike('email', cleanIdentifier);
+                           } else {
+                               let p = cleanIdentifier;
+                               if (p.startsWith('01')) p = '+88' + p;
+                               query = query.or(`phone.eq.${cleanIdentifier},phone.eq.${p}`);
+                           }
+                           
+                           const { data: dbUsers, error } = await query.limit(1);
+                           if (!error && dbUsers && dbUsers.length > 0) {
+                               matchedUser = dbUsers[0];
                            } else if (window._tempAuthUser.user_metadata && window._tempAuthUser.user_metadata.profileId) {
                                matchedUser = {
                                    ...DEFAULT_PROFILE,
                                    ...window._tempAuthUser.user_metadata,
-                                   email: window._tempAuthUser.email || cleanIdentifier
+                                   email: window._tempAuthUser.email || (isEmail ? cleanIdentifier : ''),
+                                   phone: window._tempAuthUser.phone || (!isEmail ? cleanIdentifier : '')
                                };
+                           } else {
+                               const newProfileId = 'BX-' + Math.floor(100000 + Math.random() * 900000);
+                               matchedUser = {
+                                   ...DEFAULT_PROFILE,
+                                   email: window._tempAuthUser.email || (isEmail ? cleanIdentifier : ''),
+                                   phone: window._tempAuthUser.phone || (!isEmail ? cleanIdentifier : ''),
+                                   fullName: (window._tempAuthUser.email || cleanIdentifier).split('@')[0],
+                                   profileId: newProfileId,
+                                   password: cleanPass
+                               };
+                               sb.auth.updateUser({ data: { profileId: newProfileId } }).catch(()=>{});
                            }
                        } catch(e) {
                            console.warn('Direct fetch from supabase failed', e);
                        }
                    }
                    window._tempAuthUser = null;
-                   
-                   
-                    if (authSuccess && window._tempAuthUser && !matchedUser) {
-                        try {
-                            let query = sb.from('bexo_users').select('*');
-                            if (isEmail) query = query.eq('email', cleanIdentifier);
-                            else query = query.eq('phone', cleanIdentifier);
-                            
-                            const { data: dbUser } = await query.maybeSingle();
-                            if (dbUser) {
-                                matchedUser = dbUser;
-                            } else if (window._tempAuthUser.user_metadata && window._tempAuthUser.user_metadata.profileId) {
-                                matchedUser = {
-                                    ...DEFAULT_PROFILE,
-                                    ...window._tempAuthUser.user_metadata,
-                                    email: window._tempAuthUser.email || cleanIdentifier
-                                };
-                            }
-                        } catch(e) {
-                            console.warn('Direct fetch from supabase failed', e);
-                        }
-                    }
-                    window._tempAuthUser = null;
+
 
                     let localPassMatch = false;
                     if (matchedUser && matchedUser.password) {
@@ -5889,22 +5902,37 @@ function savePosts() {
 
                                    let matchedUser = typeof findUserByEmailOrPhone === 'function' ? findUserByEmailOrPhone(identifier) : null;
 
-                                   if (!matchedUser && window.db) {
+                                   if (!matchedUser && window.supabase) {
                                        try {
-                                           const snap = await window.db.collection('bexo_users').get();
-                                           snap.forEach(doc => {
-                                               const data = doc.data();
-                                               if (data) {
+                                           let query = window.supabase.from('bexo_users').select('*');
+                                           const isEmail = identifier.includes('@');
+                                           const cleanId = String(identifier).trim().toLowerCase();
+                                           
+                                           if (isEmail) {
+                                               query = query.ilike('email', cleanId);
+                                           } else if (cleanId.startsWith('bx-')) {
+                                               query = query.ilike('profileId', cleanId);
+                                           } else {
+                                               let p = cleanId;
+                                               let p2 = p.startsWith('01') ? '+88' + p : p.replace('+88', '');
+                                               query = query.or(`phone.eq.${p},phone.eq.${p2}`);
+                                           }
+                                           
+                                           const { data: dbUsers, error } = await query.limit(10);
+                                           if (!error && dbUsers && dbUsers.length > 0) {
+                                               const normId = typeof normalizePhone === 'function' ? normalizePhone(cleanId) : cleanId;
+                                               
+                                               for (let data of dbUsers) {
                                                    const uEmail = String(data.email || '').trim().toLowerCase();
                                                    const uPhone = typeof normalizePhone === 'function' ? normalizePhone(data.phone) : String(data.phone || '').trim();
-                                                   const cleanId = String(identifier).trim().toLowerCase();
-                                                   const normId = typeof normalizePhone === 'function' ? normalizePhone(cleanId) : cleanId;
-
-                                                   if ((uEmail && uEmail === cleanId) || (uPhone && normId && uPhone === normId)) {
+                                                   const uProfileId = String(data.profileId || '').trim().toLowerCase();
+                                                   
+                                                   if ((isEmail && uEmail === cleanId) || (!isEmail && ((uPhone && normId && uPhone === normId) || (uProfileId && uProfileId === cleanId)))) {
                                                        matchedUser = data;
+                                                       break;
                                                    }
                                                }
-                                           });
+                                           }
                                        } catch (e) {
                                            console.warn('Cloud user lookup during password reset failed:', e);
                                        }
@@ -6221,7 +6249,7 @@ function savePosts() {
                   attachEvents();
               }
 
-              function handleRegister() {
+              async function handleRegister() {
                   try {
                       const shopField = document.getElementById('regShop');
                       const nameField = document.getElementById('regName');
@@ -6282,16 +6310,43 @@ function savePosts() {
                           return;
                       }
 
-                      // Check for existing user with this phone number
+                      // Check for existing user with this phone number locally
                       const normalizedInputPhone = normalizePhone(phone);
-                      const existingUser = appUsers.find(u => normalizePhone(u.phone) === normalizedInputPhone);
+                      let existingUser = appUsers.find(u => normalizePhone(u.phone) === normalizedInputPhone);
+                      
+                      // Check for existing user with this email address locally
+                      let existingEmail = appUsers.find(u => u.email && u.email.toLowerCase().trim() === email.toLowerCase().trim());
+                      
+                      // Fallback to Supabase check
+                      if (!existingUser && !existingEmail && window.supabase) {
+                          try {
+                              let p = phone;
+                              let p2 = p.startsWith('01') ? '+88' + p : p.replace('+88', '');
+                              let q = window.supabase.from('bexo_users').select('*').or(`phone.eq.${p},phone.eq.${p2}`);
+                              
+                              if (email) {
+                                  q = window.supabase.from('bexo_users').select('*').or(`phone.eq.${p},phone.eq.${p2},email.ilike.${email}`);
+                              }
+                              
+                              const { data: dbUsers, error } = await q.limit(1);
+                              if (!error && dbUsers && dbUsers.length > 0) {
+                                  const dbU = dbUsers[0];
+                                  if (normalizePhone(dbU.phone) === normalizedInputPhone) {
+                                      existingUser = dbU;
+                                  } else {
+                                      existingEmail = dbU;
+                                  }
+                              }
+                          } catch(e) {
+                              console.warn('Cloud check for duplicates failed', e);
+                          }
+                      }
+
                       if (existingUser) {
                           showToast("এই ফোন নম্বর দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
                           return;
                       }
 
-                      // Check for existing user with this email address
-                      const existingEmail = appUsers.find(u => u.email && u.email.toLowerCase().trim() === email.toLowerCase().trim());
                       if (existingEmail) {
                           showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
                           return;
@@ -6523,13 +6578,15 @@ function savePosts() {
                           if (!foundUser) {
                               if (window.db) {
                                   try {
-                                      const snap = await window.db.collection('bexo_users').get();
-                                      snap.forEach(doc => {
-                                          const data = doc.data();
-                                          if (data && data.email && data.email.toLowerCase().trim() === loggedInUser.email.toLowerCase().trim()) {
-                                              foundUser = data;
-                                          }
-                                      });
+                                      const emailTarget = loggedInUser.email.toLowerCase().trim();
+                                      const { data: dbUsers, error } = await window.supabase
+                                          .from('bexo_users')
+                                          .select('*')
+                                          .ilike('email', emailTarget)
+                                          .limit(1);
+                                      if (!error && dbUsers && dbUsers.length > 0) {
+                                          foundUser = dbUsers[0];
+                                      }
                                   } catch(e) {
                                       console.warn("Supabase check failed:", e);
                                   }
