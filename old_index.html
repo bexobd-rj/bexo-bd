@@ -5516,64 +5516,16 @@ function savePosts() {
 
                        try {
                            const { data, error } = await sb.auth.signInWithPassword(creds);
-                           if (!error && data && data.user) {
+                           if (!error && data) {
                                authSuccess = true;
-                               window._tempAuthUser = data.user;
                            }
                        } catch (e) {
                            console.warn('Supabase auth login exception:', e);
                        }
                    }
 
-                   
-                   if (authSuccess && window._tempAuthUser && !matchedUser) {
-                       try {
-                           const targetEmail = isEmail ? cleanIdentifier : window._tempAuthUser.email;
-                           let query = sb.from('bexo_users').select('*');
-                           if (isEmail) query = query.eq('email', cleanIdentifier);
-                           else query = query.eq('phone', cleanIdentifier);
-                           
-                           const { data: dbUser } = await query.maybeSingle();
-                           if (dbUser) {
-                               matchedUser = dbUser;
-                           } else if (window._tempAuthUser.user_metadata && window._tempAuthUser.user_metadata.profileId) {
-                               matchedUser = {
-                                   ...DEFAULT_PROFILE,
-                                   ...window._tempAuthUser.user_metadata,
-                                   email: window._tempAuthUser.email || cleanIdentifier
-                               };
-                           }
-                       } catch(e) {
-                           console.warn('Direct fetch from supabase failed', e);
-                       }
-                   }
-                   window._tempAuthUser = null;
-                   
-                   
-                    if (authSuccess && window._tempAuthUser && !matchedUser) {
-                        try {
-                            let query = sb.from('bexo_users').select('*');
-                            if (isEmail) query = query.eq('email', cleanIdentifier);
-                            else query = query.eq('phone', cleanIdentifier);
-                            
-                            const { data: dbUser } = await query.maybeSingle();
-                            if (dbUser) {
-                                matchedUser = dbUser;
-                            } else if (window._tempAuthUser.user_metadata && window._tempAuthUser.user_metadata.profileId) {
-                                matchedUser = {
-                                    ...DEFAULT_PROFILE,
-                                    ...window._tempAuthUser.user_metadata,
-                                    email: window._tempAuthUser.email || cleanIdentifier
-                                };
-                            }
-                        } catch(e) {
-                            console.warn('Direct fetch from supabase failed', e);
-                        }
-                    }
-                    window._tempAuthUser = null;
-
-                    let localPassMatch = false;
-                    if (matchedUser && matchedUser.password) {
+                   let localPassMatch = false;
+                   if (matchedUser && matchedUser.password) {
                        const uPassClean = String(matchedUser.password).trim().replace(/[০-৯]/g, d => bMap[d] || d);
                        if (uPassClean === cleanPass) {
                            localPassMatch = true;
@@ -5585,14 +5537,6 @@ function savePosts() {
                            matchedUser.password = cleanPass;
                            matchedUser.lastActive = new Date().toISOString();
                            userProfile = { ...DEFAULT_PROFILE, ...matchedUser };
-                           if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
-                               const existingIndex = appUsers.findIndex(u => u.profileId === userProfile.profileId);
-                               if (existingIndex > -1) {
-                                   appUsers[existingIndex] = userProfile;
-                               } else {
-                                   appUsers.push(userProfile);
-                               }
-                           }
                        } else if (isEmail) {
                            // Only create a new profile if NO profile was found anywhere
                            userProfile = {
