@@ -9,16 +9,16 @@ CREATE TABLE IF NOT EXISTS public.bexo_users (
   role text DEFAULT 'user',
   balance numeric DEFAULT 0,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-  "lastActive" text
+  lastActive text
 );
 
 -- 2. Products Table (bexo_posts)
 CREATE TABLE IF NOT EXISTS public.bexo_posts (
   id text PRIMARY KEY,
-  title text,
+  title text NOT NULL,
   price numeric DEFAULT 0,
   profit numeric DEFAULT 0,
-  stock integer DEFAULT 0,
+  quantity integer DEFAULT 0,
   image_url text,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS public.bexo_posts (
 CREATE TABLE IF NOT EXISTS public.bexo_orders (
   id text PRIMARY KEY,
   "profileId" text NOT NULL,
-  "productId" text,
-  title text,
+  "productId" text NOT NULL,
+  title text NOT NULL,
   price numeric DEFAULT 0,
   profit numeric DEFAULT 0,
   quantity integer DEFAULT 1,
@@ -43,21 +43,7 @@ CREATE TABLE IF NOT EXISTS public.bexo_transactions (
   id text PRIMARY KEY,
   "profileId" text NOT NULL,
   amount numeric DEFAULT 0,
-  type text, 
+  type text NOT NULL, 
   status text DEFAULT 'pending',
   date timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
-
--- (Optional) RLS Policies 
--- Enabling RLS but allowing all access for now since the app uses custom BX- IDs and client-side logic.
-ALTER TABLE public.bexo_users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all access for now" ON public.bexo_users FOR ALL USING (true);
-
-ALTER TABLE public.bexo_posts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all access for now" ON public.bexo_posts FOR ALL USING (true);
-
-ALTER TABLE public.bexo_orders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all access for now" ON public.bexo_orders FOR ALL USING (true);
-
-ALTER TABLE public.bexo_transactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all access for now" ON public.bexo_transactions FOR ALL USING (true);
