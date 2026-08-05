@@ -877,6 +877,12 @@
           if (!supabaseUrl) {
               try { supabaseUrl = localStorage.getItem('bexo_supabase_url') || ""; } catch(e) {}
           }
+          if (supabaseUrl && !supabaseUrl.startsWith('http')) {
+              supabaseUrl = 'https://' + supabaseUrl;
+          }
+          if (supabaseUrl && supabaseUrl.endsWith('/')) {
+              supabaseUrl = supabaseUrl.slice(0, -1);
+          }
           if (!supabaseKey) {
               try { supabaseKey = localStorage.getItem('bexo_supabase_anon_key') || ""; } catch(e) {}
           }
@@ -2621,11 +2627,11 @@
                       }, space);
                   };
 
-                  // Intercept and downgrade sandboxed Firestore connection warning logs to warnings
+                  // Intercept and downgrade sandboxed Supabase connection warning logs to warnings
                   const originalConsoleError = console.error;
                   console.error = function(...args) {
                       const firstArg = args[0] ? String(args[0]) : '';
-                      if (firstArg.includes('Could not reach Cloud Firestore backend') || firstArg.includes('Backend didn\'t respond within 10 seconds')) {
+                      if (firstArg.includes('Could not reach Cloud Supabase backend') || firstArg.includes('Backend didn\'t respond within 10 seconds')) {
                           console.warn("[Supabase Sandbox Warning Intercepted]", ...args);
                           return;
                       }
@@ -2953,9 +2959,9 @@
                   return obj;
               }
 
-              function saveUsers(userIdToSync = null, skipFirestore = false) {
+              function saveUsers(userIdToSync = null, skipSupabase = false) {
                   localStorage.setItem('bexo_users', JSON.stringify(appUsers));
-                  if (window.db && !skipFirestore) {
+                  if (window.db && !skipSupabase) {
                       if (userIdToSync) {
                           const idsToSync = Array.isArray(userIdToSync) ? userIdToSync : [userIdToSync];
                           idsToSync.forEach(id => {
@@ -2967,7 +2973,7 @@
                           });
                       } else {
                           // Prevent critical race conditions where a client overrides the entire cloud database with stale local array.
-                          // However, we MUST allow admins to sync all users to Firestore to save newly registered/edited users.
+                          // However, we MUST allow admins to sync all users to Supabase to save newly registered/edited users.
                           if (isUserAdmin()) {
                               appUsers.forEach(u => {
                                   if (u && u.profileId) {
@@ -3419,12 +3425,12 @@
                                    updateAdminStats();
                                }
                                
-                               // Upload local-only users back to Firestore to ensure Firestore has all accounts
+                               // Upload local-only users back to Supabase to ensure Supabase has all accounts
                                appUsers.forEach(u => {
                                    if (u && u.profileId && u.phone && u.password) {
-                                       const existsInFirestore = supabaseUsers.some(f => f.profileId === u.profileId);
-                                       if (!existsInFirestore) {
-                                           console.log(`[Manual Direct Sync] Uploading missing local user to Firestore: ${u.profileId}`);
+                                       const existsInSupabase = supabaseUsers.some(f => f.profileId === u.profileId);
+                                       if (!existsInSupabase) {
+                                           console.log(`[Manual Direct Sync] Uploading missing local user to Supabase: ${u.profileId}`);
                                            window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
                                                .catch(err => console.error("Direct sync upload user error:", err));
                                         }
@@ -3914,7 +3920,7 @@
                               localStorage.setItem('bexo_transactions', JSON.stringify(localTx));
                           }
                           
-                          // Delete from Firestore
+                          // Delete from Supabase
                           if (window.db) {
                               settlements.forEach(t => {
                                   if (t.id) {
@@ -3937,7 +3943,7 @@
 
                               if (window.db) {
                                   window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
-                                      .catch(err => console.error(`[Clean Sweep] Failed resetting firestore order doc ${o.id}:`, err));
+                                      .catch(err => console.error(`[Clean Sweep] Failed resetting supabase order doc ${o.id}:`, err));
                               }
                           }
                       });
@@ -4492,7 +4498,7 @@ function savePosts() {
                               );
                               
                               if (existingIdx > -1) {
-                                  // Update preserving any custom stats, but Firestore is source of truth
+                                  // Update preserving any custom stats, but Supabase is source of truth
                                   appUsers[existingIdx] = { ...appUsers[existingIdx], ...fUser };
                               } else {
                                   appUsers.push(fUser);
@@ -4533,11 +4539,11 @@ function savePosts() {
                               updateAdminStats();
                           }
 
-                          // Bi-directional sync back: Upload any local users that exist locally on this device but are completely missing in Firestore!
+                          // Bi-directional sync back: Upload any local users that exist locally on this device but are completely missing in Supabase!
                           appUsers.forEach(u => {
                               if (u && u.profileId && u.phone && u.password) {
-                                  const existsInFirestore = supabaseUsers.some(f => f.profileId === u.profileId);
-                                  if (!existsInFirestore) {
+                                  const existsInSupabase = supabaseUsers.some(f => f.profileId === u.profileId);
+                                  if (!existsInSupabase) {
                                       console.log(`[Supabase Sync] Uploading missing local user: ${u.profileId} (${u.fullName})`);
                                       window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
                                           .catch(err => console.warn("Supabase auto sync-back user error:", err));
@@ -5395,7 +5401,15 @@ function savePosts() {
                       email: email,
                       options: { shouldCreateUser: true }
                   }).then(res => {
-                      if (res.error) alert("OTP Sending failed: " + res.error.message);
+                      if (res.error) {
+                          if (res.error.message === 'Failed to fetch' || res.error.message.includes('fetch')) {
+                              alert("OTP Sending failed: Failed to fetch.\n\nThis usually means your Supabase URL is incorrect, missing 'https://', or your Anon Key is invalid. Please check your API & Database Config in the Admin Panel.");
+                          } else {
+                              alert("OTP Sending failed: " + res.error.message);
+                          }
+                      }
+                  }).catch(err => {
+                      alert("OTP Sending Exception: " + err.message + "\nPlease check your Supabase URL in Admin Panel.");
                   });
               }
 
@@ -8664,7 +8678,7 @@ function savePosts() {
                       </div>
                   `;
 
-                  // Fetch latest data from Firestore "bexo_transactions" or fallback to local memory
+                  // Fetch latest data from Supabase "bexo_transactions" or fallback to local memory
                   fetchAndUpdateAdminLogsList();
               }
 
@@ -8854,11 +8868,11 @@ function savePosts() {
                   if (window.db) {
                       window.db.collection('bexo_transactions').orderBy('timestamp', 'desc').limit(500).get().then(snapshot => {
                           if (!snapshot.empty) {
-                              const firestoreLogs = [];
+                              const supabaseLogs = [];
                               snapshot.forEach(doc => {
-                                  firestoreLogs.push(doc.data());
+                                  supabaseLogs.push(doc.data());
                               });
-                              renderTable(firestoreLogs);
+                              renderTable(supabaseLogs);
                           }
                       }).catch(err => {
                           console.warn("[Supabase] Loading bexo_transactions failed, using local instead:", err);
@@ -15042,7 +15056,7 @@ function savePosts() {
                                                <span class="w-3 h-3 bg-emerald-500 rounded-full "></span>
                                                <span class="text-lg font-black tracking-tight">Cloud Live</span>
                                            </div>
-                                           <p class="text-[10px] text-slate-400 font-bold mt-1 uppercase">ফায়ারস্টোর ডাটাবেজ সংযুক্ত আছে</p>
+                                           <p class="text-[10px] text-slate-400 font-bold mt-1 uppercase">সুপাবেস ডাটাবেজ সংযুক্ত আছে</p>
                                        ` : `
                                            <div class="flex items-center gap-2 text-rose-500">
                                                <span class="w-3 h-3 bg-rose-500 rounded-full "></span>
@@ -15056,12 +15070,21 @@ function savePosts() {
                                <!-- Database Config Card -->
                                <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
                                    <div class="flex items-center justify-between">
-                                       <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">ফায়ারস্টোর ডাটাবেজ আইডি</span>
+                                       <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">সুপাবেস ডাটাবেজ কনফিগ</span>
                                        <i class="fas fa-database text-slate-300 text-lg"></i>
                                    </div>
-                                   <div>
-                                       <p class="text-xs font-bold font-mono tracking-tighter text-slate-800 select-all break-all bg-slate-50 p-2.5 rounded-xl border border-slate-100">ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878</p>
-                                       <p class="text-[10px] text-slate-400 font-bold mt-1 uppercase">ঐচ্ছিক কাস্টম ডাটাবেজ রেফারেন্স</p>
+                                   <div class="space-y-3">
+                                       <div>
+                                           <label class="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Supabase URL</label>
+                                           <input type="text" id="adminSupabaseUrl" class="w-full bg-slate-50 border border-slate-200 text-xs font-mono p-2.5 rounded-xl focus:outline-none focus:border-orange-500" placeholder="https://xyzcompany.supabase.co" value="${localStorage.getItem('bexo_supabase_url') || ''}">
+                                       </div>
+                                       <div>
+                                           <label class="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Supabase Anon Key</label>
+                                           <input type="password" id="adminSupabaseKey" class="w-full bg-slate-50 border border-slate-200 text-xs font-mono p-2.5 rounded-xl focus:outline-none focus:border-orange-500" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." value="${localStorage.getItem('bexo_supabase_anon_key') || ''}">
+                                       </div>
+                                       <button onclick="saveSupabaseConfig()" class="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer mt-2">
+                                           <i class="fas fa-save"></i> সেভ করুন
+                                       </button>
                                    </div>
                                </div>
 
@@ -15124,7 +15147,7 @@ function savePosts() {
                                            <span class="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-white font-black text-xs font-mono">৩</span>
                                            <h4 class="text-sm font-black text-rose-950">কিল ক্যাশ ও ডিপ ক্লিন সিঙ্ক</h4>
                                        </div>
-                                       <p class="text-xs text-slate-400 font-semibold leading-relaxed">লোকাল মেমরি সম্পূর্ণ মুছে দিয়ে ফায়ারস্টোর ক্লাউড থেকে একদম তাজা ডাটা লোড করবে।</p>
+                                       <p class="text-xs text-slate-400 font-semibold leading-relaxed">লোকাল মেমরি সম্পূর্ণ মুছে দিয়ে সুপাবেস ক্লাউড থেকে একদম তাজা ডাটা লোড করবে।</p>
                                        <button onclick="clearCacheAndFullRecoverySyncDetailed()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer">
                                            <i class="fas fa-trash-restore"></i> ফুল ক্যাশ রিকভারি সিঙ্ক
                                        </button>
@@ -15169,6 +15192,25 @@ function savePosts() {
                            </div>
                        `;
                    }).join('');
+               }
+
+               function saveSupabaseConfig() {
+                   let url = document.getElementById('adminSupabaseUrl').value.trim();
+                   const key = document.getElementById('adminSupabaseKey').value.trim();
+                   if (!url || !key) {
+                       showToast("URL এবং Key প্রদান করুন", "error");
+                       return;
+                   }
+                   if (!url.startsWith('http')) {
+                       url = 'https://' + url;
+                   }
+                   if (url.endsWith('/')) {
+                       url = url.slice(0, -1);
+                   }
+                   localStorage.setItem('bexo_supabase_url', url);
+                   localStorage.setItem('bexo_supabase_anon_key', key);
+                   showToast("Supabase Credentials Saved! Reloading...", "success");
+                   setTimeout(() => window.location.reload(), 1000);
                }
 
                async function forceDatabaseDirectSyncDetailed() {
@@ -15774,7 +15816,7 @@ function savePosts() {
                       appPosts.unshift(...newPosts);
                       if (typeof savePosts === 'function') savePosts();
                       
-                      // Save to Firestore via frontend
+                      // Save to Supabase via frontend
                       if (window.db) {
                           newPosts.forEach(postData => {
                               window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForSupabase(postData))
@@ -16361,7 +16403,7 @@ function savePosts() {
                   const targetUserIdx = appUsers.findIndex(u => u.profileId === req.profileId);
                   const amountToAdd = Number(req.amount);
 
-                  // 1. Direct Firestore user document update to guarantee reliability
+                  // 1. Direct Supabase user document update to guarantee reliability
                   if (window.db && req.profileId) {
                       const userDocRef = window.db.collection('bexo_users').doc(String(req.profileId));
                       userDocRef.get().then(doc => {
@@ -16397,7 +16439,7 @@ function savePosts() {
                               }
                               
                               userDocRef.set(sanitizeForSupabase(userData))
-                                  .then(() => console.log(`[Supabase] Successfully updated user ${req.profileId} balance directly in Firestore.`))
+                                  .then(() => console.log(`[Supabase] Successfully updated user ${req.profileId} balance directly in Supabase.`))
                                   .catch(err => console.error("Error setting user doc directly:", err));
                           }
                       }).catch(err => console.error("Error fetching user doc directly:", err));
@@ -16661,7 +16703,7 @@ function savePosts() {
                   if (adminNote) req.adminNote = adminNote;
                   saveBillRequests();
 
-                  // 1. Direct Firestore user document update to guarantee reliability
+                  // 1. Direct Supabase user document update to guarantee reliability
                   if (window.db && profileId) {
                       const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
                       userDocRef.get().then(doc => {
@@ -16680,7 +16722,7 @@ function savePosts() {
                                   }
                               }
                               userDocRef.set(sanitizeForSupabase(userData))
-                                  .then(() => console.log(`[Supabase] Directly updated user ${profileId} bill status in Firestore.`))
+                                  .then(() => console.log(`[Supabase] Directly updated user ${profileId} bill status in Supabase.`))
                                   .catch(err => console.error("Error setting user doc in updateBillStatus:", err));
                           }
                       }).catch(err => console.error("Error direct getting user doc in updateBillStatus:", err));
@@ -16753,7 +16795,7 @@ function savePosts() {
                   }
                   saveRechargeRequests();
 
-                  // 1. Direct Firestore user document update to guarantee reliability
+                  // 1. Direct Supabase user document update to guarantee reliability
                   if (window.db && profileId) {
                       const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
                       userDocRef.get().then(doc => {
@@ -16772,7 +16814,7 @@ function savePosts() {
                                   }
                               }
                               userDocRef.set(sanitizeForSupabase(userData))
-                                  .then(() => console.log(`[Supabase] Directly updated user ${profileId} recharge status in Firestore.`))
+                                  .then(() => console.log(`[Supabase] Directly updated user ${profileId} recharge status in Supabase.`))
                                   .catch(err => console.error("Error setting user doc in updateRechargeStatus:", err));
                           }
                       }).catch(err => console.error("Error direct getting user doc in updateRechargeStatus:", err));
@@ -16850,7 +16892,7 @@ function savePosts() {
                   if (adminNote) req.adminNote = adminNote;
                   saveWithdrawals();
 
-                  // 1. Run standard Firestore database transaction for multi-document reliability
+                  // 1. Run standard Supabase database transaction for multi-document reliability
                   if (window.db && req.profileId) {
                       const userDocRef = window.db.collection('bexo_users').doc(String(req.profileId));
                       const withdrawDocRef = window.db.collection('bexo_withdrawals').doc(String(id));
@@ -17063,7 +17105,7 @@ function savePosts() {
                       saveUsers(profileId, true);
                   }
 
-                  // Write directly to Firestore to update the target user Profile
+                  // Write directly to Supabase to update the target user Profile
                   if (window.db && profileId) {
                       const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
                       userDocRef.get().then(doc => {
@@ -17109,7 +17151,7 @@ function savePosts() {
                           saveUsers(id, true);
                       }
 
-                      // Update directly in Firestore
+                      // Update directly in Supabase
                       if (window.db) {
                           const userDocRef = window.db.collection('bexo_users').doc(String(id));
                           userDocRef.get().then(doc => {
@@ -17118,10 +17160,10 @@ function savePosts() {
                                   userData.isPremium = true;
                                   userData.currentPlan = 'Premium Member';
                                   userDocRef.set(sanitizeForSupabase(userData))
-                                      .then(() => alert(`Profile ${id} activated successfully in Firestore!`))
+                                      .then(() => alert(`Profile ${id} activated successfully in Supabase!`))
                                       .catch(err => {
                                           console.error(err);
-                                          alert(`Error: Could not update Firestore for profile ${id}`);
+                                          alert(`Error: Could not update Supabase for profile ${id}`);
                                       });
                               } else {
                                   alert(`Profile ${id} not found in database.`);
@@ -22056,7 +22098,7 @@ function updateUserTicketStatus(id, newStatus) {
                         let deletePromises = [];
                         let orderResetPromises = [];
 
-                        // 1. Delete transactions from Firestore bexo_transactions
+                        // 1. Delete transactions from Supabase bexo_transactions
                         if (window.db) {
                             settlements.forEach(t => {
                                 if (t.id) {
@@ -22701,7 +22743,7 @@ function verifySuperAdminPin() {
                    // Execute ACID Transaction process
                    try {
                        if (window.db) {
-                           // Use relational atomicity transaction across Firestore if online!
+                           // Use relational atomicity transaction across Supabase if online!
                            const userDocRef = window.db.collection('bexo_users').doc(String(resellerProfileId));
                            const orderDocRef = window.db.collection('bexo_orders').doc(String(order.id));
                            const txnDocRef = window.db.collection('bexo_transactions').doc(String(settlementTxnId));
@@ -22889,7 +22931,7 @@ async function loadLandingProducts() {
                     });
                 }
             } catch (err) {
-                console.error("Failed to fetch landing products from firestore directly:", err);
+                console.error("Failed to fetch landing products from supabase directly:", err);
             }
         }
         
