@@ -48,16 +48,50 @@ CREATE TABLE IF NOT EXISTS public.bexo_transactions (
   date timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- (Optional) RLS Policies 
--- Enabling RLS but allowing all access for now since the app uses custom BX- IDs and client-side logic.
+-- Enable RLS on all tables
 ALTER TABLE public.bexo_users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all access for now" ON public.bexo_users FOR ALL USING (true);
-
 ALTER TABLE public.bexo_posts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all access for now" ON public.bexo_posts FOR ALL USING (true);
-
 ALTER TABLE public.bexo_orders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all access for now" ON public.bexo_orders FOR ALL USING (true);
-
 ALTER TABLE public.bexo_transactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all access for now" ON public.bexo_transactions FOR ALL USING (true);
+
+-- Helper function to check if user is admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.bexo_users 
+    WHERE id = auth.uid()::text AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RLS for bexo_users
+-- Users can read, insert, and update their own profile
+CREATE POLICY "Users can read own profile" ON public.bexo_users FOR SELECT USING (id = auth.uid()::text ); 
+CREATE POLICY "Users can insert own profile" ON public.bexo_users FOR INSERT WITH CHECK (id = auth.uid()::text);
+CREATE POLICY "Users can update own profile" ON public.bexo_users FOR UPDATE USING (id = auth.uid()::text);
+-- Admins can do everything
+CREATE POLICY "Admins can manage all users" ON public.bexo_users FOR ALL USING (public.is_admin());
+
+-- RLS for bexo_posts (Products)
+-- Anyone can read products
+CREATE POLICY "Anyone can read products" ON public.bexo_posts FOR SELECT USING (true);
+-- Only admins can insert/update/delete products
+CREATE POLICY "Admins can manage products" ON public.bexo_posts FOR ALL USING (public.is_admin());
+
+-- RLS for bexo_orders
+-- Users can manage their own orders
+CREATE POLICY "Users can manage own orders" ON public.bexo_orders FOR ALL USING (
+  "profileId" IN (SELECT "profileId" FROM public.bexo_users WHERE id = auth.uid()::text)
+);
+-- Admins can manage all orders
+CREATE POLICY "Admins can manage all orders" ON public.bexo_orders FOR ALL USING (public.is_admin());
+
+-- RLS for bexo_transactions
+-- Users can manage their own transactions
+CREATE POLICY "Users can manage own transactions" ON public.bexo_transactions FOR ALL USING (
+  "profileId" IN (SELECT "profileId" FROM public.bexo_users WHERE id = auth.uid()::text)
+);
+-- Admins can manage all transactions
+CREATE POLICY "Admins can manage all transactions" ON public.bexo_transactions FOR ALL USING (public.is_admin());
+

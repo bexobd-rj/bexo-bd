@@ -890,8 +890,34 @@
           if (supabaseUrl && supabaseKey && window.supabase && typeof window.supabase.createClient === 'function') {
               try {
                   const client = window.supabase.createClient(supabaseUrl, supabaseKey);
+                  
                   window.supabaseClient = client;
                   window.supabase = client;
+                  
+                  // Setup Auth Listener
+                  client.auth.onAuthStateChange(async (event, session) => {
+                      console.log("Supabase Auth Event:", event);
+                      if (session && session.user) {
+                          const { data, error } = await client.from('bexo_users').select('*').eq('id', session.user.id).limit(1);
+                          if (!error && data && data.length > 0) {
+                              const dbUser = data[0];
+                              window.userProfile = { ...window.DEFAULT_PROFILE, ...dbUser, id: session.user.id };
+                              localStorage.setItem('bexo_profile', JSON.stringify(window.userProfile));
+                              
+                              // Sync to appUsers
+                              if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
+                                  const idx = appUsers.findIndex(u => u.profileId === window.userProfile.profileId);
+                                  if (idx > -1) appUsers[idx] = window.userProfile;
+                                  else appUsers.push(window.userProfile);
+                                  localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                              }
+                          }
+                      } else if (event === 'SIGNED_OUT') {
+                          window.userProfile = null;
+                          localStorage.removeItem('bexo_profile');
+                      }
+                  });
+
                   return client;
               } catch(e) {
                   console.error("[Supabase Init Error]:", e);
@@ -5451,7 +5477,6 @@ function savePosts() {
                    const identifierEl = document.getElementById('loginIdentifier');
                    const passEl = document.getElementById('loginPass');
                    const btn = document.getElementById('btnLoginSubmit');
-
                    if (!identifierEl || !passEl) return showToast('সব তথ্য দিন', 'error');
 
                    const rawIdentifier = identifierEl.value.trim();
@@ -5467,135 +5492,111 @@ function savePosts() {
                    let cleanIdentifier = String(rawIdentifier).trim().replace(/[০-৯]/g, d => bMap[d] || d);
                    const isEmail = cleanIdentifier.includes('@');
 
-                   if (typeof syncGlobalStateWithLocalStorage === 'function') {
-                       syncGlobalStateWithLocalStorage();
-                   }
-                   if (typeof consolidateUserProfiles === 'function') {
-                       consolidateUserProfiles();
+                   if (typeof syncGlobalStateWithLocalStorage === 'function') syncGlobalStateWithLocalStorage();
+                   if (typeof consolidateUserProfiles === 'function') consolidateUserProfiles();
+
+                   const sb = window.getSupabase ? window.getSupabase() : window.supabase;
+                   if (!sb) {
+                        showToast("ডাটাবেস কানেকশন ত্রুটি! অনুগ্রহ করে পেজটি রিফ্রেশ করুন।", "error");
+                        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> প্রবেশ করুন';
+                        btn.disabled = false;
+                        return;
                    }
 
-                   let matchedUser = typeof findUserByEmailOrPhone === 'function' ? findUserByEmailOrPhone(cleanIdentifier) : null;
+                   const creds = { password: cleanPass };
+                   if (isEmail) creds.email = cleanIdentifier;
+                   else {
+                       let p = cleanIdentifier;
+                       if (p.startsWith('01')) p = '+88' + p;
+                       creds.phone = p; 
+                   }
 
-                   // If not found in memory, query cloud Supabase database efficiently
-                   if (!matchedUser && window.supabase) {
-                       try {
-                           let query = window.supabase.from('bexo_users').select('*');
+                   try {
+                       // We will try logging in directly via Supabase Auth
+                       let { data: authData, error: authError } = await sb.auth.signInWithPassword(creds);
+
+                       // Fallback for phone login if +88 failed, try without +88
+                       if (authError && !isEmail && cleanIdentifier.startsWith('01')) {
+                           const altCreds = { phone: cleanIdentifier, password: cleanPass };
+                           const altRes = await sb.auth.signInWithPassword(altCreds);
+                           authData = altRes.data;
+                           authError = altRes.error;
+                       }
+                       
+                       // We fallback to email if identifier might have been mapped to email.
+                       if (authError && !isEmail) {
+                            const altCreds2 = { email: cleanIdentifier + "@bexobd.com", password: cleanPass };
+                            const altRes2 = await sb.auth.signInWithPassword(altCreds2);
+                            if (!altRes2.error && altRes2.data.user) {
+                                authData = altRes2.data;
+                                authError = null;
+                            }
+                       }
+
+                       if (authError || !authData || !authData.user) {
+                           // Try querying the legacy bexo_users table to see if it's a ghost user
+                           let query = sb.from('bexo_users').select('*');
                            if (isEmail) {
                                query = query.ilike('email', cleanIdentifier);
-                           } else if (cleanIdentifier.toLowerCase().startsWith('bx-')) {
-                               query = query.ilike('profileId', cleanIdentifier);
                            } else {
                                let p = cleanIdentifier;
                                let p2 = p.startsWith('01') ? '+88' + p : p.replace('+88', '');
                                query = query.or(`phone.eq.${p},phone.eq.${p2}`);
                            }
                            
-                           const { data: dbUsers, error } = await query.limit(10); // Check multiple in case of duplicates
-                           
-                           if (!error && dbUsers && dbUsers.length > 0) {
-                               // verify locally to be safe
-                               const targetStr = cleanIdentifier.toLowerCase();
-                               const normPhone = typeof normalizePhone === 'function' ? normalizePhone(targetStr) : targetStr;
-                               
-                               for (let data of dbUsers) {
-                                   const uEmail = String(data.email || '').trim().toLowerCase();
-                                   const uPhone = typeof normalizePhone === 'function' ? normalizePhone(data.phone) : String(data.phone || '').trim();
-                                   const uProfileId = String(data.profileId || '').trim().toLowerCase();
-                                   
-                                   if ((isEmail && uEmail === targetStr) || (!isEmail && ((uPhone && normPhone && uPhone === normPhone) || (uProfileId && uProfileId === targetStr)))) {
-                                       matchedUser = data;
-                                       break;
+                           const { data: dbUsers, error: dbErr } = await query.limit(1);
+                           if (!dbErr && dbUsers && dbUsers.length > 0) {
+                               const ghostUser = dbUsers[0];
+                               // Verify legacy password
+                               if (ghostUser.password === cleanPass) {
+                                   // Register them in Supabase Auth on the fly!
+                                   const ghostEmail = ghostUser.email || (ghostUser.profileId + '@bexobd.com');
+                                   const { data: signUpData, error: signUpErr } = await sb.auth.signUp({
+                                       email: ghostEmail,
+                                       password: cleanPass,
+                                       options: {
+                                           data: { profileId: ghostUser.profileId, phone: ghostUser.phone }
+                                       }
+                                   });
+                                   if (!signUpErr && signUpData.user) {
+                                       authData = signUpData;
+                                       authError = null;
+                                       // Link the user
+                                       await sb.from('bexo_users').update({ id: signUpData.user.id }).eq('profileId', ghostUser.profileId);
+                                   } else {
+                                       throw new Error("ঘোস্ট ইউজার মাইগ্রেশন ব্যর্থ হয়েছে: " + (signUpErr ? signUpErr.message : ""));
                                    }
+                               } else {
+                                   throw new Error("ভুল পাসওয়ার্ড");
                                }
-                           }
-
-                           if (matchedUser) {
-                               if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
-                                   const idx = appUsers.findIndex(u => u.profileId === matchedUser.profileId);
-                                   if (idx > -1) appUsers[idx] = matchedUser;
-                                   else appUsers.push(matchedUser);
-                                   localStorage.setItem('bexo_users', JSON.stringify(appUsers));
-                               }
-                           }
-                       } catch(e) {
-                           console.warn('Cloud user lookup during login failed:', e);
-                       }
-                   }
-
-                   let authSuccess = false;
-                   const sb = window.getSupabase ? window.getSupabase() : null;
-
-                   if (sb && sb.auth) {
-                       const creds = { password: cleanPass };
-                       if (isEmail) creds.email = cleanIdentifier;
-                       else creds.phone = cleanIdentifier;
-
-                       try {
-                           const { data, error } = await sb.auth.signInWithPassword(creds);
-                           if (!error && data && data.user) {
-                               authSuccess = true;
-                               window._tempAuthUser = data.user;
-                           }
-                       } catch (e) {
-                           console.warn('Supabase auth login exception:', e);
-                       }
-                   }
-
-                   
-
-                   if (authSuccess && window._tempAuthUser && !matchedUser) {
-                       try {
-                           const targetEmail = isEmail ? cleanIdentifier : window._tempAuthUser.email;
-                           let query = sb.from('bexo_users').select('*');
-                           
-                           if (isEmail) {
-                               query = query.ilike('email', cleanIdentifier);
                            } else {
+                               throw new Error("লগইন ব্যর্থ: " + (authError ? authError.message : "Invalid login credentials"));
+                           }
+                       }
+
+                       // Fetch the user's profile from bexo_users based strictly on their Auth ID or profileId
+                       const { data: profiles, error: profErr } = await sb.from('bexo_users').select('*').eq('id', authData.user.id).limit(1);
+                       
+                       let matchedUser = profiles && profiles.length > 0 ? profiles[0] : null;
+                       
+                       // If not found by ID, try by email/phone to link them
+                       if (!matchedUser) {
+                           let linkQuery = sb.from('bexo_users').select('*');
+                           if (isEmail) linkQuery = linkQuery.ilike('email', cleanIdentifier);
+                           else {
                                let p = cleanIdentifier;
-                               if (p.startsWith('01')) p = '+88' + p;
-                               query = query.or(`phone.eq.${cleanIdentifier},phone.eq.${p}`);
+                               let p2 = p.startsWith('01') ? '+88' + p : p.replace('+88', '');
+                               linkQuery = linkQuery.or(`phone.eq.${p},phone.eq.${p2}`);
                            }
-                           
-                           const { data: dbUsers, error } = await query.limit(1);
-                           if (!error && dbUsers && dbUsers.length > 0) {
-                               matchedUser = dbUsers[0];
-                           } else if (window._tempAuthUser.user_metadata && window._tempAuthUser.user_metadata.profileId) {
-                               matchedUser = {
-                                   ...DEFAULT_PROFILE,
-                                   ...window._tempAuthUser.user_metadata,
-                                   email: window._tempAuthUser.email || (isEmail ? cleanIdentifier : ''),
-                                   phone: window._tempAuthUser.phone || (!isEmail ? cleanIdentifier : '')
-                               };
-                           } else {
-                               const newProfileId = 'BX-' + Math.floor(100000 + Math.random() * 900000);
-                               matchedUser = {
-                                   ...DEFAULT_PROFILE,
-                                   email: window._tempAuthUser.email || (isEmail ? cleanIdentifier : ''),
-                                   phone: window._tempAuthUser.phone || (!isEmail ? cleanIdentifier : ''),
-                                   fullName: (window._tempAuthUser.email || cleanIdentifier).split('@')[0],
-                                   profileId: newProfileId,
-                                   password: cleanPass
-                               };
-                               sb.auth.updateUser({ data: { profileId: newProfileId } }).catch(()=>{});
+                           const { data: linkUsers } = await linkQuery.limit(1);
+                           if (linkUsers && linkUsers.length > 0) {
+                               matchedUser = linkUsers[0];
+                               await sb.from('bexo_users').update({ id: authData.user.id }).eq('profileId', matchedUser.profileId);
+                               matchedUser.id = authData.user.id;
                            }
-                       } catch(e) {
-                           console.warn('Direct fetch from supabase failed', e);
                        }
-                   }
-                   window._tempAuthUser = null;
 
-
-                    let localPassMatch = false;
-                    if (matchedUser && matchedUser.password) {
-                       const uPassClean = String(matchedUser.password).trim().replace(/[০-৯]/g, d => bMap[d] || d);
-                       if (uPassClean === cleanPass) {
-                           localPassMatch = true;
-                       }
-                   }
-
-                   if (authSuccess || localPassMatch) {
                        if (matchedUser) {
-                           matchedUser.password = cleanPass;
                            matchedUser.lastActive = new Date().toISOString();
                            userProfile = { ...DEFAULT_PROFILE, ...matchedUser };
                            if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
@@ -5606,51 +5607,33 @@ function savePosts() {
                                    appUsers.push(userProfile);
                                }
                            }
-                       } else if (isEmail) {
-                           // Only create a new profile if NO profile was found anywhere
-                           userProfile = {
-                               ...DEFAULT_PROFILE,
-                               email: cleanIdentifier,
-                               fullName: cleanIdentifier.split('@')[0],
-                               password: cleanPass,
-                               profileId: 'BX-' + Math.floor(100000 + Math.random() * 900000)
-                           };
-                           if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
-                               appUsers.push(userProfile);
+                           if (typeof saveProfile === 'function') saveProfile();
+                           if (typeof saveUsers === 'function') saveUsers(userProfile ? userProfile.profileId : null);
+                           
+                           showToast('সফলভাবে লগইন হয়েছে!', 'success');
+                           
+                           const authSection = document.getElementById('authSection');
+                           const dashboardSection = document.getElementById('dashboardSection');
+                           const landingSection = document.getElementById('landingSection');
+                           if (landingSection) landingSection.classList.add('hidden');
+                           if (authSection) authSection.classList.add('hidden');
+                           if (dashboardSection) {
+                               dashboardSection.classList.remove('hidden');
+                               dashboardSection.classList.add('fade-in');
                            }
+                           if (typeof renderHome === 'function') renderHome();
+                           if (typeof updateHeaderUI === 'function') updateHeaderUI();
+                           window.scrollTo({ top: 0, behavior: 'smooth' });
+                       } else {
+                           showToast('ইউজার প্রোফাইল পাওয়া যায়নি।', 'error');
                        }
-
-                       if (typeof saveProfile === 'function') saveProfile();
-                       if (typeof saveUsers === 'function') saveUsers(userProfile ? userProfile.profileId : null);
-                       if (typeof consolidateUserProfiles === 'function') consolidateUserProfiles();
-
-                       if (sb && sb.auth && localPassMatch && !authSuccess) {
-                           sb.auth.updateUser({ password: cleanPass }).catch(() => {});
-                       }
-
-                       showToast('সফলভাবে লগইন হয়েছে!', 'success');
+                   } catch (err) {
+                       console.warn('Login Error:', err);
+                       showToast('লগইন ব্যর্থ: ' + err.message, 'error');
+                   } finally {
                        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> প্রবেশ করুন';
                        btn.disabled = false;
-
-                       const authSection = document.getElementById('authSection');
-                       const dashboardSection = document.getElementById('dashboardSection');
-                       const landingSection = document.getElementById('landingSection');
-
-                       if (landingSection) landingSection.classList.add('hidden');
-                       if (authSection) authSection.classList.add('hidden');
-                       if (dashboardSection) {
-                           dashboardSection.classList.remove('hidden');
-                           dashboardSection.classList.add('fade-in');
-                       }
-
-                       if (typeof renderHome === 'function') renderHome();
-                       if (typeof updateHeaderUI === 'function') updateHeaderUI();
-                       window.scrollTo({ top: 0, behavior: 'smooth' });
-                       return;
                    }
-
-                   btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> প্রবেশ করুন';
-                   btn.disabled = false;
 
                    if (matchedUser && !localPassMatch) {
                        showToast('লগইন ব্যর্থ: পাসওয়ার্ড ভুল প্রদান করেছেন!', 'error');
@@ -5780,61 +5763,6 @@ function savePosts() {
                   const renderContent = () => {
                       let htmlContent = '';
                       if (currentStep === 1) {
-                          htmlContent = `
-                              <div class="mb-5">
-                                  <h3 class="text-xl font-bold text-slate-800 tracking-tight">পাসওয়ার্ড ভুলে গেছেন?</h3>
-                                  <p class="text-sm text-slate-500 mt-1">আপনার নিবন্ধিত জিমেইল/ইমেইল দিন</p>
-                              </div>
-                              <div class="mb-5">
-                                  <input type="email" id="fpIdentifier" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3" placeholder="আপনার জিমেইল/ইমেইল" required>
-                              </div>
-                              <button id="fpBtnNext" class="w-full text-white bg-slate-900 hover:bg-orange-600 focus:ring-4 focus:outline-none focus:ring-slate-300 font-bold rounded-xl text-sm px-5 py-3 text-center transition-all">কোড পাঠান</button>
-                          `;
-                      } else if (currentStep === 2) {
-                          htmlContent = `
-                              <div class="mb-5">
-                                  <h3 class="text-xl font-bold text-slate-800 tracking-tight">ভেরিফিকেশন কোড</h3>
-                                  <p class="text-sm text-slate-500 mt-1">আপনার দেওয়া ঠিকানায় একটি কোড পাঠানো হয়েছে</p>
-                              </div>
-                              <div class="mb-5">
-                                  <input type="text" id="fpCode" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-2xl tracking-[0.5em] text-center font-black rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3" placeholder="------" maxlength="6" required>
-                              </div>
-                              <button id="fpBtnVerify" class="w-full text-white bg-slate-900 hover:bg-orange-600 focus:ring-4 focus:outline-none focus:ring-slate-300 font-bold rounded-xl text-sm px-5 py-3 text-center transition-all">ভেরিফাই করুন</button>
-                          `;
-                      } else if (currentStep === 3) {
-                          htmlContent = `
-                              <div class="mb-5">
-                                  <h3 class="text-xl font-bold text-slate-800 tracking-tight">নতুন পাসওয়ার্ড</h3>
-                                  <p class="text-sm text-slate-500 mt-1">আপনার নতুন পাসওয়ার্ড সেট করুন</p>
-                              </div>
-                              <div class="mb-4 relative">
-                                  <input type="password" id="fpNewPass" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3 pr-10" placeholder="নতুন পাসওয়ার্ড" required>
-                                  <button type="button" onclick="togglePasswordVisibility('fpNewPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 z-10">
-                                      <i class="fas fa-eye"></i>
-                                  </button>
-                              </div>
-                              <div class="mb-5 relative">
-                                  <input type="password" id="fpConfirmPass" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block px-4 py-3 pr-10" placeholder="পাসওয়ার্ড নিশ্চিত করুন" required>
-                                  <button type="button" onclick="togglePasswordVisibility('fpConfirmPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 z-10">
-                                      <i class="fas fa-eye"></i>
-                                  </button>
-                              </div>
-                              <button id="fpBtnSave" class="w-full text-white bg-emerald-600 hover:bg-emerald-700 focus:ring-4 focus:outline-none focus:ring-emerald-300 font-bold rounded-xl text-sm px-5 py-3 text-center transition-all">পাসওয়ার্ড পরিবর্তন ও লগইন</button>
-                          `;
-                      }
-                      modal.innerHTML = `
-                          <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md mx-auto p-8 border border-slate-100">
-                              <button id="fpBtnClose" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
-                                  <i class="fas fa-times"></i>
-                              </button>
-                              ${htmlContent}
-                          </div>
-                      `;
-
-                      // Bind events
-                      modal.querySelector('#fpBtnClose').addEventListener('click', () => modal.remove());
-                      
-                      if (currentStep === 1) {
                           modal.querySelector('#fpBtnNext').addEventListener('click', async () => {
                               const val = modal.querySelector('#fpIdentifier').value.trim();
                               if (!val) return showToast("ইমেইল দিন", "error");
@@ -5844,15 +5772,18 @@ function savePosts() {
                               const btn = modal.querySelector('#fpBtnNext');
                               btn.innerText = 'পাঠানো হচ্ছে...';
                               btn.disabled = true;
-
                               try {
-                                  await sendPasswordResetOtp(identifier);
-                                  showToast("আপনার ঠিকানায় একটি ভেরিফিকেশন কোড পাঠানো হয়েছে!", "success");
+                                  const sb = window.getSupabase ? window.getSupabase() : window.supabase;
+                                  if(!sb) throw new Error("Supabase is not initialized");
+                                  const { error } = await sb.auth.resetPasswordForEmail(identifier);
+                                  if (error) throw error;
+                                  
+                                  showToast("আপনার ইমেইলে একটি রিকভারি লিঙ্ক বা কোড পাঠানো হয়েছে!", "success");
                                   currentStep = 2;
                                   renderContent();
                               } catch(e) {
-                                  showToast(e.message || "কোড পাঠানো ব্যর্থ হয়েছে", "error");
-                                  btn.innerText = 'কোড পাঠান';
+                                  showToast(e.message || "পাসওয়ার্ড রিসেট ইমেইল পাঠানো ব্যর্থ হয়েছে", "error");
+                                  btn.innerText = 'ইমেইল পাঠান';
                                   btn.disabled = false;
                               }
                           });
@@ -5864,9 +5795,12 @@ function savePosts() {
                               const btn = modal.querySelector('#fpBtnVerify');
                               btn.innerText = 'ভেরিফাই হচ্ছে...';
                               btn.disabled = true;
-
                               try {
-                                  await verifyPasswordResetOtp(identifier, code);
+                                  const sb = window.getSupabase ? window.getSupabase() : window.supabase;
+                                  // Verify the OTP via Supabase Auth
+                                  const { data, error } = await sb.auth.verifyOtp({ email: identifier, token: code, type: 'recovery' });
+                                  if (error) throw error;
+                                  
                                   showToast("কোড সফলভাবে ভেরিফাই হয়েছে!", "success");
                                   currentStep = 3;
                                   renderContent();
@@ -5886,73 +5820,33 @@ function savePosts() {
                               
                               if (np.length < 6) return showToast("পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে", "error");
                               if (np !== cp) return showToast("পাসওয়ার্ড দুটি মিলছে না", "error");
-
                               const btn = modal.querySelector('#fpBtnSave');
                               btn.innerText = 'সংরক্ষণ হচ্ছে...';
                               btn.disabled = true;
-
                               try {
-                                  const sb = window.getSupabase ? window.getSupabase() : null;
-                                  if (sb && sb.auth) {
-                                      await sb.auth.updateUser({ password: np }).catch(() => {});
+                                  const sb = window.getSupabase ? window.getSupabase() : window.supabase;
+                                  if (!sb) throw new Error("Supabase is not initialized");
+                                  // Since we verified the OTP, we now have a session and can update the password
+                                  const { data, error } = await sb.auth.updateUser({ password: np });
+                                  if (error) throw error;
+                                  
+                                  // Fetch the updated profile from bexo_users for local sync
+                                  const { data: dbUsers, error: dbErr } = await sb.from('bexo_users').select('*').eq('id', data.user.id).limit(1);
+                                  if (dbUsers && dbUsers.length > 0) {
+                                      const matchedUser = dbUsers[0];
+                                      matchedUser.password = np; // Update local only
+                                      matchedUser.lastActive = new Date().toISOString();
+                                      
+                                      userProfile = { ...DEFAULT_PROFILE, ...matchedUser };
+                                      if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
+                                          const idx = appUsers.findIndex(u => u.profileId === matchedUser.profileId);
+                                          if (idx > -1) appUsers[idx] = matchedUser;
+                                          else appUsers.push(matchedUser);
+                                      }
+                                      
+                                      if (typeof saveProfile === 'function') saveProfile();
+                                      if (typeof saveUsers === 'function') saveUsers(matchedUser.profileId);
                                   }
-
-                                   // Save new password across matching records
-                                   saveNewPassword(identifier, np, false);
-
-                                   let matchedUser = typeof findUserByEmailOrPhone === 'function' ? findUserByEmailOrPhone(identifier) : null;
-
-                                   if (!matchedUser && window.supabase) {
-                                       try {
-                                           let query = window.supabase.from('bexo_users').select('*');
-                                           const isEmail = identifier.includes('@');
-                                           const cleanId = String(identifier).trim().toLowerCase();
-                                           
-                                           if (isEmail) {
-                                               query = query.ilike('email', cleanId);
-                                           } else if (cleanId.startsWith('bx-')) {
-                                               query = query.ilike('profileId', cleanId);
-                                           } else {
-                                               let p = cleanId;
-                                               let p2 = p.startsWith('01') ? '+88' + p : p.replace('+88', '');
-                                               query = query.or(`phone.eq.${p},phone.eq.${p2}`);
-                                           }
-                                           
-                                           const { data: dbUsers, error } = await query.limit(10);
-                                           if (!error && dbUsers && dbUsers.length > 0) {
-                                               const normId = typeof normalizePhone === 'function' ? normalizePhone(cleanId) : cleanId;
-                                               
-                                               for (let data of dbUsers) {
-                                                   const uEmail = String(data.email || '').trim().toLowerCase();
-                                                   const uPhone = typeof normalizePhone === 'function' ? normalizePhone(data.phone) : String(data.phone || '').trim();
-                                                   const uProfileId = String(data.profileId || '').trim().toLowerCase();
-                                                   
-                                                   if ((isEmail && uEmail === cleanId) || (!isEmail && ((uPhone && normId && uPhone === normId) || (uProfileId && uProfileId === cleanId)))) {
-                                                       matchedUser = data;
-                                                       break;
-                                                   }
-                                               }
-                                           }
-                                       } catch (e) {
-                                           console.warn('Cloud user lookup during password reset failed:', e);
-                                       }
-                                   }
-
-                                   if (matchedUser) {
-                                       matchedUser.password = np;
-                                       matchedUser.lastActive = new Date().toISOString();
-                                       
-                                       const idx = appUsers.findIndex(u => u.profileId === matchedUser.profileId || (u.email && matchedUser.email && u.email.toLowerCase() === matchedUser.email.toLowerCase()));
-                                       if (idx > -1) appUsers[idx] = matchedUser;
-                                       else appUsers.push(matchedUser);
-
-                                       userProfile = { ...DEFAULT_PROFILE, ...matchedUser, password: np };
-                                       if (typeof saveProfile === 'function') saveProfile();
-                                       if (typeof saveUsers === 'function') saveUsers(matchedUser.profileId);
-                                       if (typeof syncProfileWithGlobal === 'function') syncProfileWithGlobal();
-                                   }
-
-                                   if (typeof consolidateUserProfiles === 'function') consolidateUserProfiles();
 
                                   modal.remove();
                                   showToast("পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে!", "success");
@@ -6264,11 +6158,9 @@ function savePosts() {
                       if (!shopField || !nameField || !phoneField || !passField || !termsField) {
                           throw new Error("Required registration fields missing in DOM");
                       }
-
                       const shop = shopField.value.trim();
                       const name = nameField.value.trim();
                       
-                      // Convert and normalize phone and password numbers
                       let phone = phoneField.value.trim();
                       let pass = passField.value;
                       let confirm = confirmField ? confirmField.value : '';
@@ -6277,9 +6169,7 @@ function savePosts() {
                       pass = pass.replace(/[০-৯]/g, d => bMap[d] || d);
                       confirm = confirm.replace(/[০-৯]/g, d => bMap[d] || d);
                       
-                      // Standardize phone number using normalizePhone to 11 digits
                       phone = normalizePhone(phone);
-
                       const email = emailField ? emailField.value.trim() : '';
                       const addr = addrField ? addrField.value.trim() : '';
                       const refCode = refCodeField ? refCodeField.value.trim() : '';
@@ -6289,188 +6179,84 @@ function savePosts() {
                           showToast("শর্তাবলীতে রাজি হতে হবে!", "error");
                           return;
                       }
-
                       if(!shop || !name || !phone || !addr || !pass || !email) {
                           showToast("সবগুলো তথ্য সঠিকভাবে পূরণ করুন এবং অবশ্যই ইমেইল প্রদান করুন!", "error");
                           return;
                       }
-
                       if (phone.length !== 11 || !phone.startsWith('01')) {
                           showToast("অনুগ্রহ করে একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)!", "error");
                           return;
                       }
-
                       if(pass !== confirm) {
                           showToast("পাসওয়ার্ড ম্যাচ করেনি!", "error");
                           return;
                       }
-
                       if(pass.length < 6) {
                           showToast("পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে!", "error");
                           return;
                       }
 
-                      // Check for existing user with this phone number locally
-                      const normalizedInputPhone = normalizePhone(phone);
-                      let existingUser = appUsers.find(u => normalizePhone(u.phone) === normalizedInputPhone);
+                      // Create User in Supabase Auth FIRST
+                      const sb = window.getSupabase ? window.getSupabase() : window.supabase;
+                      if (!sb) {
+                           showToast("ডাটাবেস কানেকশন ত্রুটি! অনুগ্রহ করে পেজটি রিফ্রেশ করুন।", "error");
+                           return;
+                      }
                       
-                      // Check for existing user with this email address locally
-                      let existingEmail = appUsers.find(u => u.email && u.email.toLowerCase().trim() === email.toLowerCase().trim());
-                      
-                      // Fallback to Supabase check
-                      if (!existingUser && !existingEmail && window.supabase) {
-                          try {
-                              let p = phone;
-                              let p2 = p.startsWith('01') ? '+88' + p : p.replace('+88', '');
-                              let q = window.supabase.from('bexo_users').select('*').or(`phone.eq.${p},phone.eq.${p2}`);
-                              
-                              if (email) {
-                                  q = window.supabase.from('bexo_users').select('*').or(`phone.eq.${p},phone.eq.${p2},email.ilike.${email}`);
+                      const { data: authData, error: authErr } = await sb.auth.signUp({
+                          email: email,
+                          password: pass,
+                          phone: phone, // Assuming Supabase supports phone auth, otherwise we just map it.
+                          options: {
+                              data: {
+                                  full_name: name,
+                                  phone: phone,
                               }
-                              
-                              const { data: dbUsers, error } = await q.limit(1);
-                              if (!error && dbUsers && dbUsers.length > 0) {
-                                  const dbU = dbUsers[0];
-                                  if (normalizePhone(dbU.phone) === normalizedInputPhone) {
-                                      existingUser = dbU;
-                                  } else {
-                                      existingEmail = dbU;
-                                  }
-                              }
-                          } catch(e) {
-                              console.warn('Cloud check for duplicates failed', e);
                           }
-                      }
+                      });
 
-                      if (existingUser) {
-                          showToast("এই ফোন নম্বর দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
+                      if (authErr) {
+                          if (authErr.message.includes('already registered')) {
+                              showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
+                          } else {
+                              showToast("নিবন্ধন ব্যর্থ হয়েছে: " + authErr.message, "error", 6000);
+                          }
                           return;
                       }
 
-                      if (existingEmail) {
-                          showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
-                          return;
-                      }
-
-                      // Passive Income: Referral Logic
                       let referredBy = null;
                       if (refCode) {
                           const referrer = findReferrerByCode(refCode);
                           if (referrer) {
                               referredBy = referrer.profileId;
-                          } else {
-                              showToast("ভুল রেফারেল কোড! দয়া করে সঠিক কোড দিন অথবা ঘরটি খালি রাখুন।", "error");
-                              return;
                           }
                       }
 
                       const oldProfileId = userProfile ? userProfile.profileId : null;
+                      
+                      const newProfileId = 'BX-' + Math.floor(100000 + Math.random() * 900000);
 
-                      // Create Profile (Staged/Prepared)
                       const newProfile = {
                           ...DEFAULT_PROFILE,
+                          id: authData.user ? authData.user.id : null, // The critical link!
                           shopName: shop,
                           fullName: name,
                           phone: phone,
                           email: email,
                           address: addr,
-                          password: pass,
+                          password: pass, // Should not store plain text, but keeping it for legacy compat if needed. Better to omit.
                           referredBy: referredBy,
-                          profileId: 'BX-' + Math.floor(100000 + Math.random() * 900000),
+                          profileId: newProfileId,
                           joinDate: new Date().toLocaleDateString('bn-BD'),
                           createdAt: Date.now()
                       };
+                      
+                      // Also update profileId in auth metadata just in case
+                      if (authData.user) {
+                          await sb.auth.updateUser({ data: { profileId: newProfileId } });
+                      }
 
-                      // Define actual creation and database integration function
-                      const completeRegistration = (profile) => {
-                          // Migrate guest session resources to new registered profileId
-                          if (oldProfileId && oldProfileId !== profile.profileId) {
-                              // 1. Migrate appAccounts (Bank / wallet accounts)
-                              let migratedAccCount = 0;
-                              appAccounts.forEach(acc => {
-                                  if (acc.profileId === oldProfileId) {
-                                      acc.profileId = profile.profileId;
-                                      migratedAccCount++;
-                                  }
-                              });
-                              if (migratedAccCount > 0) saveAccounts();
-
-                              // 2. Migrate balance requests
-                              let migratedBalCount = 0;
-                              appBalanceRequests.forEach(req => {
-                                  if (req.profileId === oldProfileId) {
-                                      req.profileId = profile.profileId;
-                                      migratedBalCount++;
-                                  }
-                              });
-                              if (migratedBalCount > 0) saveBalanceRequests();
-
-                              // 3. Migrate withdrawals
-                              let migratedWdrCount = 0;
-                              appWithdrawals.forEach(w => {
-                                  if (w.profileId === oldProfileId) {
-                                      w.profileId = profile.profileId;
-                                      migratedWdrCount++;
-                                  }
-                              });
-                              if (migratedWdrCount > 0) saveWithdrawals();
-
-                              // 4. Migrate orders
-                              let migratedOrdCount = 0;
-                              appOrders.forEach(o => {
-                                  if (o.profileId === oldProfileId) {
-                                      o.profileId = profile.profileId;
-                                      migratedOrdCount++;
-                                  }
-                              });
-                              if (migratedOrdCount > 0) saveOrders();
-                          }
-
-                          // REFERRAL COMMISSION Logic
-                          if (referredBy) {
-                              const refs = JSON.parse(localStorage.getItem('bexo_referrals')) || [];
-                              refs.push({
-                                  referredBy: refCode,
-                                  name: shop,
-                                  commission: 50,
-                                  date: new Date().toLocaleString()
-                              });
-                              localStorage.setItem('bexo_referrals', JSON.stringify(refs));
-                              showToast("রেফারেল বোনাস ৫০ টাকা সফলভাবে যোগ হয়েছে।", "success");
-                          }
-
-                          // Update Global and Local State
-                          userProfile = profile;
-                          saveProfile();
-                          updateAppUsersList(userProfile);
-
-                          // Set login fields for visuals (optional but good for consistency)
-                          const loginPhone = document.getElementById('loginPhone');
-                          const loginPass = document.getElementById('loginPass');
-                          if(loginPhone) loginPhone.value = phone;
-                          if(loginPass) loginPass.value = pass;
-
-                          showToast("অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে তৈরি এবং ভেরিফাই হয়েছে।", "success");
-
-                          // Direct Login UI Switch
-                          const auth = document.getElementById('authSection');
-                          const dash = document.getElementById('dashboardSection');
-
-                          if(auth && dash) {
-                              auth.classList.add('hidden');
-                              dash.classList.remove('hidden');
-                              dash.classList.add('fade-in');
-                              var landing = document.getElementById('landingSection');
-                              if(landing) landing.classList.add('hidden');
-                              renderHome();
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }
-                      };
-
-                      // Trigger dual verification flow
-                      // Skip verification and complete registration immediately
                       completeRegistration(newProfile);
-
                   } catch (error) {
                       console.error("Registration Error:", error);
                       showToast("অ্যাকাউন্ট তৈরিতে সমস্যা হয়েছে! আবার চেষ্টা করুন।", "error");
@@ -10603,7 +10389,7 @@ function savePosts() {
                                       <div class="space-y-4">
                                           <h3 class="text-xs font-black text-slate-800 border-b border-slate-100 pb-4 uppercase tracking-widest">পণ্যের বিবরণ</h3>
                                           <div class="text-[12px] text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">${p.desc}${p.details || ''}</div>
-                                          <button onclick="copyToClipboard(\`${p.title}\\${p.desc}\\${p.details || ''}\`)" class="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-6 py-2 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all font-black text-[9px] uppercase tracking-widest mt-4">
+                                          <button onclick="copyToClipboard(this.getAttribute('data-copy-text'))" data-copy-text="${p.title}\n\n${p.desc}\n\n${p.details || ''}" class="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-6 py-2 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all font-black text-[9px] uppercase tracking-widest mt-4">
                                               <i class="fas fa-copy"></i> কপি করুন
                                           </button>
                                       </div>
