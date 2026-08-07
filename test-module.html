@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script type="module">
+    setTimeout(() => {
+      console.log("Module changing variable");
+      if (typeof userProfile !== 'undefined') {
+          userProfile = "Changed by module!";
+          console.log("userProfile inside module:", userProfile);
+      }
+    }, 100);
+  </script>
+</head>
+<body>
+  <script>
+    let userProfile = "Initial";
+    setTimeout(() => {
+        console.log("userProfile outside module:", userProfile);
+    }, 200);
+  </script>
+</body>
+</html>

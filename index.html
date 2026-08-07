@@ -901,8 +901,16 @@
                           const { data, error } = await client.from('bexo_users').select('*').eq('id', session.user.id).limit(1);
                           if (!error && data && data.length > 0) {
                               const dbUser = data[0];
-                              window.userProfile = { ...window.DEFAULT_PROFILE, ...dbUser, id: session.user.id };
-                              localStorage.setItem('bexo_profile', JSON.stringify(window.userProfile));
+                              const prevProfileStr = localStorage.getItem('bexo_profile');
+                              window.userProfile = { ...(window.DEFAULT_PROFILE || {}), ...dbUser, id: session.user.id };
+                              const newProfileStr = JSON.stringify(window.userProfile);
+                              
+                              if (prevProfileStr !== newProfileStr) {
+                                  localStorage.setItem('bexo_profile', newProfileStr);
+                                  if (event === 'INITIAL_SESSION') {
+                                      window.location.reload();
+                                  }
+                              }
                               
                               // Sync to appUsers
                               if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
@@ -912,9 +920,14 @@
                                   localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                               }
                           }
-                      } else if (event === 'SIGNED_OUT') {
+                      } else if (!session || event === 'SIGNED_OUT') {
                           window.userProfile = null;
-                          localStorage.removeItem('bexo_profile');
+                          if (localStorage.getItem('bexo_profile')) {
+                              localStorage.removeItem('bexo_profile');
+                              if (event === 'INITIAL_SESSION') {
+                                  window.location.reload();
+                              }
+                          }
                       }
                   });
 
@@ -4298,26 +4311,40 @@ function savePosts() {
                                                   if (!window.supabase) return;
                                                   try {
                                                       const payload = { ...data };
-                                                      if (payload.id === undefined) payload.id = String(docId);
-                                                      await window.supabase.from(collectionName).upsert(payload);
+                                                      if (collectionName === 'bexo_users') {
+                                                          if (payload.profileId === undefined) payload.profileId = String(docId);
+                                                          await window.supabase.from(collectionName).upsert(payload, { onConflict: 'profileId' });
+                                                      } else {
+                                                          if (payload.id === undefined) payload.id = String(docId);
+                                                          await window.supabase.from(collectionName).upsert(payload);
+                                                      }
                                                   } catch (e) { console.warn("Supabase set error:", e); }
                                               },
                                               update: async (data) => {
                                                   if (!window.supabase) return;
                                                   try {
-                                                      await window.supabase.from(collectionName).update(data).eq('id', String(docId));
+                                                      if (collectionName === 'bexo_users') {
+                                                          await window.supabase.from(collectionName).update(data).eq('profileId', String(docId));
+                                                      } else {
+                                                          await window.supabase.from(collectionName).update(data).eq('id', String(docId));
+                                                      }
                                                   } catch (e) { console.warn("Supabase update error:", e); }
                                               },
                                               delete: async () => {
                                                   if (!window.supabase) return;
                                                   try {
-                                                      await window.supabase.from(collectionName).delete().eq('id', String(docId));
+                                                      if (collectionName === 'bexo_users') {
+                                                          await window.supabase.from(collectionName).delete().eq('profileId', String(docId));
+                                                      } else {
+                                                          await window.supabase.from(collectionName).delete().eq('id', String(docId));
+                                                      }
                                                   } catch (e) { console.warn("Supabase delete error:", e); }
                                               },
                                               get: async () => {
                                                   if (!window.supabase) return { exists: false, data: () => null, id: docId };
                                                   try {
-                                                      const { data, error } = await window.supabase.from(collectionName).select('*').eq('id', String(docId)).maybeSingle();
+                                                      const field = collectionName === 'bexo_users' ? 'profileId' : 'id';
+                                                      const { data, error } = await window.supabase.from(collectionName).select('*').eq(field, String(docId)).maybeSingle();
                                                       if (error || !data) return { exists: false, data: () => null, id: docId };
                                                       return { exists: true, data: () => data, id: docId };
                                                   } catch (e) {
@@ -6260,6 +6287,57 @@ function savePosts() {
                   } catch (error) {
                       console.error("Registration Error:", error);
                       showToast("অ্যাকাউন্ট তৈরিতে সমস্যা হয়েছে! আবার চেষ্টা করুন।", "error");
+                  }
+              }
+
+              
+              async function completeRegistration(newProfile) {
+                  try {
+                      if (!window.supabase) {
+                          showToast("সিস্টেম এরর: ডাটাবেস সংযোগ নেই।", "error");
+                          return;
+                      }
+                      
+                      const { error } = await window.supabase.from('bexo_users').insert([{
+                          id: newProfile.id,
+                          profileId: newProfile.profileId,
+                          email: newProfile.email,
+                          phone: newProfile.phone,
+                          "fullName": newProfile.fullName,
+                          password: newProfile.password,
+                          created_at: newProfile.createdAt ? new Date(newProfile.createdAt).toISOString() : new Date().toISOString()
+                      }]);
+                      
+                      if (error) {
+                          console.error("Supabase insert error:", error);
+                          showToast("প্রোফাইল সেভ করতে সমস্যা হয়েছে।", "error");
+                          return;
+                      }
+
+                      // Local state update
+                      userProfile = newProfile;
+                      if (typeof appUsers !== 'undefined') appUsers.push(userProfile);
+                      if (typeof saveProfile === 'function') saveProfile();
+                      if (typeof saveUsers === 'function') saveUsers(userProfile.profileId);
+                      
+                      showToast('অ্যাকাউন্ট তৈরি সফল হয়েছে!', 'success');
+                      
+                      const authSection = document.getElementById('authSection');
+                      const dashboardSection = document.getElementById('dashboardSection');
+                      const landingSection = document.getElementById('landingSection');
+                      if (landingSection) landingSection.classList.add('hidden');
+                      if (authSection) authSection.classList.add('hidden');
+                      if (dashboardSection) {
+                          dashboardSection.classList.remove('hidden');
+                          dashboardSection.classList.add('fade-in');
+                      }
+                      
+                      if (typeof renderHome === 'function') renderHome();
+                      if (typeof updateHeaderUI === 'function') updateHeaderUI();
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                  } catch (err) {
+                      console.error("Registration finalization error:", err);
+                      showToast("অ্যাকাউন্ট তৈরি সফল হয়েছে, কিন্তু লগইন করতে সমস্যা হচ্ছে।", "warning");
                   }
               }
 
