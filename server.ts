@@ -7,8 +7,6 @@ import testConnection from "./api/test-connection.ts";
 import importProducts from "./api/import-products.ts";
 import publishProducts from "./api/publish-products.ts";
 import saveSettings from "./api/save-settings.ts";
-import sendOtp from "./api/auth/send-otp.ts";
-import verifyOtp from "./api/auth/verify-otp.ts";
 
 async function startServer() {
   const app = express();
@@ -21,8 +19,6 @@ async function startServer() {
   app.all("/api/import-products", async (req, res) => await importProducts(req, res));
   app.all("/api/publish-products", async (req, res) => await publishProducts(req, res));
   app.all("/api/save-settings", async (req, res) => await saveSettings(req, res));
-  app.all("/api/auth/send-otp", async (req, res) => await sendOtp(req, res));
-  app.all("/api/auth/verify-otp", async (req, res) => await verifyOtp(req, res));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
