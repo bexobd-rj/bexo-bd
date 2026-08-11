@@ -1,11 +1,22 @@
 const fs = require('fs');
 let html = fs.readFileSync('index.html', 'utf8');
-const lines = html.split('\n');
 
-if (lines[13382].trim() === '}') {
-    lines.splice(13382, 1);
-    fs.writeFileSync('index.html', lines.join('\n'));
-    console.log('Fixed syntax error');
-} else {
-    console.log('Line 13383 is not } - it is ', lines[13382]);
-}
+// I will just replace the specific broken part.
+const broken = `                      if (loginBtn) {
+                          loginBtn.disabled = false;
+                          loginBtn.innerHTML = 'লগইন করুন <i class="fas fa-arrow-right"></i>';
+                      }
+                  }
+              });
+              }`;
+
+const fixed = `                      if (loginBtn) {
+                          loginBtn.disabled = false;
+                          loginBtn.innerHTML = 'লগইন করুন <i class="fas fa-arrow-right"></i>';
+                      }
+                  }
+              }`;
+
+html = html.replace(broken, fixed);
+fs.writeFileSync('index.html', html);
+console.log("Fixed syntax error");
