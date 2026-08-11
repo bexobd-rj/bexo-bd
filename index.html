@@ -45,57 +45,8 @@
     </script>
     
     <!-- Firebase SDK Compat with Sequential, Fail-Safe Loader -->
-    <script>
-      (function() {
-        const urlAppGstatic = "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js";
-        const urlAppCloudflare = "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-app-compat.min.js";
-        const urlAuthGstatic = "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js";
-        const urlAuthCloudflare = "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-auth-compat.min.js";
-        const urlFirestoreGstatic = "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js";
-        const urlFirestoreCloudflare = "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.0/firebase-firestore-compat.min.js";
-
-        function injectScript(primarySrc, fallbackSrc, callback) {
-          const script = document.createElement('script');
-          script.src = primarySrc;
-          script.crossOrigin = "anonymous";
-          
-          script.onload = function() {
-            console.log("[Firebase Sequence Loader] Loaded successfully: " + primarySrc);
-            if (callback) callback();
-          };
-          
-          script.onerror = function() {
-            console.warn("[Firebase Sequence Loader] Failed to load primary: " + primarySrc + ". Trying fallback...");
-            const fallbackScript = document.createElement('script');
-            fallbackScript.src = fallbackSrc;
-            fallbackScript.crossOrigin = "anonymous";
-            fallbackScript.onload = function() {
-              console.log("[Firebase Sequence Loader] Fallback loaded successfully: " + fallbackSrc);
-              if (callback) callback();
-            };
-            fallbackScript.onerror = function() {
-              console.error("[Firebase Sequence Loader] CRITICAL: Fallback also failed: " + fallbackSrc);
-              if (callback) callback();
-            };
-            document.head.appendChild(fallbackScript);
-          };
-          
-          document.head.appendChild(script);
-        }
-
-        // Start sequential script loading
-        injectScript(urlAppGstatic, urlAppCloudflare, function() {
-          injectScript(urlAuthGstatic, urlAuthCloudflare, function() {
-            injectScript(urlFirestoreGstatic, urlFirestoreCloudflare, function() {
-              console.log("[Firebase Sequence Loader] All Firebase SDK scripts loaded synchronously in correct order!");
-              if (typeof window.initializeFirebaseIfReady === 'function') {
-                window.initializeFirebaseIfReady();
-              }
-            });
-          });
-        });
-      })();
-    </script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- Visual Search Utility -->
     <script>
@@ -1170,7 +1121,7 @@
               <span class="text-xl font-bold tracking-tight text-slate-800 leading-none"
                 >Bexo BD</span
               >
-              <div id="firebaseConnectionStatusBadge" class="flex items-center gap-1 text-[8px] font-bold text-rose-500 tracking-wider uppercase mt-1">
+              <div id="supabaseConnectionStatusBadge" class="flex items-center gap-1 text-[8px] font-bold text-rose-500 tracking-wider uppercase mt-1">
                 <span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Offline
               </div>
             </div>
@@ -1844,7 +1795,7 @@
             <h2 class="text-xl font-black tracking-tighter">
               BEXO <span class="text-orange-500">ADMIN</span>
             </h2>
-            <div id="adminFirebaseConnectionStatusBadge" class="flex items-center gap-1 text-[8px] font-bold text-rose-500 tracking-wider uppercase mt-1">
+            <div id="adminSupabaseConnectionStatusBadge" class="flex items-center gap-1 text-[8px] font-bold text-rose-500 tracking-wider uppercase mt-1">
               <span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Offline
             </div>
           </div>
@@ -2340,16 +2291,16 @@
 
               function saveOrders(orderIdToSync = null) {
                   localStorage.setItem('bexo_orders', JSON.stringify(appOrders));
-                  if (window.db) {
+                  if (window.supabaseClient) {
                       if (orderIdToSync) {
                           const o = appOrders.find(item => String(item.id) === String(orderIdToSync));
                           if (o) {
-                              window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
+                              window.supabaseClient.from('bexo_orders').upsert({ id: String(o.id), ...(sanitizeForFirestore(o) }))
                                   .catch(err => console.error("Firebase sync specific order error:", err));
                           }
                       } else {
                           appOrders.forEach(o => {
-                              window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
+                              window.supabaseClient.from('bexo_orders').upsert({ id: String(o.id), ...(sanitizeForFirestore(o) }))
                                   .catch(err => console.error("Firebase sync order error:", err));
                           });
                       }
@@ -2428,14 +2379,14 @@
 
               function saveUsers(userIdToSync = null, skipFirestore = false) {
                   localStorage.setItem('bexo_users', JSON.stringify(appUsers));
-                  if (window.db && !skipFirestore) {
+                  if (window.supabaseClient && !skipFirestore) {
                       if (userIdToSync) {
                           const idsToSync = Array.isArray(userIdToSync) ? userIdToSync : [userIdToSync];
                           idsToSync.forEach(id => {
                               const target = appUsers.find(u => String(u.profileId) === String(id));
                               if (target && target.profileId) {
                                   const docId = target.uid ? String(target.uid) : String(target.profileId);
-                                  window.db.collection('bexo_users').doc(docId).set(sanitizeForFirestore(target))
+                                  window.supabaseClient.from('bexo_users').upsert({ id: docId, ...(sanitizeForFirestore(target) }))
                                       .catch(err => console.error("Firebase sync specific user error:", err));
                               }
                           });
@@ -2444,7 +2395,7 @@
                               appUsers.forEach(u => {
                                   if (u && u.profileId) {
                                       const docId = u.uid ? String(u.uid) : String(u.profileId);
-                                      window.db.collection('bexo_users').doc(docId).set(sanitizeForFirestore(u))
+                                      window.supabaseClient.from('bexo_users').upsert({ id: docId, ...(sanitizeForFirestore(u) }))
                                           .catch(err => console.error("Firebase sync user error:", err));
                                   }
                               });
@@ -2452,7 +2403,7 @@
                               const target = appUsers.find(u => String(u.profileId) === String(userProfile.profileId));
                               if (target && target.profileId) {
                                   const docId = target.uid ? String(target.uid) : String(target.profileId);
-                                  window.db.collection('bexo_users').doc(docId).set(sanitizeForFirestore(target))
+                                  window.supabaseClient.from('bexo_users').upsert({ id: docId, ...(sanitizeForFirestore(target) }))
                                       .catch(err => console.error("Firebase regular user sync error:", err));
                               }
                            }
@@ -2463,10 +2414,10 @@
 
               function saveAccounts() {
                   localStorage.setItem('bexo_accounts', JSON.stringify(appAccounts));
-                  if (window.db) {
+                  if (window.supabaseClient) {
                       appAccounts.forEach(a => {
                           if (a && a.id) {
-                              window.db.collection('bexo_accounts').doc(String(a.id)).set(sanitizeForFirestore(a))
+                              window.supabaseClient.from('bexo_accounts').upsert({ id: String(a.id), ...(sanitizeForFirestore(a) }))
                                   .catch(err => console.error("Firebase sync accounts error:", err));
                           }
                       });
@@ -2477,10 +2428,10 @@
 
               function saveProfilePayments() {
                   localStorage.setItem('bexo_profile_payments', JSON.stringify(appProfilePayments));
-                  if (window.db) {
+                  if (window.supabaseClient) {
                       appProfilePayments.forEach(p => {
                           if (p && p.id) {
-                              window.db.collection('bexo_profile_payments').doc(String(p.id)).set(sanitizeForFirestore(p))
+                              window.supabaseClient.from('bexo_profile_payments').upsert({ id: String(p.id), ...(sanitizeForFirestore(p) }))
                                   .catch(err => console.error("Firebase sync profile payments error:", err));
                           }
                       });
@@ -2500,10 +2451,10 @@
 
               function saveWithdrawals() {
                   localStorage.setItem('bexo_withdrawals', JSON.stringify(appWithdrawals));
-                  if (window.db) {
+                  if (window.supabaseClient) {
                       appWithdrawals.forEach(w => {
                           if (w && w.id) {
-                              window.db.collection('bexo_withdrawals').doc(String(w.id)).set(sanitizeForFirestore(w))
+                              window.supabaseClient.from('bexo_withdrawals').upsert({ id: String(w.id), ...(sanitizeForFirestore(w) }))
                                   .catch(err => console.error("Firebase sync withdrawal error:", err));
                           }
                       });
@@ -2514,10 +2465,10 @@
 
               function saveSupportTickets() {
                   localStorage.setItem('bexo_support_tickets', JSON.stringify(appSupportTickets));
-                  if (window.db) {
+                  if (window.supabaseClient) {
                       appSupportTickets.forEach(t => {
                           if (t && t.id) {
-                              window.db.collection('bexo_support_tickets').doc(String(t.id)).set(sanitizeForFirestore(t))
+                              window.supabaseClient.from('bexo_support_tickets').upsert({ id: String(t.id), ...(sanitizeForFirestore(t) }))
                                   .catch(err => console.error("Firebase sync support tickets error:", err));
                           }
                       });
@@ -2525,7 +2476,7 @@
               }
 
               async function processPendingSyncs() {
-                  if (!window.db) return;
+                  if (!window.supabaseClient) return;
                   try {
                       let pending = JSON.parse(localStorage.getItem('bexo_pending_user_syncs') || '[]');
                       if (pending.length === 0) return;
@@ -2535,7 +2486,7 @@
                           const u = appUsers.find(user => user.profileId === id);
                           if (u && u.phone && u.password) {
                               try {
-                                  await window.db.collection('bexo_users').doc(String(id)).set(sanitizeForFirestore(u));
+                                  await window.supabaseClient.from('bexo_users').upsert({ id: String(id), ...(sanitizeForFirestore(u) }));
                                   console.log(`[Firebase Sync Applet] Successfully synced pending user: ${id}`);
                               } catch (err) {
                                   console.error(`[Firebase Sync Applet] Failed to sync pending user ${id}:`, err);
@@ -2568,10 +2519,10 @@
                           }
                           
                           // Delete from Firestore
-                          if (window.db) {
+                          if (window.supabaseClient) {
                               settlements.forEach(t => {
                                   if (t.id) {
-                                      window.db.collection('bexo_transactions').doc(String(t.id)).delete()
+                                      window.supabaseClient.from('bexo_transactions').delete().eq('id', String(t.id))
                                           .catch(err => console.error(`[Clean Sweep] Error deleting database transaction doc ${t.id}:`, err));
                                   }
                               });
@@ -2588,8 +2539,8 @@
                               delete o.settledProfitValue;
                               resetOccurred = true;
 
-                              if (window.db) {
-                                  window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
+                              if (window.supabaseClient) {
+                                  window.supabaseClient.from('bexo_orders').upsert({ id: String(o.id), ...(sanitizeForFirestore(o) }))
                                       .catch(err => console.error(`[Clean Sweep] Failed resetting firestore order doc ${o.id}:`, err));
                               }
                           }
@@ -2675,8 +2626,8 @@
 
               function saveAppSettings() {
                   localStorage.setItem('bexo_settings', JSON.stringify(appSettings));
-                  if (window.db) {
-                      window.db.collection('bexo_settings').doc('global').set(appSettings)
+                  if (window.supabaseClient) {
+                      window.supabaseClient.from('bexo_settings').upsert({ id: 'global', ...(appSettings) })
                           .catch(err => console.error("Firebase sync settings error:", err));
                   }
               }
@@ -2757,8 +2708,8 @@ window.deductProductStock = function(items) {
                 product.stockStatus = 'in_stock';
             }
             updated = true;
-            if (window.db) {
-                window.db.collection('bexo_posts').doc(String(product.id)).set(sanitizeForFirestore(product))
+            if (window.supabaseClient) {
+                window.supabaseClient.from('bexo_posts').upsert({ id: String(product.id), ...(sanitizeForFirestore(product) }))
                     .catch(err => console.error("Firebase update stock error:", err));
             }
         }
@@ -2778,195 +2729,90 @@ function savePosts() {
               }
 
               // Initialize Firebase inside index.html for real-time cloud sync of users and products
-              const firebaseConfig = {
-                  projectId: "gen-lang-client-0517262341",
-                  appId: "1:122942813238:web:80790eae2ed43eba58d497",
-                  apiKey: "AIzaSyAOntVjvoUS2pqoDHjFPmCROwfOTIYPhto",
-                  authDomain: "gen-lang-client-0517262341.firebaseapp.com",
-                  firestoreDatabaseId: "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878",
-                  storageBucket: "gen-lang-client-0517262341.firebasestorage.app",
-                  messagingSenderId: "122942813238"
-              };
               
-              window.db = null;
-              var isFirebaseInitInProgress = false;
-              var firebaseInitAttempts = 0;
+const supabaseUrl = 'https://ksjdusqylhrorizlhkoa.supabase.co';
+const supabaseKey = 'sb_publishable_V_bC1gNPj9EOB-8WZdbtrw_pCODlDzu';
+window.supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-              function queueUserForSync(profileId) {
-                  try {
-                      let pending = JSON.parse(localStorage.getItem('bexo_pending_user_syncs') || '[]');
-                      if (!pending.includes(profileId)) {
-                          pending.push(profileId);
-                          localStorage.setItem('bexo_pending_user_syncs', JSON.stringify(pending));
-                      }
-                  } catch(e) {
-                      console.error("Queue user sync error:", e);
-                  }
-              }
+async function signInWithEmailAndPassword(auth, email, password) {
+    const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return { user: data.user };
+}
 
-              function updateFirebaseConnectionBadges(isLive, errMsg = null) {
-                  const badgeIds = ['firebaseConnectionStatusBadge', 'adminFirebaseConnectionStatusBadge'];
-                  badgeIds.forEach(id => {
-                      const el = document.getElementById(id);
-                      if (el) {
-                          if (isLive && !errMsg) {
-                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-emerald-500 rounded-full "></span> Cloud Live';
-                              el.className = "flex items-center gap-1 text-[8px] font-bold text-emerald-500 tracking-wider uppercase mt-1 cursor-pointer";
-                              el.title = "ক্লাউড ডাটাবেজ সফলভাবে সংযুক্ত আছে";
-                          } else if (errMsg) {
-                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-amber-500 rounded-full "></span> Sync Error';
-                              el.className = "flex items-center gap-1 text-[8px] font-bold text-amber-500 tracking-wider uppercase mt-1 cursor-pointer";
-                              el.title = "সিঙ্ক ত্রুটি: " + errMsg;
-                          } else {
-                              el.innerHTML = '<span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Connection Offline';
-                              el.className = "flex items-center gap-1 text-[8px] font-bold text-rose-500 tracking-wider uppercase mt-1 cursor-pointer";
-                              el.title = "ইন্টারনেট বা ক্লাউড সংযোগ বিচ্ছিন্ন";
-                          }
-                      }
-                  });
-              }
+async function createUserWithEmailAndPassword(auth, email, password) {
+    const { data, error } = await window.supabaseClient.auth.signUp({ email, password });
+    if (error) throw error;
+    return { user: data.user };
+}
 
-              window.firebaseErrors = [];
-              
-              const OperationType = {
-                  CREATE: 'create',
-                  UPDATE: 'update',
-                  DELETE: 'delete',
-                  LIST: 'list',
-                  GET: 'get',
-                  WRITE: 'write',
-              };
+async function signOut(auth) {
+    await window.supabaseClient.auth.signOut();
+}
 
-              function handleFirestoreError(error, operationType, path) {
-                  const msg = error instanceof Error ? error.message : String(error);
-                  const lowerMsg = msg.toLowerCase();
-                  const isPermissionErr = lowerMsg.includes('permission') || lowerMsg.includes('denied') || lowerMsg.includes('unauthorized') || lowerMsg.includes('insufficient');
-                  
-                  const errInfo = {
-                      error: msg,
-                      operationType: operationType,
-                      path: path,
-                      authInfo: {
-                          userId: null,
-                          email: null,
-                          emailVerified: false,
-                          isAnonymous: false,
-                          tenantId: null,
-                          providerInfo: []
-                      }
-                  };
-                  console.error('Firestore Error: ', JSON.stringify(errInfo));
-                  
-                  // Throw only if it's a security rule or permissions failure, per Firebase compliance rules.
-                  // Connection issues / offline errors are normal and shouldn't crash the asynchronous listeners.
-                  if (isPermissionErr) {
-                      throw new Error(JSON.stringify(errInfo));
-                  }
-              }
+async function sendPasswordResetEmail(auth, email) {
+    const { error } = await window.supabaseClient.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+}
 
-              function logFirebaseError(context, err) {
-                  const msg = err && err.message ? err.message : String(err);
-                  console.error(`[Firebase ${context} Error]`, err);
-                  if (!window.firebaseErrors) window.firebaseErrors = [];
-                  if (window.firebaseErrors.length > 0 && window.firebaseErrors[0].context === context && window.firebaseErrors[0].message === msg) {
-                      return;
-                  }
-                  window.firebaseErrors.unshift({
-                      time: new Date().toLocaleTimeString(),
-                      context: context,
-                      message: msg
-                  });
-                  if (window.firebaseErrors.length > 25) window.firebaseErrors.pop();
-                  
-                  const el = document.getElementById('firebaseDiagnosticsLogs');
-                  if (el) {
-                      el.innerHTML = renderDiagnosticLogs();
-                  }
-              }
 
-              function renderDiagnosticLogs() {
-                  if (!window.firebaseErrors || window.firebaseErrors.length === 0) {
-                      return `<div class="text-slate-400 text-xs italic text-center py-4">কোন ত্রুটি বা লগ নেই (সিস্টেম সফলভাবে ক্লাউডের সাথে সংযুক্ত আছে)</div>`;
-                  }
-                  return window.firebaseErrors.map(log => `
-                      <div class="p-3 bg-rose-50 border border-rose-100 rounded-2xl text-[11px] font-mono space-y-1">
-                          <div class="flex justify-between items-center text-[9px] text-rose-500 font-bold">
-                              <span>[${log.context}]</span>
-                              <span>${log.time}</span>
-                          </div>
-                          <p class="text-rose-700 font-semibold leading-relaxed break-words">${log.message}</p>
-                      </div>
-                  `).join('');
-              }
+function subscribeSupabaseCollection(table, callback) {
+    const fetchAll = async () => {
+        const { data } = await window.supabaseClient.from(table).select('*');
+        if (data) callback(data);
+    };
+    fetchAll();
+    window.supabaseClient.channel('channel_' + table).on('postgres_changes', { event: '*', schema: 'public', table: table }, () => {
+        fetchAll();
+    }).subscribe();
+    return () => { window.supabaseClient.removeAllChannels(); }; // simple unsubscribe
+}
 
-              async function initializeFirebaseIfReady() {
-                  if (window.db) {
-                      updateFirebaseConnectionBadges(true);
-                      return true;
-                  }
-                  if (isFirebaseInitInProgress) return false;
-                  isFirebaseInitInProgress = true;
-                  updateFirebaseConnectionBadges(false);
-                  
-                  try {
-                      console.log("[Firebase Applet] Starting dynamic import loader for modern modular SDK...");
-                      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
-                      const { 
-                          initializeFirestore, 
-                          collection, 
-                          doc, 
-                          setDoc, 
-                          deleteDoc,
-                          updateDoc, 
-                          getDocs, 
-                          getDoc,
-                          onSnapshot,
-                          query,
-                          orderBy,
-                          limit,
-                          runTransaction
-                      } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+function subscribeSupabaseDoc(table, id, callback) {
+    const fetchDoc = async () => {
+        const { data } = await window.supabaseClient.from(table).select('*').eq('id', id).maybeSingle();
+        callback(data);
+    };
+    fetchDoc();
+    window.supabaseClient.channel('channel_' + table + '_' + id).on('postgres_changes', { event: '*', schema: 'public', table: table, filter: 'id=eq.'+id }, () => {
+        fetchDoc();
+    }).subscribe();
+    return () => { window.supabaseClient.removeAllChannels(); };
+}
 
-                      const {
-                          getAuth,
-                          GoogleAuthProvider,
-                          signInWithPopup,
-                          signOut,
-                          createUserWithEmailAndPassword,
-                          signInWithEmailAndPassword,
-                          sendPasswordResetEmail,
-                          onAuthStateChanged
-                      } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
 
-                      let app = initializeApp(firebaseConfig);
-                      const rawDb = initializeFirestore(app, {
-                          experimentalForceLongPolling: true,
-                          useFetchStreams: false
-                      }, "ai-studio-849e4512-323e-4cb4-b68a-951d9ae13878");
-                      console.log("[Firebase Applet] Connected directly to custom named database via modular SDK with long polling enabled!");
+window.fakeTransaction = {
+    get: async (ref) => {
+        if (!ref || !ref.table) return null;
+        const { data } = await window.supabaseClient.from(ref.table).select('*').eq('id', ref.id).maybeSingle();
+        // Return something that mimics the snapshot
+        if (data) return { exists: true, data: () => data, id: data.id };
+        return null; // or { exists: false }
+    },
+    set: async (ref, data) => {
+        await window.supabaseClient.from(ref.table).upsert({ id: ref.id, ...data });
+    },
+    update: async (ref, data) => {
+        await window.supabaseClient.from(ref.table).update(data).eq('id', ref.id);
+    }
+};
 
-                      // Initialize Auth globals
-                      window.firebaseAuth = getAuth(app);
-                      window.GoogleAuthProvider = GoogleAuthProvider;
-                      window.signInWithPopup = signInWithPopup;
-                      window.signOut = signOut;
-                      window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
-                      window.signInWithEmailAndPassword = signInWithEmailAndPassword;
-                      window.sendPasswordResetEmail = sendPasswordResetEmail;
-                      window.onAuthStateChanged = onAuthStateChanged;
+window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    const user = session ? session.user : null;
+    await handleSupabaseAuthStateChange(user);
+});
 
-                      // Source of Truth: Listen to Firebase Auth State
-                      onAuthStateChanged(window.firebaseAuth, async (user) => {
+
+                      // Source of Truth: Listen to Supabase Auth State
+                      async function handleSupabaseAuthStateChange(user) {
                           if (user) {
                               try {
-                                  const docRef = window.db.collection('bexo_users').doc(user.uid);
-                                  const snap = await docRef.get();
-                                  if (snap.exists) {
-                                      const data = snap.data();
+                                  const { data } = await window.supabaseClient.from('bexo_users').select('*').eq('id', user.id).maybeSingle();
+                                  if (data) {
                                       
                                       // Check if user is banned
                                       if (data.isBanned === true) {
-                                          window.signOut(window.firebaseAuth);
+                                          window.signOut(window.supabaseClient);
                                           showToast("আপনার অ্যাকাউন্টটি প্রশাসনিক কারণে স্থগিত (Banned) করা হয়েছে।", "error");
                                           userProfile = null;
                                           localStorage.removeItem('bexo_profile');
@@ -2999,7 +2845,7 @@ function savePosts() {
                                       updateHeaderBalance();
                                   } else {
                                       // User exists in auth but no profile in Firestore? Log them out.
-                                      window.signOut(window.firebaseAuth);
+                                      window.signOut(window.supabaseClient);
                                       userProfile = null;
                                       localStorage.removeItem('bexo_profile');
                                   }
@@ -3024,117 +2870,8 @@ function savePosts() {
                                   }
                               }
                           }
-                      });
-
-                      // Expose fully compliant compat wrapper on window.db supporting queries/get constraints
-                      window.db = {
-                          runTransaction: (updateFunction) => {
-                              return runTransaction(rawDb, (transaction) => {
-                                  const compatTransaction = {
-                                      get: async (docRefCompat) => {
-                                          const snapshot = await transaction.get(docRefCompat._rawDocRef);
-                                          return {
-                                              exists: snapshot.exists(),
-                                              data: () => snapshot.data(),
-                                              id: snapshot.id
-                                          };
-                                      },
-                                      set: (docRefCompat, data) => {
-                                          transaction.set(docRefCompat._rawDocRef, data);
-                                          return compatTransaction;
-                                      },
-                                      update: (docRefCompat, data) => {
-                                          transaction.update(docRefCompat._rawDocRef, data);
-                                          return compatTransaction;
-                                      },
-                                      delete: (docRefCompat) => {
-                                          transaction.delete(docRefCompat._rawDocRef);
-                                          return compatTransaction;
-                                      }
-                                  };
-                                  return updateFunction(compatTransaction);
-                              });
-                          },
-                          collection: (collectionName) => {
-                              const colRef = collection(rawDb, collectionName);
-                              
-                              const makeQuery = (constraints) => {
-                                  return {
-                                      doc: (docId) => {
-                                          const docRef = doc(rawDb, collectionName, String(docId));
-                                          return {
-                                              _rawDocRef: docRef,
-                                              set: (data) => setDoc(docRef, data),
-                                              update: (data) => updateDoc(docRef, data),
-                                              delete: () => deleteDoc(docRef),
-                                              get: async () => {
-                                                  const snapshot = await getDoc(docRef);
-                                                  return {
-                                                      exists: snapshot.exists(),
-                                                      data: () => snapshot.data(),
-                                                      id: snapshot.id
-                                                  };
-                                              },
-                                              onSnapshot: (onNext, onError) => {
-                                                  return onSnapshot(docRef, (snapshot) => {
-                                                      onNext({
-                                                          exists: snapshot.exists(),
-                                                          data: () => snapshot.data(),
-                                                          id: snapshot.id
-                                                      });
-                                                  }, onError || (err => console.error("Doc onSnapshot error:", err)));
-                                              }
-                                          };
-                                      },
-                                      orderBy: (field, direction = "asc") => {
-                                          return makeQuery([...constraints, orderBy(field, direction)]);
-                                      },
-                                      limit: (num) => {
-                                          return makeQuery([...constraints, limit(num)]);
-                                      },
-                                      onSnapshot: (onNext, onError) => {
-                                          const q = constraints.length > 0 ? query(colRef, ...constraints) : colRef;
-                                          return onSnapshot(q, (querySnapshot) => {
-                                              const docs = [];
-                                              querySnapshot.forEach((docSnap) => {
-                                                  docs.push({
-                                                      exists: docSnap.exists(),
-                                                      data: () => docSnap.data(),
-                                                      id: docSnap.id
-                                                  });
-                                              });
-                                              onNext({
-                                                  forEach: (callback) => docs.forEach(callback),
-                                                  docs: docs,
-                                                  empty: docs.length === 0
-                                              });
-                                          }, onError || (err => console.error("Col onSnapshot error:", err)));
-                                      },
-                                      get: async () => {
-                                          const q = constraints.length > 0 ? query(colRef, ...constraints) : colRef;
-                                          const querySnapshot = await getDocs(q);
-                                          const docs = [];
-                                          querySnapshot.forEach((docSnap) => {
-                                              docs.push({
-                                                  exists: docSnap.exists(),
-                                                  data: () => docSnap.data(),
-                                                  id: docSnap.id
-                                              });
-                                          });
-                                          return {
-                                              forEach: (callback) => docs.forEach(callback),
-                                              docs: docs,
-                                              empty: docs.length === 0
-                                          };
-                                      }
-                                  };
-                              };
-
-                              return makeQuery([]);
-                          }
-                      };
-
-                      updateFirebaseConnectionBadges(true);
+                      }
+updateSupabaseConnectionBadges(true);
                       setupFirebaseRealtimeListeners();
                       processPendingSyncs();
                       executeStartupSettlementCleanSweep();
@@ -3148,7 +2885,7 @@ function savePosts() {
                       console.error("Firebase modular SDK init failed inside index.html:", e);
                       logFirebaseError("Modular SDK Init Failed", e);
                       isFirebaseInitInProgress = false;
-                      updateFirebaseConnectionBadges(false);
+                      updateSupabaseConnectionBadges(false);
                       
                       firebaseInitAttempts++;
                       if (firebaseInitAttempts < 30) {
@@ -3164,21 +2901,21 @@ function savePosts() {
               initializeFirebaseIfReady();
 
               function setupFirebaseRealtimeListeners() {
-                  if (!window.db) return;
+                  if (!window.supabaseClient) return;
                   
                   // Realtime posts/products sync
-                  window.db.collection('bexo_posts').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_posts', snap => {
                       if (!snap) return;
                       const firebasePosts = [];
                       snap.forEach(doc => {
-                          let data = doc.data();
+                          let data = doc;
                           // Auto-fix corrupted images arrays (caused by split(''))
                           if (data.images && data.images.length > 1 && 
                               ((data.images[0] === 'h' && data.images[1] === 't') || (data.images[0] === 'd' && data.images[1] === 'a' && data.images[2] === 't' && data.images[3] === 'a'))
                           ) {
                               data.images = [data.images.join('')];
                               // Auto-correct in db silently
-                              window.db.collection('bexo_posts').doc(String(doc.id)).update({ images: data.images }).catch(()=>{});
+                              window.supabaseClient.from('bexo_posts').update({ images: data.images }).eq('id', String(doc.id)).catch(()=>{});
                           }
                           // Normalize stock status for real-time consistency across all clients
                           const numStock = (data.stockCount !== undefined && data.stockCount !== null) ? Number(data.stockCount) : ((data.stock !== undefined && data.stock !== null) ? Number(data.stock) : 0);
@@ -3211,23 +2948,23 @@ function savePosts() {
                       } else if (appPosts.length > 0) {
                           // Seed empty Firebase with existing local products
                           appPosts.forEach(p => {
-                              window.db.collection('bexo_posts').doc(String(p.id)).set(sanitizeForFirestore(p))
+                              window.supabaseClient.from('bexo_posts').upsert({ id: String(p.id), ...(sanitizeForFirestore(p) }))
                                   .catch(err => console.error("Auto-seed product error:", err));
                           });
                       }
                   }, err => {
                       console.error("Firebase posts snapshot subscription error:", err);
                       logFirebaseError("bexo_posts onSnapshot", err);
-                      updateFirebaseConnectionBadges(false, "Posts Sync Error: " + err.message);
+                      updateSupabaseConnectionBadges(false, "Posts Sync Error: " + err.message);
                       handleFirestoreError(err, OperationType.LIST, "bexo_posts");
                   });
 
                   // Realtime users list sync with fallback merging to prevent race condition data loss on offline/slow registrations
-                  window.db.collection('bexo_users').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_users', snap => {
                       if (!snap) return;
                       const firebaseUsers = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) {
                               firebaseUsers.push(data);
                           }
@@ -3303,7 +3040,7 @@ function savePosts() {
                                   const existsInFirestore = firebaseUsers.some(f => f.profileId === u.profileId);
                                   if (!existsInFirestore) {
                                       console.log(`[Firebase Sync] Uploading missing local user: ${u.profileId} (${u.fullName})`);
-                                      window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u))
+                                      window.supabaseClient.from('bexo_users').upsert({ id: String(u.profileId), ...(sanitizeForFirestore(u) }))
                                           .catch(err => console.error("Firebase auto sync-back user error:", err));
                                   }
                               }
@@ -3311,23 +3048,23 @@ function savePosts() {
                       } else if (appUsers.length > 0) {
                           // Seed empty Firebase with existing local users
                           appUsers.forEach(u => {
-                              window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u))
+                              window.supabaseClient.from('bexo_users').upsert({ id: String(u.profileId), ...(sanitizeForFirestore(u) }))
                                   .catch(err => console.error("Auto-seed user error:", err));
                           });
                       }
                   }, err => {
                       console.error("Firebase users snapshot subscription error:", err);
                       logFirebaseError("bexo_users onSnapshot", err);
-                      updateFirebaseConnectionBadges(false, "Users Sync Error: " + err.message);
+                      updateSupabaseConnectionBadges(false, "Users Sync Error: " + err.message);
                       handleFirestoreError(err, OperationType.LIST, "bexo_users");
                   });
 
                   // Realtime orders sync
-                  window.db.collection('bexo_orders').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_orders', snap => {
                       if (!snap) return;
                       const firebaseOrders = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) firebaseOrders.push(data);
                       });
                       if (firebaseOrders.length > 0) {
@@ -3336,43 +3073,43 @@ function savePosts() {
                           triggerViewRendering('orders');
                       } else if (appOrders.length > 0) {
                           appOrders.forEach(o => {
-                              window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
+                              window.supabaseClient.from('bexo_orders').upsert({ id: String(o.id), ...(sanitizeForFirestore(o) }))
                                   .catch(err => console.error("Auto-seed orders error:", err));
                           });
                       }
                   }, err => {
                       console.error("Firebase orders subscription error:", err);
                       logFirebaseError("bexo_orders onSnapshot", err);
-                      updateFirebaseConnectionBadges(false, "Orders Sync Error: " + err.message);
+                      updateSupabaseConnectionBadges(false, "Orders Sync Error: " + err.message);
                       handleFirestoreError(err, OperationType.LIST, "bexo_orders");
                   });
 
                   // Realtime settings sync
-                  window.db.collection('bexo_settings').doc('global').onSnapshot(doc => {
-                      if (doc && doc.exists) {
-                          const data = doc.data();
+                  subscribeSupabaseCollection('bexo_settings').doc('global', doc => {
+                      if (doc && doc) {
+                          const data = doc;
                           if (data) {
                               appSettings = { ...appSettings, ...data };
                               localStorage.setItem('bexo_settings', JSON.stringify(appSettings));
                               triggerViewRendering('settings');
                           }
                       } else {
-                          window.db.collection('bexo_settings').doc('global').set(sanitizeForFirestore(appSettings))
+                          window.supabaseClient.from('bexo_settings').upsert({ id: 'global', ...(sanitizeForFirestore(appSettings) }))
                               .catch(err => console.error("Auto-seed settings error:", err));
                       }
                   }, err => {
                       console.error("Firebase settings subscription error:", err);
                       logFirebaseError("bexo_settings onSnapshot", err);
-                      updateFirebaseConnectionBadges(false, "Settings Sync Error: " + err.message);
+                      updateSupabaseConnectionBadges(false, "Settings Sync Error: " + err.message);
                       handleFirestoreError(err, OperationType.GET, "bexo_settings/global");
                   });
 
                   // Realtime premium requests sync
-                  window.db.collection('bexo_premium_requests').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_premium_requests', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3381,7 +3118,7 @@ function savePosts() {
                           triggerViewRendering('premium');
                       } else if (appPremiumRequests.length > 0) {
                           appPremiumRequests.forEach(r => {
-                              window.db.collection('bexo_premium_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
+                              window.supabaseClient.from('bexo_premium_requests').upsert({ id: String(r.id), ...(sanitizeForFirestore(r) }))
                                   .catch(err => console.error("Auto-seed premium error:", err));
                           });
                       }
@@ -3391,11 +3128,11 @@ function savePosts() {
                   });
 
                   // Realtime recharge requests sync
-                  window.db.collection('bexo_recharge_requests').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_recharge_requests', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3404,7 +3141,7 @@ function savePosts() {
                           triggerViewRendering('recharges');
                       } else if (appRechargeRequests.length > 0) {
                           appRechargeRequests.forEach(r => {
-                              window.db.collection('bexo_recharge_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
+                              window.supabaseClient.from('bexo_recharge_requests').upsert({ id: String(r.id), ...(sanitizeForFirestore(r) }))
                                   .catch(err => console.error("Auto-seed recharge error:", err));
                           });
                       }
@@ -3414,11 +3151,11 @@ function savePosts() {
                   });
 
                   // Realtime balance requests sync
-                  window.db.collection('bexo_balance_requests').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_balance_requests', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3427,7 +3164,7 @@ function savePosts() {
                           triggerViewRendering('balances');
                       } else if (appBalanceRequests.length > 0) {
                           appBalanceRequests.forEach(r => {
-                              window.db.collection('bexo_balance_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
+                              window.supabaseClient.from('bexo_balance_requests').upsert({ id: String(r.id), ...(sanitizeForFirestore(r) }))
                                   .catch(err => console.error("Auto-seed balance error:", err));
                           });
                       }
@@ -3437,11 +3174,11 @@ function savePosts() {
                   });
 
                   // Realtime bill requests sync
-                  window.db.collection('bexo_bill_requests').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_bill_requests', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3450,7 +3187,7 @@ function savePosts() {
                           triggerViewRendering('bills');
                       } else if (appBillRequests.length > 0) {
                           appBillRequests.forEach(r => {
-                              window.db.collection('bexo_bill_requests').doc(String(r.id)).set(sanitizeForFirestore(r))
+                              window.supabaseClient.from('bexo_bill_requests').upsert({ id: String(r.id), ...(sanitizeForFirestore(r) }))
                                   .catch(err => console.error("Auto-seed bills error:", err));
                           });
                       }
@@ -3460,16 +3197,16 @@ function savePosts() {
                   });
 
                   // Realtime customer reports sync
-                  window.db.collection('bexo_customer_reports').doc('global').onSnapshot(doc => {
-                      if (doc && doc.exists) {
-                          const data = doc.data();
+                  subscribeSupabaseCollection('bexo_customer_reports').doc('global', doc => {
+                      if (doc && doc) {
+                          const data = doc;
                           if (data) {
                               appCustomerReports = { ...appCustomerReports, ...data };
                               localStorage.setItem('bexo_customer_reports', JSON.stringify(appCustomerReports));
                               triggerViewRendering('customer_reports');
                           }
                       } else {
-                          window.db.collection('bexo_customer_reports').doc('global').set(sanitizeForFirestore(appCustomerReports))
+                          window.supabaseClient.from('bexo_customer_reports').upsert({ id: 'global', ...(sanitizeForFirestore(appCustomerReports) }))
                               .catch(err => console.error(err));
                       }
                   }, err => {
@@ -3478,11 +3215,11 @@ function savePosts() {
                   });
 
                   // Realtime categories sync
-                  window.db.collection('bexo_categories').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_categories', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3491,7 +3228,7 @@ function savePosts() {
                           triggerViewRendering('categories');
                       } else if (appCategories.length > 0) {
                           appCategories.forEach(c => {
-                              window.db.collection('bexo_categories').doc(String(c.id)).set(sanitizeForFirestore(c))
+                              window.supabaseClient.from('bexo_categories').upsert({ id: String(c.id), ...(sanitizeForFirestore(c) }))
                                   .catch(err => console.error("Auto-seed categories error:", err));
                           });
                       }
@@ -3501,11 +3238,11 @@ function savePosts() {
                   });
 
                   // Realtime transactions sync
-                  window.db.collection('bexo_transactions').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_transactions', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3514,7 +3251,7 @@ function savePosts() {
                           triggerViewRendering('transactions');
                       } else if (appTransactions.length > 0) {
                           appTransactions.forEach(t => {
-                              window.db.collection('bexo_transactions').doc(String(t.id)).set(sanitizeForFirestore(t))
+                              window.supabaseClient.from('bexo_transactions').upsert({ id: String(t.id), ...(sanitizeForFirestore(t) }))
                                   .catch(err => console.error("Firebase sync transaction error:", err));
                           });
                       }
@@ -3524,11 +3261,11 @@ function savePosts() {
                   });
 
                   // Realtime accounts sync
-                  window.db.collection('bexo_accounts').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_accounts', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3537,7 +3274,7 @@ function savePosts() {
                           triggerViewRendering('accounts');
                       } else if (appAccounts.length > 0) {
                           appAccounts.forEach(a => {
-                              window.db.collection('bexo_accounts').doc(String(a.id)).set(sanitizeForFirestore(a))
+                              window.supabaseClient.from('bexo_accounts').upsert({ id: String(a.id), ...(sanitizeForFirestore(a) }))
                                   .catch(err => console.error("Firebase sync accounts error:", err));
                           });
                       }
@@ -3547,11 +3284,11 @@ function savePosts() {
                   });
 
                   // Realtime withdrawals sync
-                  window.db.collection('bexo_profile_payments').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_profile_payments', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3564,11 +3301,11 @@ function savePosts() {
                       handleFirestoreError(err, OperationType.LIST, "bexo_profile_payments");
                   });
 
-                  window.db.collection('bexo_withdrawals').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_withdrawals', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3577,7 +3314,7 @@ function savePosts() {
                           triggerViewRendering('withdrawals');
                       } else if (appWithdrawals.length > 0) {
                           appWithdrawals.forEach(w => {
-                              window.db.collection('bexo_withdrawals').doc(String(w.id)).set(sanitizeForFirestore(w))
+                              window.supabaseClient.from('bexo_withdrawals').upsert({ id: String(w.id), ...(sanitizeForFirestore(w) }))
                                   .catch(err => console.error("Firebase sync withdrawal error:", err));
                           });
                       }
@@ -3587,11 +3324,11 @@ function savePosts() {
                   });
 
                   // Realtime support tickets sync
-                  window.db.collection('bexo_support_tickets').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_support_tickets', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3600,7 +3337,7 @@ function savePosts() {
                           triggerViewRendering('support');
                       } else if (appSupportTickets.length > 0) {
                           appSupportTickets.forEach(t => {
-                              window.db.collection('bexo_support_tickets').doc(String(t.id)).set(sanitizeForFirestore(t))
+                              window.supabaseClient.from('bexo_support_tickets').upsert({ id: String(t.id), ...(sanitizeForFirestore(t) }))
                                   .catch(err => console.error("Firebase sync support tickets error:", err));
                           });
                       }
@@ -3610,11 +3347,11 @@ function savePosts() {
                   });
 
                   // Realtime manager records sync
-                  window.db.collection('bexo_manager_records').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_manager_records', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3623,7 +3360,7 @@ function savePosts() {
                           triggerViewRendering('manager');
                       } else if (appManagerRecords.length > 0) {
                           appManagerRecords.forEach(r => {
-                              window.db.collection('bexo_manager_records').doc(String(r.id)).set(sanitizeForFirestore(r))
+                              window.supabaseClient.from('bexo_manager_records').upsert({ id: String(r.id), ...(sanitizeForFirestore(r) }))
                                   .catch(err => console.error("Firebase sync manager record error:", err));
                           });
                       }
@@ -3633,11 +3370,11 @@ function savePosts() {
                   });
 
                   // Realtime reseller payouts sync
-                  window.db.collection('bexo_reseller_payouts').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_reseller_payouts', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
-                          const data = doc.data();
+const data = doc;
                           if (data) list.push(data);
                       });
                       if (list.length > 0) {
@@ -3646,7 +3383,7 @@ function savePosts() {
                           triggerViewRendering('manager');
                       } else if (appResellerPayouts.length > 0) {
                           appResellerPayouts.forEach(p => {
-                              window.db.collection('bexo_reseller_payouts').doc(String(p.id)).set(sanitizeForFirestore(p))
+                              window.supabaseClient.from('bexo_reseller_payouts').upsert({ id: String(p.id), ...(sanitizeForFirestore(p) }))
                                   .catch(err => console.error("Firebase sync reseller payouts error:", err));
                           });
                       }
@@ -4162,7 +3899,7 @@ function savePosts() {
                       btn.innerText = 'পাঠানো হচ্ছে...';
                       btn.disabled = true;
 
-                      if (!window.firebaseAuth || !window.sendPasswordResetEmail) {
+                      if (!window.supabaseClient || !window.sendPasswordResetEmail) {
                           showToast("Firebase এখনো লোড হয়নি। দয়া করে অপেক্ষা করুন।", "error");
                           btn.innerText = 'পাসওয়ার্ড রিসেট লিংক পাঠান';
                           btn.disabled = false;
@@ -4170,7 +3907,7 @@ function savePosts() {
                       }
 
                       try {
-                          await window.sendPasswordResetEmail(window.firebaseAuth, email);
+                          await window.sendPasswordResetEmail(window.supabaseClient, email);
                           showToast("আপনার ইমেইলে পাসওয়ার্ড রিসেট লিংক পাঠানো হয়েছে! ইনবক্স চেক করুন।", "success");
                           modal.remove();
                       } catch(e) {
@@ -4207,7 +3944,7 @@ async function loginSession() {
                       return;
                   }
 
-                  if (!window.firebaseAuth || !window.signInWithEmailAndPassword) {
+                  if (!window.supabaseClient || !window.signInWithEmailAndPassword) {
                       showToast("Firebase এখনো লোড হয়নি। দয়া করে অপেক্ষা করুন।", "error");
                       return;
                   }
@@ -4219,7 +3956,7 @@ async function loginSession() {
 
                   try {
                       alertBox.classList.add('hidden');
-                      await window.signInWithEmailAndPassword(window.firebaseAuth, phone, pass);
+                      await window.signInWithEmailAndPassword(window.supabaseClient, phone, pass);
                       if (loginBtn) {
                           loginBtn.disabled = false;
                           loginBtn.innerHTML = 'লগইন করুন <i class="fas fa-arrow-right"></i>';
@@ -4298,14 +4035,14 @@ async function loginSession() {
                           else { showToast("ভুল রেফারেল কোড! দয়া করে সঠিক কোড দিন অথবা ঘরটি খালি রাখুন।", "error"); enableBtn(); return; }
                       }
 
-                      if (!window.firebaseAuth || !window.createUserWithEmailAndPassword) {
+                      if (!window.supabaseClient || !window.createUserWithEmailAndPassword) {
                           showToast("Firebase এখনো লোড হয়নি। দয়া করে অপেক্ষা করুন।", "error");
                           enableBtn(); return;
                       }
 
                       try {
                           // Create User in Firebase Auth
-                          const userCredential = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, pass);
+                          const userCredential = await window.createUserWithEmailAndPassword(window.supabaseClient, email, pass);
                           const user = userCredential.user;
                           
                           let sCode = '';
@@ -4328,11 +4065,11 @@ async function loginSession() {
                               profileId: 'BX-' + Math.floor(100000 + Math.random() * 900000),
                               joinDate: new Date().toLocaleDateString('bn-BD'),
                               createdAt: Date.now(),
-                              uid: user.uid // Map to Firebase Auth UID
+                              uid: user.id // Map to Firebase Auth UID
                           };
 
                           // Store in Firestore with Auth UID as document ID
-                          await window.db.collection('bexo_users').doc(user.uid).set(sanitizeForFirestore(newProfile));
+                          await window.supabaseClient.from('bexo_users').upsert({ id: user.id, ...(sanitizeForFirestore(newProfile) }));
 
                           if (referredBy) {
                               const refs = JSON.parse(localStorage.getItem('bexo_referrals')) || [];
@@ -6710,8 +6447,8 @@ return;
 
               
               function logout() {
-                  if (window.firebaseAuth && window.signOut) {
-                      window.signOut(window.firebaseAuth).then(() => {
+                  if (window.supabaseClient && window.signOut) {
+                      window.signOut(window.supabaseClient).then(() => {
                           userProfile = null;
                           localStorage.removeItem('bexo_profile');
                           window.location.reload();
@@ -10070,7 +9807,7 @@ return;
                                        <i class="fas fa-wifi text-slate-300 text-lg"></i>
                                    </div>
                                    <div>
-                                       ${window.db ? `
+                                       ${window.supabaseClient ? `
                                            <div class="flex items-center gap-2 text-emerald-600">
                                                <span class="w-3 h-3 bg-emerald-500 rounded-full "></span>
                                                <span class="text-lg font-black tracking-tight">Cloud Live</span>
@@ -10206,22 +9943,18 @@ return;
 
                async function forceDatabaseDirectSyncDetailed() {
                    showToast("ডাটাবেজ ডিরেক্ট সিঙ্ক শুরু হয়েছে...", "info");
-                   if (!window.db) {
+                   if (!window.supabaseClient) {
                        showToast("ডাটাবেজ লাইভ নেই! পুনরায় সংযোগের চেষ্টা চলছে...", "warning");
                        initializeFirebaseIfReady();
-                       if (!window.db) {
+                       if (!window.supabaseClient) {
                            showToast("ডাটাবেজ সংযোগ ব্যর্থ হয়েছে! এরর লগটি চেক করুন।", "error");
 if(document.getElementById('regSubmitBtn')) { document.getElementById('regSubmitBtn').disabled = false; document.getElementById('regSubmitBtn').innerHTML = '<i class="fas fa-user-plus"></i> অ্যাকাউন্ট তৈরি করুন'; }
 return;
                        }
                    }
                    try {
-                       const snap = await window.db.collection('bexo_users').get();
-                       const firebaseUsers = [];
-                       snap.forEach(doc => {
-                           const data = doc.data();
-                           if (data) firebaseUsers.push(data);
-                       });
+                       const { data: firebaseUsers_db } = await window.supabaseClient.from('bexo_users').select('*');
+                       const firebaseUsers = firebaseUsers_db || [];
                        
                        let addedCount = 0;
                        let updatedCount = 0;
@@ -10254,7 +9987,7 @@ return;
                }
 
                async function forceUploadLocalUsersDetailed() {
-                   if (!window.db) {
+                   if (!window.supabaseClient) {
                        showToast("ডাটাবেজ কানেকশন অফলাইন!", "error");
 if(document.getElementById('regSubmitBtn')) { document.getElementById('regSubmitBtn').disabled = false; document.getElementById('regSubmitBtn').innerHTML = '<i class="fas fa-user-plus"></i> অ্যাকাউন্ট তৈরি করুন'; }
 return;
@@ -10264,7 +9997,7 @@ return;
                        let uploadCount = 0;
                        for (const u of appUsers) {
                            if (u && u.profileId && u.phone && u.password) {
-                               await window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForFirestore(u));
+                               await window.supabaseClient.from('bexo_users').upsert({ id: String(u.profileId), ...(sanitizeForFirestore(u) }));
                                uploadCount++;
                            }
                        }
@@ -10287,17 +10020,13 @@ return;
                        appUsers = [];
                        localStorage.setItem('bexo_users', JSON.stringify([]));
                        
-                       if (!window.db) {
+                       if (!window.supabaseClient) {
                            initializeFirebaseIfReady();
                        }
                        
-                       if (window.db) {
-                           const snap = await window.db.collection('bexo_users').get();
-                           const firebaseUsers = [];
-                           snap.forEach(doc => {
-                               const data = doc.data();
-                               if (data) firebaseUsers.push(data);
-                           });
+                       if (window.supabaseClient) {
+                           const { data: firebaseUsers_db } = await window.supabaseClient.from('bexo_users').select('*');
+                       const firebaseUsers = firebaseUsers_db || [];
                            
                            firebaseUsers.forEach(f => {
                                if (f && f.phone && f.password) {
@@ -10810,9 +10539,9 @@ return;
                       if (typeof savePosts === 'function') savePosts();
                       
                       // Save to Firestore via frontend
-                      if (window.db) {
+                      if (window.supabaseClient) {
                           newPosts.forEach(postData => {
-                              window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForFirestore(postData))
+                              window.supabaseClient.from('bexo_posts').upsert({ id: String(postData.id), ...(sanitizeForFirestore(postData) }))
                                   .catch(err => console.error("Firebase save post error:", err));
                           });
                       }
@@ -11398,11 +11127,11 @@ return;
                   const amountToAdd = Number(req.amount);
 
                   // 1. Direct Firestore user document update to guarantee reliability
-                  if (window.db && req.profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(req.profileId));
-                      userDocRef.get().then(doc => {
-                          if (doc.exists) {
-                              const userData = doc.data();
+                  if (window.supabaseClient && req.profileId) {
+                      const userDocRef_table = 'bexo_users'; const userDocRef_id = String(req.profileId);
+                      window.supabaseClient.from(userDocRef_table).select('*').eq('id', userDocRef_id).maybeSingle().then(({data: userData}) => {
+                          if (userData) {
+                          
                               if (status === 'Approved') {
                                   userData.rechargeBalance = (Number(userData.rechargeBalance) || 0) + amountToAdd;
                                   userData.balance = userData.rechargeBalance; // Keep balance & rechargeBalance in sync
@@ -11432,7 +11161,7 @@ return;
                                   }
                               }
                               
-                              userDocRef.set(sanitizeForFirestore(userData))
+                              window.supabaseClient.from(userDocRef_table).upsert({ id: userDocRef_id, ...(userData) })
                                   .then(() => console.log(`[Firebase] Successfully updated user ${req.profileId} balance directly in Firestore.`))
                                   .catch(err => console.error("Error setting user doc directly:", err));
                           }
@@ -11698,11 +11427,11 @@ return;
                   saveBillRequests();
 
                   // 1. Direct Firestore user document update to guarantee reliability
-                  if (window.db && profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
-                      userDocRef.get().then(doc => {
-                          if (doc.exists) {
-                              const userData = doc.data();
+                  if (window.supabaseClient && profileId) {
+                      const userDocRef_table = 'bexo_users'; const userDocRef_id = String(profileId);
+                      window.supabaseClient.from(userDocRef_table).select('*').eq('id', userDocRef_id).maybeSingle().then(({data: userData}) => {
+                          if (userData) {
+                          
                               if (!userData.rechargeTransactions) userData.rechargeTransactions = [];
                               const tx = userData.rechargeTransactions.find(t => t.id === internalId);
                               if (tx) {
@@ -11715,7 +11444,7 @@ return;
                                       userData.balance = userData.rechargeBalance;
                                   }
                               }
-                              userDocRef.set(sanitizeForFirestore(userData))
+                              window.supabaseClient.from(userDocRef_table).upsert({ id: userDocRef_id, ...(userData) })
                                   .then(() => console.log(`[Firebase] Directly updated user ${profileId} bill status in Firestore.`))
                                   .catch(err => console.error("Error setting user doc in updateBillStatus:", err));
                           }
@@ -11790,11 +11519,11 @@ return;
                   saveRechargeRequests();
 
                   // 1. Direct Firestore user document update to guarantee reliability
-                  if (window.db && profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
-                      userDocRef.get().then(doc => {
-                          if (doc.exists) {
-                              const userData = doc.data();
+                  if (window.supabaseClient && profileId) {
+                      const userDocRef_table = 'bexo_users'; const userDocRef_id = String(profileId);
+                      window.supabaseClient.from(userDocRef_table).select('*').eq('id', userDocRef_id).maybeSingle().then(({data: userData}) => {
+                          if (userData) {
+                          
                               if (!userData.rechargeTransactions) userData.rechargeTransactions = [];
                               const tx = userData.rechargeTransactions.find(t => t.id === internalId);
                               if (tx) {
@@ -11807,7 +11536,7 @@ return;
                                       userData.balance = userData.rechargeBalance;
                                   }
                               }
-                              userDocRef.set(sanitizeForFirestore(userData))
+                              window.supabaseClient.from(userDocRef_table).upsert({ id: userDocRef_id, ...(userData) })
                                   .then(() => console.log(`[Firebase] Directly updated user ${profileId} recharge status in Firestore.`))
                                   .catch(err => console.error("Error setting user doc in updateRechargeStatus:", err));
                           }
@@ -11887,17 +11616,17 @@ return;
                   saveWithdrawals();
 
                   // 1. Run standard Firestore database transaction for multi-document reliability
-                  if (window.db && req.profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(req.profileId));
-                      const withdrawDocRef = window.db.collection('bexo_withdrawals').doc(String(id));
+                  if (window.supabaseClient && req.profileId) {
+                      const userDocRef_table = 'bexo_users'; const userDocRef_id = String(req.profileId);
+                      const withdrawDocRef = { table: 'bexo_withdrawals', id: String(id });
 
-                      window.db.runTransaction(async (transaction) => {
+                      (async (transaction) => { return await async (transaction) => {
                           const userDoc = await transaction.get(userDocRef);
                           const withdrawDoc = await transaction.get(withdrawDocRef);
 
                           let currentDbStatus = 'Pending';
-                          if (withdrawDoc.exists) {
-                              currentDbStatus = withdrawDoc.data().status || 'Pending';
+                          if (withdrawDoc) {
+                              currentDbStatus = (typeof withdrawDoc.data === 'function' ? withdrawDoc.data() : withdrawDoc).status || 'Pending';
                           }
 
                           // CRITICAL DOUBLE-SPENDING PREVENTION:
@@ -11905,8 +11634,8 @@ return;
                               throw new Error(`উইথড্র রিকোয়েস্টটি ইতিমধ্যে প্রসেস করা হয়েছে! (Status: ${currentDbStatus})`);
                           }
 
-                          if (userDoc.exists) {
-                              const currentUsrData = userDoc.data();
+                          if (userDoc) {
+                              const currentUsrData = userDoc;
                               const currentBalance = Number(currentUsrData.rechargeBalance) || 0;
                               const amount = Number(req.amount) || 0;
 
@@ -11970,7 +11699,7 @@ return;
                                   adminNote: adminNote,
                                   details: statusToSet === 'Cancelled' ? `উইথড্র রিকোয়েস্ট বাতিল এবং রিফান্ড (উইথড্র ID: ${id})` : `উইথড্র রিকোয়েস্ট সফলভাবে সম্পন্ন হয়েছে (উইথড্র ID: ${id})`
                               };
-                              const auditTxnRef = window.db.collection('bexo_transactions').doc(String(auditTxnId));
+                              const auditTxnRef = { table: 'bexo_transactions', id: String(auditTxnId });
                               transaction.set(auditTxnRef, sanitizeForFirestore(auditTxn));
                           }
                       }).then(() => {
@@ -12100,14 +11829,14 @@ return;
                   }
 
                   // Write directly to Firestore to update the target user Profile
-                  if (window.db && profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
-                      userDocRef.get().then(doc => {
-                          if (doc.exists) {
-                              const userData = doc.data();
+                  if (window.supabaseClient && profileId) {
+                      const userDocRef_table = 'bexo_users'; const userDocRef_id = String(profileId);
+                      window.supabaseClient.from(userDocRef_table).select('*').eq('id', userDocRef_id).maybeSingle().then(({data: userData}) => {
+                          if (userData) {
+                          
                               userData.isPremium = true;
                               userData.currentPlan = 'Premium Member';
-                              userDocRef.set(sanitizeForFirestore(userData))
+                              window.supabaseClient.from(userDocRef_table).upsert({ id: userDocRef_id, ...(userData) })
                                   .then(() => console.log(`[Firebase] Successfully activated premium user ${profileId}`))
                                   .catch(err => console.error("Error setting user doc in activateProfileById:", err));
                           }
@@ -12146,14 +11875,14 @@ return;
                       }
 
                       // Update directly in Firestore
-                      if (window.db) {
-                          const userDocRef = window.db.collection('bexo_users').doc(String(id));
-                          userDocRef.get().then(doc => {
-                              if (doc.exists) {
-                                  const userData = doc.data();
+                      if (window.supabaseClient) {
+                          const userDocRef_table = 'bexo_users'; const userDocRef_id = String(id);
+                          window.supabaseClient.from(userDocRef_table).select('*').eq('id', userDocRef_id).maybeSingle().then(({data: userData}) => {
+                          if (userData) {
+                              
                                   userData.isPremium = true;
                                   userData.currentPlan = 'Premium Member';
-                                  userDocRef.set(sanitizeForFirestore(userData))
+                                  window.supabaseClient.from(userDocRef_table).upsert({ id: userDocRef_id, ...(userData) })
                                       .then(() => alert(`Profile ${id} activated successfully in Firestore!`))
                                       .catch(err => {
                                           console.error(err);
@@ -12580,9 +12309,9 @@ return;
                   }
                   savePosts();
 
-                  if (window.db) {
+                  if (window.supabaseClient) {
                       newPosts.forEach(postData => {
-                          window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForFirestore(postData))
+                          window.supabaseClient.from('bexo_posts').upsert({ id: String(postData.id), ...(sanitizeForFirestore(postData) }))
                               .catch(err => console.error("Firebase save post error:", err));
                       });
                   }
@@ -12615,8 +12344,8 @@ return;
                   if(!confirm("আপনি কি নিশ্চিতভাবে এই পোস্টটি ডিলিট করতে চান?")) return;
                   appPosts = appPosts.filter(p => String(p.id) !== String(id));
                   savePosts();
-                  if (window.db) {
-                      window.db.collection('bexo_posts').doc(String(id)).delete()
+                  if (window.supabaseClient) {
+                      window.supabaseClient.from('bexo_posts').delete().eq('id', String(id))
                           .catch(err => console.error("Firebase delete product error:", err));
                   }
                   renderAdminPostList();
@@ -12638,8 +12367,8 @@ return;
                           p.stock = 0;
                       }
                       savePosts();
-                      if (window.db) {
-                          window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForFirestore(p))
+                      if (window.supabaseClient) {
+                          window.supabaseClient.from('bexo_posts').upsert({ id: String(id), ...(sanitizeForFirestore(p) }))
                               .catch(err => console.error("Firebase update product error:", err));
                       }
                       renderAdminPostList();
@@ -12651,8 +12380,8 @@ return;
                   if(p) {
                       p.isPublished = (p.isPublished === false) ? true : false;
                       savePosts();
-                      if (window.db) {
-                          window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForFirestore(p))
+                      if (window.supabaseClient) {
+                          window.supabaseClient.from('bexo_posts').upsert({ id: String(id), ...(sanitizeForFirestore(p) }))
                               .catch(err => console.error("Firebase update product error:", err));
                       }
                       renderAdminPostList();
@@ -12996,8 +12725,8 @@ function changeStock(id) {
             p.stockStatus = 'out_of_stock';
         }
         savePosts();
-        if (window.db) {
-            window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForFirestore(p))
+        if (window.supabaseClient) {
+            window.supabaseClient.from('bexo_posts').upsert({ id: String(id), ...(sanitizeForFirestore(p) }))
                 .catch(err => console.error("Firebase update stock error:", err));
         }
         renderAdminPostList();
@@ -13016,8 +12745,8 @@ function changePrice(id) {
                   if(newPrice !== null && !isNaN(newPrice)) {
                       p.price = parseInt(newPrice);
                       savePosts();
-                      if (window.db) {
-                          window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForFirestore(p))
+                      if (window.supabaseClient) {
+                          window.supabaseClient.from('bexo_posts').upsert({ id: String(id), ...(sanitizeForFirestore(p) }))
                               .catch(err => console.error("Firebase update price error:", err));
                       }
                       renderAdminPostList();
@@ -15114,20 +14843,20 @@ window.subscribeFullScreenLiveChat = function() {
     window.currentChatSession = { profileId, userName, phone, email, isGuest, ipAddress, possibleRegisteredUser, profilePic };
     
     // Subscribe to messages
-    if (!window.db) return;
+    if (!window.supabaseClient) return;
     const collectionName = isGuest ? 'guest_chats' : 'live_chats';
     
     if (window.fullScreenLiveChatUnsubscribe) {
         window.fullScreenLiveChatUnsubscribe();
     }
     
-    window.fullScreenLiveChatUnsubscribe = window.db.collection(collectionName).doc(profileId).onSnapshot(doc => {
+    window.fullScreenLiveChatUnsubscribe = window.supabaseClient.collection(collectionName).doc(profileId).onSnapshot(doc => {
         let lastMsgText = 'কোনো মেসেজ নেই';
         let lastMsgTime = '';
         let unreadUser = 0;
 
-        if (doc.exists) {
-            const data = doc.data();
+        if (doc) {
+            const data = doc;
             const msgs = data.messages || [];
             unreadUser = data.unreadUser || 0;
             
@@ -15226,14 +14955,14 @@ window.subscribeFullScreenLiveChat = function() {
 window.sendFullScreenLiveChatMessage = function() {
     const input = document.getElementById('fullScreenLiveChatMessageInput');
     const text = input.value.trim();
-    if (!text || !window.db || !window.currentChatSession) return;
+    if (!text || !window.supabaseClient || !window.currentChatSession) return;
     
     input.value = '';
     input.style.height = 'auto'; // reset textarea height
     
     const userId = String(window.currentChatSession.profileId);
     const collectionName = window.currentChatSession.isGuest ? 'guest_chats' : 'live_chats';
-    const docRef = window.db.collection(collectionName).doc(userId);
+    const docRef = window.supabaseClient.collection(collectionName).doc(userId);
     
     const newMsg = {
         text: text,
@@ -15241,9 +14970,9 @@ window.sendFullScreenLiveChatMessage = function() {
         timestamp: Date.now()
     };
     
-    window.db.runTransaction(transaction => {
+    (async (transaction) => { return await transaction => {
         return transaction.get(docRef).then(doc => {
-            if (!doc.exists) {
+            if (!doc) {
                 transaction.set(docRef, {
                     userId: userId,
                     userName: window.currentChatSession.userName,
@@ -15260,7 +14989,7 @@ window.sendFullScreenLiveChatMessage = function() {
                     messages: [newMsg]
                 });
             } else {
-                const data = doc.data();
+                const data = doc;
                 const messages = data.messages || [];
                 messages.push(newMsg);
                 transaction.update(docRef, {
@@ -16526,11 +16255,11 @@ return; }
                       targetUser.rechargeTransactions.unshift(transaction);
 
                       // Direct database synchronization to avoid silent out of sync
-                      if (window.db && targetUser.profileId) {
-                          const userDocRef = window.db.collection('bexo_users').doc(String(targetUser.profileId));
-                          userDocRef.get().then(doc => {
-                              if (doc.exists) {
-                                  const userData = doc.data();
+                      if (window.supabaseClient && targetUser.profileId) {
+                          const userDocRef_table = 'bexo_users'; const userDocRef_id = String(targetUser.profileId);
+                          window.supabaseClient.from(userDocRef_table).select('*').eq('id', userDocRef_id).maybeSingle().then(({data: userData}) => {
+                          if (userData) {
+                              
                                   const dbOldBalance = Number(userData.rechargeBalance) || Number(userData.balance) || 0;
                                   userData.rechargeBalance = dbOldBalance + profit;
                                   userData.balance = userData.rechargeBalance;
@@ -16538,7 +16267,7 @@ return; }
                                   if (!userData.rechargeTransactions) userData.rechargeTransactions = [];
                                   userData.rechargeTransactions.unshift(sanitizeForFirestore(transaction));
                                   
-                                  userDocRef.set(sanitizeForFirestore(userData))
+                                  window.supabaseClient.from(userDocRef_table).upsert({ id: userDocRef_id, ...(userData) })
                                       .then(() => console.log(`[Firebase] Successfully added order profit directly to user ${targetUser.profileId}`))
                                       .catch(err => console.error(err));
                               }
@@ -17111,11 +16840,11 @@ return;
                         let orderResetPromises = [];
 
                         // 1. Delete transactions from Firestore bexo_transactions
-                        if (window.db) {
+                        if (window.supabaseClient) {
                             settlements.forEach(t => {
                                 if (t.id) {
                                     deletePromises.push(
-                                        window.db.collection('bexo_transactions').doc(String(t.id)).delete()
+                                        window.supabaseClient.from('bexo_transactions').delete().eq('id', String(t.id))
                                             .catch(err => console.error(`Error deleting doc ${t.id}:`, err))
                                     );
                                 }
@@ -17138,9 +16867,9 @@ return;
                                         message: 'সেটেলমেন্ট অডিট লগ ডিলিট করার কারণে প্রফিট নিষ্পত্তি রিসেট করা হয়েছে।'
                                     });
 
-                                    if (window.db) {
+                                    if (window.supabaseClient) {
                                         orderResetPromises.push(
-                                            window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForFirestore(o))
+                                            window.supabaseClient.from('bexo_orders').upsert({ id: String(o.id), ...(sanitizeForFirestore(o) }))
                                                 .catch(err => console.error(`Error resetting order Doc ${o.id}:`, err))
                                         );
                                     }
@@ -17757,16 +17486,16 @@ return;
 
                    // Execute ACID Transaction process
                    try {
-                       if (window.db) {
+                       if (window.supabaseClient) {
                            // Use relational atomicity transaction across Firestore if online!
-                           const userDocRef = window.db.collection('bexo_users').doc(String(resellerProfileId));
-                           const orderDocRef = window.db.collection('bexo_orders').doc(String(order.id));
-                           const txnDocRef = window.db.collection('bexo_transactions').doc(String(settlementTxnId));
+                           const userDocRef_table = 'bexo_users'; const userDocRef_id = String(resellerProfileId);
+                           const orderDocRef = { table: 'bexo_orders', id: String(order.id });
+                           const txnDocRef = { table: 'bexo_transactions', id: String(settlementTxnId });
 
-                           await window.db.runTransaction(async (transaction) => {
+                           await (async (transaction) => { return await async (transaction) => {
                                // Read active order from inside transactional bounds
                                const orderDoc = await transaction.get(orderDocRef);
-                               const orderData = orderDoc.data() || {};
+                               const orderData = typeof orderDoc.data === 'function' ? orderDoc.data() : (orderDoc || {});
                                if (orderData.isProfitDistributed) {
                                    throw new Error("This order has already been settled in a different session!");
                                }
@@ -17933,13 +17662,12 @@ async function loadLandingProducts() {
     try {
         let products = [];
         
-        // Attempt to fetch from window.db first if it's initialized
-        if (window.db && typeof window.db.collection === 'function') {
+        // Attempt to fetch from window.supabaseClient first if it's initialized
+        if (window.supabaseClient) {
             try {
-                const snapshot = await window.db.collection('bexo_posts').get();
-                if (snapshot && !snapshot.empty) {
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
+                const { data: snapshot } = await window.supabaseClient.from('bexo_posts').select('*');
+                if (snapshot && snapshot.length > 0) {
+                    snapshot.forEach(data => {
                         if (data) {
                             products.push(data);
                         }
@@ -18080,11 +17808,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Render immediately using local posts cache if available
     loadLandingProducts();
     
-    if (window.db !== null && typeof window.db !== 'undefined') {
+    if (window.supabaseClient !== null && typeof window.supabaseClient !== 'undefined') {
         loadLandingProducts();
     } else {
         const interval = setInterval(() => {
-            if (window.db !== null && typeof window.db !== 'undefined') {
+            if (window.supabaseClient !== null && typeof window.supabaseClient !== 'undefined') {
                 clearInterval(interval);
                 loadLandingProducts();
             }
@@ -18308,15 +18036,15 @@ window.openLiveChat = async function() {
         }
     } else {
         // Logged in! Merge guest chats if they exist
-        if (guestId && window.db) {
+        if (guestId && window.supabaseClient) {
             try {
-                const guestRef = window.db.collection('guest_chats').doc(guestId);
+                const guestRef = { table: 'guest_chats', id: guestId };
                 const guestDoc = await guestRef.get();
-                if (guestDoc.exists) {
-                    const guestData = guestDoc.data();
+                if (guestDoc) {
+                    const guestData = guestDoc;
                     if (guestData.messages && guestData.messages.length > 0) {
-                        const userRef = window.db.collection('live_chats').doc(profileId);
-                        await window.db.runTransaction(async t => {
+                        const userRef = { table: 'live_chats', id: profileId };
+                        await (async (transaction) => { return await async t => {
                             const userDoc = await t.get(userRef);
                             let userMsgs = userDoc.exists ? (userDoc.data().messages || []) : [];
                             const allMsgs = [...guestData.messages, ...userMsgs].sort((a,b) => a.timestamp - b.timestamp);
@@ -18413,18 +18141,18 @@ window.closeLiveChat = function() {
 };
 
 window.subscribeLiveChatUser = function() {
-    if (!window.db || !window.currentChatSession) return;
+    if (!window.supabaseClient || !window.currentChatSession) return;
     
     const userId = String(window.currentChatSession.profileId);
     const collectionName = window.currentChatSession.isGuest ? 'guest_chats' : 'live_chats';
     
-    window.liveChatUnsubscribe = window.db.collection(collectionName).doc(userId).onSnapshot(doc => {
-        const data = doc.data() || { messages: [] };
+    window.liveChatUnsubscribe = window.supabaseClient.collection(collectionName).doc(userId).onSnapshot(doc => {
+        const data = doc || { messages: [] };
         renderLiveChatMessagesUser(data.messages || []);
         
         // Reset unreadUser
         if (data.unreadUser > 0) {
-            window.db.collection(collectionName).doc(userId).update({ unreadUser: 0 }).catch(e => console.error(e));
+            window.supabaseClient.from(collectionName).update({ unreadUser: 0 }).eq('id', userId).catch(e => console.error(e));
         }
     });
 };
@@ -18502,13 +18230,13 @@ window.sendLiveChatMessage = function() {
     console.log("sendLiveChatMessage called");
     const input = document.getElementById('liveChatMessageInput');
     const text = input.value.trim();
-    if (!text || !window.db || !window.currentChatSession) return;
+    if (!text || !window.supabaseClient || !window.currentChatSession) return;
     
     input.value = '';
     
     const userId = String(window.currentChatSession.profileId);
     const collectionName = window.currentChatSession.isGuest ? 'guest_chats' : 'live_chats';
-    const docRef = window.db.collection(collectionName).doc(userId);
+    const docRef = window.supabaseClient.collection(collectionName).doc(userId);
     
     const newMsg = {
         text: text,
@@ -18517,9 +18245,9 @@ window.sendLiveChatMessage = function() {
     };
     
     console.log("Starting transaction for:", userId);
-    window.db.runTransaction(transaction => {
+    (async (transaction) => { return await transaction => {
         return transaction.get(docRef).then(doc => {
-            if (!doc.exists) {
+            if (!doc) {
                 transaction.set(docRef, {
                     userId: userId,
                     userName: window.currentChatSession.userName,
@@ -18536,7 +18264,7 @@ window.sendLiveChatMessage = function() {
                     messages: [newMsg]
                 });
             } else {
-                const data = doc.data();
+                const data = doc;
                 const messages = data.messages || [];
                 messages.push(newMsg);
                 transaction.update(docRef, {
@@ -18620,16 +18348,16 @@ window.adminLiveChatDetailUnsubscribe = null;
 window.adminSubscribeLiveChatsList = function(collectionName) {
     if (window.adminLiveChatsUnsubscribe) window.adminLiveChatsUnsubscribe();
     
-    window.adminLiveChatsUnsubscribe = window.db.collection(collectionName).orderBy('lastMessageTime', 'desc').onSnapshot(snapshot => {
+    window.adminLiveChatsUnsubscribe = window.supabaseClient.collection(collectionName).orderBy('lastMessageTime', 'desc').onSnapshot(snapshot => {
         const listArea = document.getElementById('adminLiveChatList');
         if (!listArea) return;
         
         let html = '';
-        if (snapshot.empty) {
+        if (!snapshot || snapshot.length === 0) {
             html = `<div class="text-center text-slate-400 text-xs p-4">কোনো চ্যাট নেই</div>`;
         } else {
             snapshot.forEach(doc => {
-                const data = doc.data();
+const data = doc;
                 const unreadBadge = data.unreadAdmin > 0 ? `<span class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">${data.unreadAdmin}</span>` : '';
                 const time = formatChatTime(data.lastMessageTime);
                 const isActive = window.adminCurrentLiveChatUser === data.userId ? 'bg-emerald-50 border-emerald-100' : 'hover:bg-slate-50 border-transparent';
@@ -18696,16 +18424,16 @@ window.adminOpenLiveChatDetail = function(userId, userName, isGuest, ipAddress, 
     // Subscribe to details
     if (window.adminLiveChatDetailUnsubscribe) window.adminLiveChatDetailUnsubscribe();
     
-    window.adminLiveChatDetailUnsubscribe = window.db.collection(collectionName).doc(userId).onSnapshot(doc => {
+    window.adminLiveChatDetailUnsubscribe = window.supabaseClient.collection(collectionName).doc(userId).onSnapshot(doc => {
         const messagesArea = document.getElementById('adminLiveChatMessages');
         if (!messagesArea) return;
         
-        if (!doc.exists) {
+        if (!doc) {
             messagesArea.innerHTML = `<div class="text-center text-slate-400 text-sm mt-10">চ্যাট পাওয়া যায়নি</div>`;
             return;
         }
         
-        const data = doc.data();
+        const data = doc;
         let html = '';
         
         (data.messages || []).forEach(m => {
@@ -18740,7 +18468,7 @@ window.adminOpenLiveChatDetail = function(userId, userName, isGuest, ipAddress, 
         
         // Reset unreadAdmin
         if (data.unreadAdmin > 0) {
-            window.db.collection(collectionName).doc(userId).update({ unreadAdmin: 0 }).catch(e => console.error(e));
+            window.supabaseClient.from(collectionName).update({ unreadAdmin: 0 }).eq('id', userId).catch(e => console.error(e));
         }
     });
 };
@@ -18750,13 +18478,13 @@ window.adminSendLiveChatMessage = function() {
     
     const input = document.getElementById('adminLiveChatMessageInput');
     const text = input.value.trim();
-    if (!text || !window.db) return;
+    if (!text || !window.supabaseClient) return;
     
     input.value = '';
     
     const userId = window.adminCurrentLiveChatUser;
     const collectionName = window.adminCurrentLiveChatCollection;
-    const docRef = window.db.collection(collectionName).doc(userId);
+    const docRef = window.supabaseClient.collection(collectionName).doc(userId);
     
     const newMsg = {
         text: text,
@@ -18764,10 +18492,10 @@ window.adminSendLiveChatMessage = function() {
         timestamp: Date.now()
     };
     
-    window.db.runTransaction(transaction => {
+    (async (transaction) => { return await transaction => {
         return transaction.get(docRef).then(doc => {
-            if (!doc.exists) return; // Should exist if admin is replying
-            const data = doc.data();
+            if (!doc) return; // Should exist if admin is replying
+            const data = doc;
             const messages = data.messages || [];
             messages.push(newMsg);
             transaction.update(docRef, {
