@@ -2937,6 +2937,7 @@
                       newAncestors.add(obj);
 
                       for (const key in obj) {
+                          if (key === 'password') continue;
                           if (Object.prototype.hasOwnProperty.call(obj, key)) {
                               const val = obj[key];
                               if (val === undefined) {
@@ -5520,7 +5521,7 @@ function savePosts() {
 
                    if (authSuccess || localPassMatch) {
                        if (matchedUser) {
-                           matchedUser.password = cleanPass;
+                           delete matchedUser.password;
                            matchedUser.lastActive = new Date().toISOString();
                            userProfile = { ...DEFAULT_PROFILE, ...matchedUser };
                        } else if (isEmail) {
@@ -5529,13 +5530,13 @@ function savePosts() {
                                ...DEFAULT_PROFILE,
                                email: cleanIdentifier,
                                fullName: cleanIdentifier.split('@')[0],
-                               password: cleanPass,
                                profileId: 'BX-' + Math.floor(100000 + Math.random() * 900000)
                            };
                            if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
                                appUsers.push(userProfile);
                            }
                        }
+                       delete userProfile.password;
 
                        if (typeof saveProfile === 'function') saveProfile();
                        if (typeof saveUsers === 'function') saveUsers(userProfile ? userProfile.profileId : null);
@@ -5599,75 +5600,31 @@ function savePosts() {
 
               async function sendPasswordResetOtp(email) {
                   let sb = window.getSupabase ? window.getSupabase() : null;
-                  let lastError = null;
-
-                  if (sb && sb.auth) {
-                      try {
-                          const { error } = await sb.auth.resetPasswordForEmail(email);
-                          if (!error) {
-                              return { success: true, method: 'supabase' };
-                          }
-                          lastError = error.message;
-                      } catch (e) {
-                          lastError = e.message;
-                      }
+                  if (!sb || !sb.auth) {
+                      throw new Error("Supabase অথেন্টিকেশন সংযুক্ত নয়। দয়া করে পরিবেশ ভেরিয়েবল চেক করুন।");
                   }
-
-                  // Try backend OTP API as fallback
-                  try {
-                      const resp = await fetch('/api/auth/send-otp', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ email })
-                      });
-                      const data = await resp.json();
-                      if (resp.ok && data.success) {
-                          return { success: true, method: 'api' };
-                      } else {
-                          throw new Error(data.error || lastError || "কোড পাঠানো ব্যর্থ হয়েছে");
-                      }
-                  } catch (e) {
-                      throw new Error(e.message || lastError || "কোড পাঠানো ব্যর্থ হয়েছে");
+                  const { error } = await sb.auth.resetPasswordForEmail(email);
+                  if (error) {
+                      throw new Error(error.message || "পাসওয়ার্ড রিসেট ইমেইল পাঠানো ব্যর্থ হয়েছে");
                   }
+                  return { success: true, method: 'supabase' };
               }
               window.sendPasswordResetOtp = sendPasswordResetOtp;
 
               async function verifyPasswordResetOtp(email, code) {
                   let sb = window.getSupabase ? window.getSupabase() : null;
-                  let lastError = null;
-
-                  if (sb && sb.auth) {
-                      try {
-                          const { error } = await sb.auth.verifyOtp({
-                              email: email,
-                              token: code,
-                              type: 'recovery'
-                          });
-                          if (!error) {
-                              return { success: true, method: 'supabase' };
-                          }
-                          lastError = error.message;
-                      } catch (e) {
-                          lastError = e.message;
-                      }
+                  if (!sb || !sb.auth) {
+                      throw new Error("Supabase অথেন্টিকেশন সংযুক্ত নয়।");
                   }
-
-                  // Try backend OTP API as fallback
-                  try {
-                      const resp = await fetch('/api/auth/verify-otp', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ email, otp: code })
-                      });
-                      const data = await resp.json();
-                      if (resp.ok && data.success) {
-                          return { success: true, method: 'api' };
-                      } else {
-                          throw new Error(data.error || lastError || "ভুল কোড প্রদান করেছেন");
-                      }
-                  } catch (e) {
-                      throw new Error(e.message || lastError || "ভুল কোড প্রদান করেছেন");
+                  const { error } = await sb.auth.verifyOtp({
+                      email: email,
+                      token: code,
+                      type: 'recovery'
+                  });
+                  if (error) {
+                      throw new Error(error.message || "ভুল বা মেয়াদোত্তীর্ণ ওটিপি কোড");
                   }
+                  return { success: true, method: 'supabase' };
               }
               window.verifyPasswordResetOtp = verifyPasswordResetOtp;
 
@@ -6242,6 +6199,7 @@ function savePosts() {
                       const oldProfileId = userProfile ? userProfile.profileId : null;
 
                       // Create Profile (Staged/Prepared)
+                      const profileUid = 'BX-' + Math.floor(100000 + Math.random() * 900000);
                       const newProfile = {
                           ...DEFAULT_PROFILE,
                           shopName: shop,
@@ -6249,12 +6207,40 @@ function savePosts() {
                           phone: phone,
                           email: email,
                           address: addr,
-                          password: pass,
                           referredBy: referredBy,
-                          profileId: 'BX-' + Math.floor(100000 + Math.random() * 900000),
+                          profileId: profileUid,
                           joinDate: new Date().toLocaleDateString('bn-BD'),
                           createdAt: Date.now()
                       };
+
+                      // Authenticate via Supabase Auth
+                      const sb = window.getSupabase ? window.getSupabase() : null;
+                      if (sb && sb.auth && email && pass) {
+                          try {
+                              const { data: authData, error: authError } = await sb.auth.signUp({
+                                  email: email,
+                                  password: pass,
+                                  options: {
+                                      data: {
+                                          fullName: name,
+                                          shopName: shop,
+                                          phone: phone,
+                                          address: addr,
+                                          referredBy: referredBy,
+                                          profileId: profileUid
+                                      }
+                                  }
+                              });
+                              if (authError) {
+                                  console.warn("Supabase Auth signUp note:", authError.message);
+                              }
+                              if (authData && authData.user) {
+                                  newProfile.id = authData.user.id;
+                              }
+                          } catch (authErr) {
+                              console.warn("Supabase Auth signUp error:", authErr);
+                          }
+                      }
 
                       // Define actual creation and database integration function
                       const completeRegistration = (profile) => {

@@ -1,10 +1,12 @@
+import { authenticateAdmin } from "./security.ts";
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-access-token'
   );
 
   if (req.method === 'OPTIONS') {
@@ -12,10 +14,18 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, error: "Method not allowed" });
+  }
+
+  // Authenticate Admin
+  const authResult = await authenticateAdmin(req);
+  if (!authResult.authenticated) {
+    return res.status(401).json({ success: false, error: authResult.error || "Unauthorized" });
+  }
+
   try {
     const settings = req.body || {};
-    // Here we could save to a database if we had a backend database configured.
-    // For now, return success to the frontend which will also save to localStorage/Firebase.
     return res.json({ success: true, message: "Settings saved successfully" });
   } catch (error: any) {
     console.error("Save settings error:", error);
