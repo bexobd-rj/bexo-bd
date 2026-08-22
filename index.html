@@ -857,49 +857,7 @@
   
         <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module">
-      window.getSupabase = function() {
-          if (window.supabaseClient && window.supabaseClient.auth) {
-              return window.supabaseClient;
-          }
-          if (window.supabase && window.supabase.auth) {
-              return window.supabase;
-          }
-          let supabaseUrl = "";
-          let supabaseKey = "";
-          try {
-              if (typeof import.meta !== 'undefined' && import.meta.env) {
-                  supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-                  supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-              }
-          } catch(e) {}
-
-          if (!supabaseUrl) {
-              try { supabaseUrl = localStorage.getItem('bexo_supabase_url') || ""; } catch(e) {}
-          }
-          if (!supabaseKey) {
-              try { supabaseKey = localStorage.getItem('bexo_supabase_anon_key') || ""; } catch(e) {}
-          }
-
-          if (supabaseUrl && supabaseKey && window.supabase && typeof window.supabase.createClient === 'function') {
-              try {
-                  const client = window.supabase.createClient(supabaseUrl, supabaseKey);
-                  window.supabaseClient = client;
-                  window.supabase = client;
-                  return client;
-              } catch(e) {
-                  console.error("[Supabase Init Error]:", e);
-              }
-          }
-          return null;
-      };
-
-      // Auto-init loop
-      const initSupabaseTimer = setInterval(() => {
-          const client = window.getSupabase();
-          if (client) clearInterval(initSupabaseTimer);
-      }, 50);
-    </script>
+  <script type="module" src="/src/supabase.ts"></script>
 </head>
   <body class="bg-slate-50 text-slate-900 overflow-x-hidden">
     <!-- Admin User Password Edit Section (Now handled inline, removing old modal) -->
@@ -2635,6 +2593,8 @@
 
               // checkAdminAccess is defined once later in the file
 
+                            // --- Core Constants & Safe Storage Parser ---
+              const APP_VERSION = '2.0.2';
               let currentMenu = 'dashboard';
               let currentAdminOrderStatusTab = 'All';
               let adminDashboardTimeFilter = 'All';
@@ -2650,60 +2610,6 @@
                   }
               }
 
-              // Sticky Header / Sidebar Scroll Prevention
-              window.addEventListener('scroll', () => {
-                  const header = document.querySelector('header');
-                  if (header) {
-                      if (window.scrollY > 0) {
-                          header.classList.add('shadow-lg');
-                      } else {
-                          header.classList.remove('shadow-lg');
-                      }
-                  }
-              });
-
-              // Cross-tab and Focus Data Synchronization
-              window.addEventListener('storage', (e) => {
-                  if (['bexo_users', 'bexo_orders', 'bexo_recharge_requests', 'bexo_balance_requests', 'bexo_withdrawals'].includes(e.key)) {
-                      if (typeof syncGlobalStateWithLocalStorage === 'function') {
-                          syncGlobalStateWithLocalStorage();
-                      }
-                      if (typeof currentMenu === 'string' && currentMenu === 'admin') {
-                          const dashboardTimeFilter = document.getElementById('adminDashboardTimeFilterSelect');
-                          if (dashboardTimeFilter && typeof renderAdminDashboard === 'function') {
-                              renderAdminDashboard();
-                          }
-                          const userTable = document.getElementById('adminUserTableBody');
-                          if (userTable && typeof renderAdminUsers === 'function') {
-                              renderAdminUsers();
-                          }
-                      }
-                      if (typeof updateAdminStats === 'function') {
-                          updateAdminStats();
-                      }
-                  }
-              });
-
-              window.addEventListener('focus', () => {
-                  if (typeof syncGlobalStateWithLocalStorage === 'function') {
-                      syncGlobalStateWithLocalStorage();
-                  }
-                  if (typeof currentMenu === 'string' && currentMenu === 'admin') {
-                      const dashboardTimeFilter = document.getElementById('adminDashboardTimeFilterSelect');
-                      if (dashboardTimeFilter && typeof renderAdminDashboard === 'function') {
-                          renderAdminDashboard();
-                      }
-                      const userTable = document.getElementById('adminUserTableBody');
-                      if (userTable && typeof renderAdminUsers === 'function') {
-                          renderAdminUsers();
-                      }
-                  }
-                  if (typeof updateAdminStats === 'function') {
-                      updateAdminStats();
-                  }
-              });
-              // --- Mock State & Data ---
-              const APP_VERSION = '2.0.2';
               // --- Security Utilities ---
               window.safeText = (str) => {
                   if (!str) return "";
@@ -2724,15 +2630,6 @@
                   localStorage.setItem('bexo_banned', JSON.stringify(b));
                   renderAdminUsers();
               };
-              if (localStorage.getItem('bexo_app_version') !== APP_VERSION) {
-                  // Migration: Clear old demo data if version changed
-                  localStorage.removeItem('bexo_orders');
-                  localStorage.removeItem('bexo_transactions');
-                  localStorage.removeItem('bexo_recharge_requests');
-                  localStorage.removeItem('bexo_balance_requests');
-                  localStorage.setItem('bexo_app_version', APP_VERSION);
-                  console.log("Migration executed: Demo data purged.");
-              }
 
               const DEFAULT_PROFILE = {
                   profileId: '',
@@ -2773,20 +2670,52 @@
                   notifications: []
               };
 
-              function getAbbr(name) {
-                  if (!name || name.trim() === '' || name.toLowerCase() === 'official reseller' || name.toLowerCase() === 'n/a') return 'BBA';
-                  const cleanName = name.replace(/[^a-zA-Z0-9\u0980-\u09ff\s]/g, '').trim();
-                  if (!cleanName) return 'BBA';
-                  const words = cleanName.split(/\s+/).filter(Boolean);
-                  if (words.length >= 2) {
-                      // Check english words or bengali words
-                      return words.slice(0, 3).map(w => {
-                          const char = w[0] || '';
-                          return char;
-                      }).join('').toUpperCase();
-                  }
-                  return cleanName.slice(0, 3).toUpperCase();
+              const INITIAL_CATEGORIES = [];
+
+              const PASSIVE_COMMISSION_RATES = [
+                  { min: 8501, max: 10000, l1: 16, l2: 12, l3: 10, l4: 5 },
+                  { min: 6101, max: 8500, l1: 10, l2: 7, l3: 5, l4: 4 },
+                  { min: 4001, max: 6100, l1: 8, l2: 6, l3: 4, l4: 3 },
+                  { min: 2801, max: 4000, l1: 7, l2: 4, l3: 3, l4: 2 },
+                  { min: 1701, max: 2800, l1: 6, l2: 4, l3: 3, l4: 2 },
+                  { min: 801, max: 1700, l1: 6, l2: 4, l3: 2, l4: 2 },
+                  { min: 501, max: 800, l1: 6, l2: 3, l3: 2, l4: 2 },
+                  { min: 401, max: 500, l1: 5, l2: 2, l3: 2, l4: 2 },
+                  { min: 301, max: 400, l1: 4, l2: 2, l3: 2, l4: 2 },
+                  { min: 201, max: 300, l1: 3, l2: 2, l3: 2, l4: 2 },
+                  { min: 101, max: 200, l1: 2, l2: 2, l3: 2, l4: 2 },
+                  { min: 80, max: 100, l1: 1, l2: 1, l3: 1, l4: 1 }
+              ];
+
+              function getPassiveCommission(adminPrice, level) {
+                  const rate = PASSIVE_COMMISSION_RATES.find(r => adminPrice >= r.min && adminPrice <= r.max);
+                  if (!rate) return 0;
+                  return rate[`l${level}`] || 0;
               }
+
+              // --- State Variables Initialized Immediately ---
+              let userProfile = safeParse('bexo_profile', null);
+              if (!userProfile) {
+                  userProfile = {
+                      ...DEFAULT_PROFILE,
+                      shopName: '',
+                      fullName: '',
+                      phone: '',
+                      address: '',
+                      district: '',
+                      password: ''
+                  };
+              }
+              const requiredArrays = ['cart', 'orders', 'favorites', 'rechargeTransactions', 'passiveTransactions'];
+              requiredArrays.forEach(arr => {
+                  if (!userProfile[arr]) userProfile[arr] = [];
+              });
+              if (!userProfile.referrals) {
+                  userProfile.referrals = { level1: [], level2: [], level3: [], level4: [] };
+              }
+              if (userProfile.deliveredOrdersCount === undefined) userProfile.deliveredOrdersCount = 0;
+              if (userProfile.passiveEarnings === undefined) userProfile.passiveEarnings = 0;
+              if (userProfile.rechargeBalance === undefined) userProfile.rechargeBalance = 0;
 
               let appUsers = safeParse('bexo_users', []).filter(u => u && (u.phone || u.email || u.profileId)).map(u => {
                   if (!u.profileId) {
@@ -2794,24 +2723,182 @@
                   }
                   return u;
               });
-              saveUsers();
 
-              
+              let appOrders = safeParse('bexo_orders', []);
+              let appManagerRecords = safeParse('bexo_manager_records', []);
+              let appResellerPayouts = safeParse('bexo_reseller_payouts', []);
+
+              let appSettings = safeParse('bexo_settings', null) || {
+                  youtubeLink: '',
+                  premiumGroupLink: '',
+                  homeBannerUrl: '',
+                  bkashLogo: '',
+                  nagadLogo: '',
+                  mcashLogo: '',
+                  bkashNumber: '',
+                  nagadNumber: '',
+                  mcashNumber: '',
+                  showTopSellingHome: false,
+                  topSellingLimit: 0,
+                  dhakaCharge: 80,
+                  outsideDhakaCharge: 130
+              };
+
+              let appPremiumRequests = safeParse('bexo_premium_requests', []);
+              let appRechargeRequests = safeParse('bexo_recharge_requests', []);
+              let appBalanceRequests = safeParse('bexo_balance_requests', []);
+              let appBillRequests = safeParse('bexo_bill_requests', []);
+              let appPendingProfits = safeParse('bexo_pending_profits', {});
+              let appCustomerReports = safeParse('bexo_customer_reports', {});
+              let appCategories = safeParse('bexo_categories', null) || INITIAL_CATEGORIES;
+              let appTransactions = safeParse('bexo_transactions', []);
+              if (appTransactions.length > 500) appTransactions = appTransactions.slice(0, 500); // Performance cap
+              let appAccounts = safeParse('bexo_accounts', []);
+              let appProfilePayments = safeParse('bexo_profile_payments', []);
+              let appWithdrawals = safeParse('bexo_withdrawals', []);
+              let appSupportTickets = safeParse('bexo_support_tickets', []);
+
+              let appPosts = safeParse('bexo_posts', []);
+              appPosts.forEach(p => {
+                  const s = (p.stockCount !== undefined && p.stockCount !== null) ? Number(p.stockCount) : ((p.stock !== undefined && p.stock !== null) ? Number(p.stock) : null);
+                  if (s !== null && s > 0) {
+                      p.isStockOut = false;
+                      p.stockStatus = 'in_stock';
+                      p.stockCount = s;
+                      p.stock = s;
+                  } else if (s !== null && s <= 0) {
+                      p.isStockOut = true;
+                      p.stockStatus = 'out_of_stock';
+                      p.stockCount = 0;
+                      p.stock = 0;
+                  }
+              });
+
+              // Clean image arrays for appPosts
+              let _needsPostSave = false;
+              appPosts.forEach(p => {
+                  if (p.images && p.images.length > 1 && typeof p.images[0] === 'string' && typeof p.images[1] === 'string') {
+                      if ((p.images[0] === 'h' && p.images[1] === 't') || (p.images[0] === 'd' && p.images[1] === 'a' && p.images[2] === 't' && p.images[3] === 'a')) {
+                          p.images = [p.images.join('')];
+                          _needsPostSave = true;
+                      }
+                  }
+              });
+              if (_needsPostSave) localStorage.setItem('bexo_posts', JSON.stringify(appPosts));
+
+              let productCurrentPage = 1;
+              const productsPerPage = 18;
+
+              // --- Clean and sanitize loaded orders ---
+              appOrders = appOrders.map(o => {
+                  if (!o) return o;
+                  const item = (o.items && o.items.length > 0) ? o.items[0] : null;
+                  
+                  let customerName = o.customerName || (o.shipping && o.shipping.name) || o.customer;
+                  if (!customerName || customerName === 'undefined') {
+                      customerName = 'সম্মানিত কাস্টমার';
+                  }
+
+                  let customerPhone = o.customerPhone || (o.shipping && o.shipping.mobile);
+                  if (!customerPhone || customerPhone === 'undefined') {
+                      customerPhone = 'N/A';
+                  }
+
+                  let customerAddress = o.customerAddress || (o.shipping && o.shipping.address);
+                  if (!customerAddress || customerAddress === 'undefined') {
+                      customerAddress = 'ঠিকানা প্রদান করা হয়নি';
+                  }
+
+                  const qty = Number(item ? (item.qty || 1) : 1) || 1;
+
+                  let basePriceObj = 0;
+                  if (item) {
+                      basePriceObj = Number(item.basePrice || item.base || 0);
+                  }
+                  let totalBasePrice = Number(o.totalBasePrice);
+                  if (isNaN(totalBasePrice) || o.totalBasePrice === undefined || o.totalBasePrice === null) {
+                      totalBasePrice = basePriceObj * qty;
+                  }
+                  if (isNaN(totalBasePrice) || totalBasePrice <= 0) {
+                      const totalRev = Number(o.total || o.totalSellingPrice || 0);
+                      const totalProf = Number(o.totalProfit || o.profit || 0);
+                      totalBasePrice = Math.max(0, totalRev - totalProf);
+                  }
+
+                  let sellingPriceObj = 0;
+                  if (item) {
+                      sellingPriceObj = Number(item.sellingPrice || item.selling || 0);
+                  }
+                  let totalSellingPrice = Number(o.totalSellingPrice || o.total || o.selling);
+                  if (isNaN(totalSellingPrice) || totalSellingPrice === undefined || totalSellingPrice === null || totalSellingPrice <= 0) {
+                      totalSellingPrice = sellingPriceObj * qty;
+                  }
+                  if (isNaN(totalSellingPrice) || totalSellingPrice <= 0) {
+                      totalSellingPrice = totalBasePrice + (Number(o.totalProfit) || Number(o.profit) || 0);
+                  }
+
+                  let totalProfit = o.totalProfit !== undefined ? Number(o.totalProfit) : Number(o.profit);
+                  if (isNaN(totalProfit) || totalProfit === undefined || totalProfit === null) {
+                      totalProfit = Math.max(0, totalSellingPrice - totalBasePrice);
+                  }
+
+                  const sanitizedItems = o.items ? o.items.map(it => ({
+                      productId: it.productId || 'UNKNOWN',
+                      title: it.title || 'প্রোডাক্ট',
+                      image: it.image || it.img || 'https://picsum.photos/seed/def/200/200',
+                      size: it.size || 'N/A',
+                      qty: Number(it.qty) || 1,
+                      sellingPrice: Number(it.sellingPrice || it.selling || 0) || (totalSellingPrice / qty),
+                      basePrice: Number(it.basePrice || it.base || 0) || (totalBasePrice / qty)
+                  })) : [{
+                      productId: 'UNKNOWN',
+                      title: o.product || 'প্রোডাক্ট',
+                      image: 'https://picsum.photos/seed/def/200/200',
+                      size: 'N/A',
+                      qty: qty,
+                      sellingPrice: totalSellingPrice / qty,
+                      basePrice: totalBasePrice / qty
+                  }];
+
+                  const oToken = o.secretToken || ('SEC-' + (Math.abs(Number(o.id) || Date.now()) % 900000 + 100000));
+                  return {
+                      ...o,
+                      customerName,
+                      customerPhone,
+                      customerAddress,
+                      totalBasePrice: totalBasePrice || 0,
+                      totalSellingPrice: totalSellingPrice || 0,
+                      totalProfit: totalProfit || 0,
+                      grandTotal: Number(o.grandTotal) || (totalSellingPrice + Number(o.deliveryCharge || 0)),
+                      items: sanitizedItems,
+                      secretToken: oToken
+                  };
+              });
+
+              // --- Helper Functions ---
+              function getAbbr(name) {
+                  if (!name || name.trim() === '' || name.toLowerCase() === 'official reseller' || name.toLowerCase() === 'n/a') return 'BBA';
+                  const cleanName = name.replace(/[^a-zA-Z0-9ঀ-৿\s]/g, '').trim();
+                  if (!cleanName) return 'BBA';
+                  const words = cleanName.split(/\s+/).filter(Boolean);
+                  if (words.length >= 2) {
+                      return words.slice(0, 3).map(w => (w[0] || '')).join('').toUpperCase();
+                  }
+                  return cleanName.slice(0, 3).toUpperCase();
+              }
+
               function toBengaliNumber(num) {
                   const bMap = {'0':'০','1':'১','2':'২','3':'৩','4':'৪','5':'৫','6':'৬','7':'৭','8':'৮','9':'৯'};
                   return String(num).replace(/[0-9]/g, d => bMap[d] || d);
               }
+
               function normalizePhone(p) {
                   if(!p) return '';
                   let str = String(p);
-                  // Convert Bangla to English digits inline for safety
                   const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
                   str = str.replace(/[০-৯]/g, d => bMap[d] || d);
-                  // Remove formatting
                   let cleaned = str.replace(/[\s\-\+\(\)]/g, '');
-                  // Take last 11 characters
                   let sliced = cleaned.slice(-11);
-                  // Pad leading zero if 10-digit number is missing it
                   if (sliced.length === 10 && sliced.startsWith('1')) {
                       sliced = '0' + sliced;
                   }
@@ -2840,6 +2927,278 @@
               }
               window.findUserByEmailOrPhone = findUserByEmailOrPhone;
 
+              function isUserAdmin() {
+                  return localStorage.getItem('bexo_is_admin') === 'true';
+              }
+
+              function toggleAdminMode() {
+                  if (isUserAdmin()) {
+                      localStorage.removeItem('bexo_is_admin');
+                      showToast("অ্যাডমিন মুড অফ করা হয়েছে", "info");
+                  } else {
+                      checkAdminAccess();
+                  }
+                  renderProductList();
+              }
+
+              function sanitizeForSupabase(obj, ancestors = new Set()) {
+                  if (obj === undefined || obj === null) {
+                      return null;
+                  }
+                  if (typeof obj === 'object') {
+                      if (ancestors.has(obj)) {
+                          return "[Circular]";
+                      }
+
+                      if (Array.isArray(obj)) {
+                          const newAncestors = new Set(ancestors);
+                          newAncestors.add(obj);
+                          return obj.map(item => sanitizeForSupabase(item, newAncestors));
+                      }
+
+                      if (obj instanceof Date) {
+                          return obj.toISOString();
+                      }
+
+                      const clean = {};
+                      const newAncestors = new Set(ancestors);
+                      newAncestors.add(obj);
+
+                      for (const key in obj) {
+                          if (key === 'password') continue;
+                          if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                              const val = obj[key];
+                              if (val === undefined) {
+                                  clean[key] = null;
+                              } else if (val && typeof val === 'object') {
+                                  clean[key] = sanitizeForSupabase(val, newAncestors);
+                              } else {
+                                  clean[key] = val;
+                              }
+                          }
+                      }
+                      return clean;
+                  }
+                  return obj;
+              }
+
+              // --- Persistence / Save Helpers ---
+              function saveProfile() {
+                  try {
+                      if (!userProfile) return;
+                      localStorage.setItem('bexo_profile', JSON.stringify(userProfile));
+                      if (typeof updateAppUsersList === 'function') {
+                          updateAppUsersList(userProfile);
+                      }
+                  } catch (e) {
+                      console.error("Save Profile Error:", e);
+                  }
+              }
+
+              function saveUsers(userIdToSync = null, skipSupabase = false) {
+                  localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                  if (window.supabase && !skipSupabase) {
+                      if (userIdToSync) {
+                          const idsToSync = Array.isArray(userIdToSync) ? userIdToSync : [userIdToSync];
+                          idsToSync.forEach(id => {
+                              const target = appUsers.find(u => String(u.profileId) === String(id));
+                              if (target && target.profileId) {
+                                  window.supabase.collection('bexo_users').doc(String(target.profileId)).set(sanitizeForSupabase(target))
+                                      .catch(err => console.warn("Supabase sync specific user error:", err));
+                              }
+                          });
+                      } else {
+                          if (isUserAdmin()) {
+                              appUsers.forEach(u => {
+                                  if (u && u.profileId) {
+                                      window.supabase.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
+                                          .catch(err => console.warn("Supabase sync user error:", err));
+                                  }
+                              });
+                          } else if (userProfile && userProfile.profileId) {
+                              const target = appUsers.find(u => String(u.profileId) === String(userProfile.profileId));
+                              if (target && target.profileId) {
+                                  window.supabase.collection('bexo_users').doc(String(target.profileId)).set(sanitizeForSupabase(target))
+                                      .catch(err => console.warn("Supabase regular user sync error:", err));
+                              }
+                          }
+                      }
+                  }
+              }
+
+              function saveOrders(specificOrderId = null) {
+                  localStorage.setItem('bexo_orders', JSON.stringify(appOrders));
+                  if (window.getSupabase && window.getSupabase()) {
+                      if (specificOrderId) {
+                          const o = appOrders.find(order => String(order.id) === String(specificOrderId));
+                          if (o) {
+                              window.supabase.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
+                                  .catch(err => console.warn("Supabase sync specific order error:", err));
+                          }
+                      } else {
+                          appOrders.forEach(o => {
+                              if (o && o.id) {
+                                  window.supabase.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
+                                      .catch(err => console.warn("Supabase sync order error:", err));
+                              }
+                          });
+                      }
+                  }
+              }
+
+              function saveManagerRecords() {
+                  localStorage.setItem('bexo_manager_records', JSON.stringify(appManagerRecords));
+              }
+
+              function saveResellerPayouts() {
+                  localStorage.setItem('bexo_reseller_payouts', JSON.stringify(appResellerPayouts));
+              }
+
+              function saveSettings() {
+                  localStorage.setItem('bexo_settings', JSON.stringify(appSettings));
+                  if (window.getSupabase && window.getSupabase()) {
+                      (window.getSupabase ? window.getSupabase().from('bexo_settings').upsert(sanitizeForSupabase(appSettings)) : Promise.resolve())
+                          .catch(err => console.warn("Supabase sync settings error:", err));
+                  }
+              }
+              function saveAppSettings() {
+                  saveSettings();
+              }
+
+              function savePremiumRequests() {
+                  localStorage.setItem('bexo_premium_requests', JSON.stringify(appPremiumRequests));
+                  if (window.getSupabase && window.getSupabase()) {
+                      appPremiumRequests.forEach(r => {
+                          if (r && r.id) {
+                              window.supabase.collection('bexo_premium_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
+                                  .catch(err => console.warn("Supabase sync premium error:", err));
+                          }
+                      });
+                  }
+              }
+
+              function saveRechargeRequests() {
+                  localStorage.setItem('bexo_recharge_requests', JSON.stringify(appRechargeRequests));
+                  if (window.getSupabase && window.getSupabase()) {
+                      appRechargeRequests.forEach(r => {
+                          if (r && r.id) {
+                              window.supabase.collection('bexo_recharge_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
+                                  .catch(err => console.warn("Supabase sync recharge error:", err));
+                          }
+                      });
+                  }
+              }
+
+              function saveBalanceRequests() {
+                  localStorage.setItem('bexo_balance_requests', JSON.stringify(appBalanceRequests));
+                  if (window.getSupabase && window.getSupabase()) {
+                      appBalanceRequests.forEach(r => {
+                          if (r && r.id) {
+                              window.supabase.collection('bexo_balance_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
+                                  .catch(err => console.warn("Supabase sync balance error:", err));
+                          }
+                      });
+                  }
+              }
+
+              function saveBillRequests() {
+                  localStorage.setItem('bexo_bill_requests', JSON.stringify(appBillRequests));
+                  if (window.getSupabase && window.getSupabase()) {
+                      appBillRequests.forEach(r => {
+                          if (r && r.id) {
+                              window.supabase.collection('bexo_bill_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
+                                  .catch(err => console.warn("Supabase sync bill error:", err));
+                          }
+                      });
+                  }
+              }
+
+              function savePendingProfits() {
+                  localStorage.setItem('bexo_pending_profits', JSON.stringify(appPendingProfits));
+              }
+
+              function saveCustomerReports() {
+                  localStorage.setItem('bexo_customer_reports', JSON.stringify(appCustomerReports));
+                  if (window.getSupabase && window.getSupabase()) {
+                      (window.getSupabase ? window.getSupabase().from('bexo_customer_reports').upsert(sanitizeForSupabase(appCustomerReports)) : Promise.resolve())
+                          .catch(err => console.error(err));
+                  }
+              }
+
+              function saveCategories() {
+                  localStorage.setItem('bexo_categories', JSON.stringify(appCategories));
+                  if (window.getSupabase && window.getSupabase()) {
+                      appCategories.forEach(c => {
+                          if (c && c.id) {
+                              window.supabase.collection('bexo_categories').doc(String(c.id)).set(sanitizeForSupabase(c))
+                                  .catch(err => console.warn("Supabase sync category error:", err));
+                          }
+                      });
+                  }
+              }
+
+              function saveTransactions() {
+                  localStorage.setItem('bexo_transactions', JSON.stringify(appTransactions));
+                  if (typeof updateHeaderBalance === 'function') updateHeaderBalance();
+                  if (window.getSupabase && window.getSupabase()) {
+                      appTransactions.forEach(t => {
+                          if (t && t.id) {
+                              window.supabase.collection('bexo_transactions').doc(String(t.id)).set(sanitizeForSupabase(t))
+                                  .catch(err => console.warn("Supabase sync transaction error:", err));
+                          }
+                      });
+                  }
+              }
+
+              function saveAccounts() {
+                  localStorage.setItem('bexo_accounts', JSON.stringify(appAccounts));
+                  if (window.getSupabase && window.getSupabase()) {
+                      appAccounts.forEach(a => {
+                          if (a && a.id) {
+                              window.supabase.collection('bexo_accounts').doc(String(a.id)).set(sanitizeForSupabase(a))
+                                  .catch(err => console.warn("Supabase sync accounts error:", err));
+                          }
+                      });
+                  }
+              }
+
+              function saveProfilePayments() {
+                  localStorage.setItem('bexo_profile_payments', JSON.stringify(appProfilePayments));
+                  if (window.getSupabase && window.getSupabase()) {
+                      appProfilePayments.forEach(p => {
+                          if (p && p.id) {
+                              window.supabase.collection('bexo_profile_payments').doc(String(p.id)).set(sanitizeForSupabase(p))
+                                  .catch(err => console.warn("Supabase sync profile payments error:", err));
+                          }
+                      });
+                  }
+              }
+
+              function saveWithdrawals() {
+                  localStorage.setItem('bexo_withdrawals', JSON.stringify(appWithdrawals));
+                  if (window.getSupabase && window.getSupabase()) {
+                      appWithdrawals.forEach(w => {
+                          if (w && w.id) {
+                              window.supabase.collection('bexo_withdrawals').doc(String(w.id)).set(sanitizeForSupabase(w))
+                                  .catch(err => console.warn("Supabase sync withdrawal error:", err));
+                          }
+                      });
+                  }
+              }
+
+              function saveSupportTickets() {
+                  localStorage.setItem('bexo_support_tickets', JSON.stringify(appSupportTickets));
+                  if (window.getSupabase && window.getSupabase()) {
+                      appSupportTickets.forEach(t => {
+                          if (t && t.id) {
+                              window.supabase.collection('bexo_support_tickets').doc(String(t.id)).set(sanitizeForSupabase(t))
+                                  .catch(err => console.warn("Supabase sync support tickets error:", err));
+                          }
+                      });
+                  }
+              }
+
+              // --- User & State Synchronization Functions ---
               function consolidateUserProfiles() {
                   if (typeof appUsers === 'undefined' || !Array.isArray(appUsers) || appUsers.length === 0) return;
 
@@ -2913,119 +3272,38 @@
               }
               window.consolidateUserProfiles = consolidateUserProfiles;
 
-              function sanitizeForSupabase(obj, ancestors = new Set()) {
-                  if (obj === undefined || obj === null) {
-                      return null;
-                  }
-                  if (typeof obj === 'object') {
-                      if (ancestors.has(obj)) {
-                          return "[Circular]";
-                      }
-
-                      if (Array.isArray(obj)) {
-                          const newAncestors = new Set(ancestors);
-                          newAncestors.add(obj);
-                          return obj.map(item => sanitizeForSupabase(item, newAncestors));
-                      }
-
-                      if (obj instanceof Date) {
-                          return obj.toISOString();
-                      }
-
-                      const clean = {};
-                      const newAncestors = new Set(ancestors);
-                      newAncestors.add(obj);
-
-                      for (const key in obj) {
-                          if (key === 'password') continue;
-                          if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                              const val = obj[key];
-                              if (val === undefined) {
-                                  clean[key] = null;
-                              } else if (val && typeof val === 'object') {
-                                  clean[key] = sanitizeForSupabase(val, newAncestors);
-                              } else {
-                                  clean[key] = val;
-                              }
-                          }
-                      }
-                      return clean;
-                  }
-                  return obj;
-              }
-
-              function saveUsers(userIdToSync = null, skipSupabase = false) {
-                  localStorage.setItem('bexo_users', JSON.stringify(appUsers));
-                  if (window.db && !skipSupabase) {
-                      if (userIdToSync) {
-                          const idsToSync = Array.isArray(userIdToSync) ? userIdToSync : [userIdToSync];
-                          idsToSync.forEach(id => {
-                              const target = appUsers.find(u => String(u.profileId) === String(id));
-                              if (target && target.profileId) {
-                                  window.db.collection('bexo_users').doc(String(target.profileId)).set(sanitizeForSupabase(target))
-                                      .catch(err => console.warn("Supabase sync specific user error:", err));
-                              }
-                          });
-                      } else {
-                          // Prevent critical race conditions where a client overrides the entire cloud database with stale local array.
-                          // However, we MUST allow admins to sync all users to Supabase to save newly registered/edited users.
-                          if (isUserAdmin()) {
-                              appUsers.forEach(u => {
-                                  if (u && u.profileId) {
-                                      window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
-                                          .catch(err => console.warn("Supabase sync user error:", err));
-                                  }
-                              });
-                          } else if (userProfile && userProfile.profileId) {
-                              const target = appUsers.find(u => String(u.profileId) === String(userProfile.profileId));
-                              if (target && target.profileId) {
-                                  window.db.collection('bexo_users').doc(String(target.profileId)).set(sanitizeForSupabase(target))
-                                      .catch(err => console.warn("Supabase regular user sync error:", err));
-                              }
-                           }
-                      }
-                  }
-              }
-
               function syncGlobalStateWithLocalStorage() {
                   try {
-                      // 1. Synchronize appUsers
                       appUsers = safeParse('bexo_users', []).filter(u => u && (u.phone || u.email || u.profileId)).map(u => {
                           if (!u.profileId) {
                               u.profileId = 'BX-' + Math.floor(100000 + Math.random() * 900000);
                           }
                           return u;
-                      if (typeof consolidateUserProfiles === "function") consolidateUserProfiles();
                       });
+                      if (typeof consolidateUserProfiles === "function") consolidateUserProfiles();
 
-                      // 2. Synchronize appOrders with sanitization
                       let rawOrders = safeParse('bexo_orders', []);
                       appOrders = rawOrders.map(o => {
                           if (!o) return o;
                           const item = (o.items && o.items.length > 0) ? o.items[0] : null;
                           
-                          // Clean customer name
                           let customerName = o.customerName || (o.shipping && o.shipping.name) || o.customer;
                           if (!customerName || customerName === 'undefined') {
                               customerName = 'সম্মানিত কাস্টমার';
                           }
 
-                          // Clean customer phone
                           let customerPhone = o.customerPhone || (o.shipping && o.shipping.mobile);
                           if (!customerPhone || customerPhone === 'undefined') {
                               customerPhone = 'N/A';
                           }
 
-                          // Clean customer address
                           let customerAddress = o.customerAddress || (o.shipping && o.shipping.address);
                           if (!customerAddress || customerAddress === 'undefined') {
                               customerAddress = 'ঠিকানা প্রদান করা হয়নি';
                           }
 
-                          // Determine quantity (qty)
                           const qty = Number(item ? (item.qty || 1) : 1) || 1;
 
-                          // Determine base price (buying)
                           let basePriceObj = 0;
                           if (item) {
                               basePriceObj = Number(item.basePrice || item.base || 0);
@@ -3040,7 +3318,6 @@
                               totalBasePrice = Math.max(0, totalRev - totalProf);
                           }
 
-                          // Determine selling price
                           let sellingPriceObj = 0;
                           if (item) {
                               sellingPriceObj = Number(item.sellingPrice || item.selling || 0);
@@ -3053,13 +3330,11 @@
                               totalSellingPrice = totalBasePrice + (Number(o.totalProfit) || Number(o.profit) || 0);
                           }
 
-                          // Determine total profit
                           let totalProfit = o.totalProfit !== undefined ? Number(o.totalProfit) : Number(o.profit);
                           if (isNaN(totalProfit) || totalProfit === undefined || totalProfit === null) {
                               totalProfit = Math.max(0, totalSellingPrice - totalBasePrice);
                           }
 
-                          // Standardize the items inside the order
                           const sanitizedItems = o.items ? o.items.map(it => ({
                               productId: it.productId || 'UNKNOWN',
                               title: it.title || 'প্রোডাক্ট',
@@ -3091,7 +3366,6 @@
                           };
                       });
 
-                      // 3. Synchronize other lists
                       appPremiumRequests = safeParse('bexo_premium_requests', []);
                       appRechargeRequests = safeParse('bexo_recharge_requests', []);
                       appBalanceRequests = safeParse('bexo_balance_requests', []);
@@ -3108,772 +3382,168 @@
                   }
               }
 
-              function isUserAdmin() {
-                  return localStorage.getItem('bexo_is_admin') === 'true';
-              }
-
-              function toggleAdminMode() {
-                  if (isUserAdmin()) {
-                      localStorage.removeItem('bexo_is_admin');
-                      showToast("অ্যাডমিন মুড অফ করা হয়েছে", "info");
-                  } else {
-                      checkAdminAccess();
-                  }
-                  renderProductList();
-              }
-
-              function openCategoryManagementModal(catId = null, subId = null) {
-                  const modal = document.createElement('div');
-                  modal.id = 'categoryManageModal';
-                  modal.className = 'fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm';
-
-                  let title = catId ? (subId ? 'সাব-ক্যাটাগরি এডিট' : 'ক্যাটাগরি এডিট') : 'নতুন ক্যাটাগরি';
-                  let nameVal = '';
-                  let orderVal = 1;
-                  let imageVal = '';
-
-                  if (catId && !subId) {
-                      const cat = appCategories.find(c => c.id == catId);
-                      if (cat) {
-                          nameVal = cat.name;
-                          orderVal = cat.order || 1;
+              function ensureBexoPayFields() {
+                  const fields = {
+                      rechargeBalance: 0,
+                      totalRecharge: 0,
+                      totalBillPay: 0,
+                      totalCommission: 0,
+                      rechargeTransactions: []
+                  };
+                  Object.keys(fields).forEach(key => {
+                      if (userProfile && userProfile[key] === undefined) {
+                          userProfile[key] = fields[key];
                       }
-                  } else if (catId && subId) {
-                      const cat = appCategories.find(c => c.id == catId);
-                      const sub = cat.subCategories.find(s => s.id == subId);
-                      if (sub) {
-                          nameVal = sub.name;
-                          orderVal = sub.order || 1;
-                          imageVal = sub.image || '';
-                      }
-                  } else {
-                      orderVal = appCategories.length + 1;
-                  }
-
-                  modal.innerHTML = `
-                      <div class="bg-white rounded-[2rem] w-full max-w-md p-4 sm:p-8 shadow-2xl animate-fade-in border border-slate-100">
-                          <div class="flex justify-between items-center mb-6">
-                              <h3 class="text-xl font-black text-slate-800">${title}</h3>
-                              <button onclick="this.closest('#categoryManageModal').remove()" class="text-slate-400 hover:text-rose-500"><i class="fas fa-times"></i></button>
-                          </div>
-                          <div class="space-y-4">
-                              <div class="space-y-1">
-                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">নাম</label>
-                                  <input type="text" id="manageCatName" value="${nameVal}" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm">
-                              </div>
-                              <div class="space-y-1">
-                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ক্রম (Order/Serial)</label>
-                                  <input type="number" id="manageCatOrder" value="${orderVal}" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm">
-                              </div>
-                              ${(subId || subId === 0 || title.includes('সাব')) ? `
-                              <div class="space-y-1">
-                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ছবি URL (সাব-ক্যাটাগরির জন্য)</label>
-                                  <input type="text" id="manageCatImage" value="${imageVal}" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm" placeholder="https://...">
-                              </div>
-                              ` : ''}
-
-                              <div class="pt-4 flex gap-3">
-                                  ${catId ? `<button onclick="deleteObjectFromCategory('${catId}', '${subId || ''}')" class="flex-1 py-3 bg-rose-50 text-rose-500 rounded-xl font-bold text-xs hover:bg-rose-100 transition-all">ডিলিট করুন</button>` : ''}
-                                  <button onclick="saveCategoryManagement('${catId || ''}', '${subId || ''}')" class="flex-[2] py-3 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-orange-600 transition-all shadow-lg hover:shadow-orange-100">সংরক্ষণ করুন</button>
-                              </div>
-                          </div>
-                      </div>
-                  `;
-                  document.body.appendChild(modal);
+                  });
+                  saveProfile();
               }
-
-              function saveCategoryManagement(catId, subId) {
-                  const name = document.getElementById('manageCatName').value.trim();
-                  const order = parseInt(document.getElementById('manageCatOrder').value) || 1;
-                  const image = document.getElementById('manageCatImage')?.value.trim() || '';
-
-                  if (!name) {
-                      showToast("নাম অবশ্যই দিতে হবে!", "error");
-                      return;
-                  }
-
-                  if (catId && subId && subId !== 'null' && subId !== '') {
-                      // Edit SubCategory
-                      const cat = appCategories.find(c => c.id == catId);
-                      const sub = cat.subCategories.find(s => s.id == subId);
-                      sub.name = name;
-                      sub.order = order;
-                      sub.image = image;
-                  } else if (catId && (!subId || subId === 'null' || subId === '')) {
-                      // Edit Category
-                      const cat = appCategories.find(c => c.id == catId);
-                      cat.name = name;
-                      cat.order = order;
-                  } else if (!catId) {
-                      // New Category
-                      const newCat = {
-                          id: Date.now(),
-                          name: name,
-                          order: order,
-                          subCategories: []
-                      };
-                      appCategories.push(newCat);
-                  }
-
-                  saveCategories();
-                  const m = document.getElementById('categoryManageModal');
-                  if(m) m.remove();
-
-                  if (currentMenu === 'admin') {
-                      const subView = localStorage.getItem('bexo_admin_subview') || document.querySelector('.admin-nav-item.active')?.getAttribute('data-view');
-                      if (subView === 'all-products') renderAdminPostList();
-                      else if (subView === 'categories') renderAdminCategoryList();
-                      else renderProductList();
-                  } else {
-                      renderProductList();
-                  }
-                  showToast("সংরক্ষণ করা হয়েছে", "success");
-              }
-
-              function openAddSubCategoryModal(catId) {
-                   const modal = document.createElement('div');
-                  modal.id = 'categoryManageModal';
-                  modal.className = 'fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm';
-
-                  modal.innerHTML = `
-                      <div class="bg-white rounded-[2rem] w-full max-w-md p-4 sm:p-8 shadow-2xl animate-fade-in border border-slate-100">
-                          <div class="flex justify-between items-center mb-6">
-                              <h3 class="text-xl font-black text-slate-800">নতুন সাব-ক্যাটাগরি</h3>
-                              <button onclick="this.closest('#categoryManageModal').remove()" class="text-slate-400 hover:text-rose-500"><i class="fas fa-times"></i></button>
-                          </div>
-                          <div class="space-y-4">
-                              <div class="space-y-1">
-                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">নাম</label>
-                                  <input type="text" id="manageSubName" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm">
-                              </div>
-                              <div class="space-y-1">
-                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ক্রম (Order/Serial)</label>
-                                  <input type="number" id="manageSubOrder" value="1" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm">
-                              </div>
-                              <div class="space-y-1">
-                                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ছবি URL</label>
-                                  <input type="text" id="manageSubImage" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-orange-500 font-bold text-sm" placeholder="https://...">
-                              </div>
-
-                              <div class="pt-4 flex gap-3">
-                                  <button onclick="saveNewSubCategory('${catId}')" class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-orange-600 transition-all shadow-lg hover:shadow-orange-100">সংরক্ষণ করুন</button>
-                              </div>
-                          </div>
-                      </div>
-                  `;
-                  document.body.appendChild(modal);
-              }
-
-              function saveNewSubCategory(catId) {
-                  const name = document.getElementById('manageSubName').value.trim();
-                  const order = parseInt(document.getElementById('manageSubOrder').value) || 1;
-                  const image = document.getElementById('manageSubImage').value.trim();
-
-                  if (!name) {
-                      showToast("নাম অবশ্যই দিতে হবে!", "error");
-                      return;
-                  }
-
-                  const cat = appCategories.find(c => c.id == catId);
-                  if (cat) {
-                      if(!cat.subCategories) cat.subCategories = [];
-                      cat.subCategories.push({
-                          id: Date.now(),
-                          name: name,
-                          order: order,
-                          image: image || 'https://via.placeholder.com/150'
-                      });
-                      saveCategories();
-                      const m = document.getElementById('categoryManageModal');
-                      if(m) m.remove();
-
-                      if (currentMenu === 'admin') {
-                          const subView = localStorage.getItem('bexo_admin_subview') || document.querySelector('.admin-nav-item.active')?.getAttribute('data-view');
-                          if (subView === 'all-products') renderAdminPostList();
-                          else if (subView === 'categories') renderAdminCategoryList();
-                          else renderProductList();
-                      } else {
-                          renderProductList();
-                      }
-                      showToast("সাব-ক্যাটাগরি যুক্ত হয়েছে", "success");
-                  }
-              }
-
-              function deleteObjectFromCategory(catId, subId) {
-                  if (!confirm('আপনি কি নিশ্চিত যে এটি ডিলিট করতে চান?')) return;
-                  try {
-                      if (subId && subId !== 'null' && subId !== '') {
-                          const cat = appCategories.find(c => String(c.id) === String(catId));
-                          if(cat) cat.subCategories = cat.subCategories.filter(s => String(s.id) !== String(subId));
-                      } else {
-                          appCategories = appCategories.filter(c => String(c.id) !== String(catId));
-                          if (window.db) {
-                              window.db.collection('bexo_categories').doc(String(catId)).delete().catch(err => console.error('Error deleting category from DB:', err));
-                          }
-                      }
-
-                      saveCategories();
-                      const m = document.getElementById('categoryManageModal');
-                      if(m) m.remove();
-
-                      if (currentMenu === 'admin') {
-                          const subView = localStorage.getItem('bexo_admin_subview') || document.querySelector('.admin-nav-item.active')?.getAttribute('data-view');
-                          if (subView === 'all-products') renderAdminPostList();
-                          else if (subView === 'categories') renderAdminCategoryList();
-                          else renderProductList();
-                      } else {
-                          renderProductList();
-                      }
-                      showToast("ডিলিট করা হয়েছে", "info");
-                  } catch (e) {
-                      console.error("Delete Error", e);
-                      showToast("Error: " + e.message, "error");
-                  }
-              }
-
-              // saveCategories is defined once later in the file
-
-              function openCategoryQuickEdit(catName) {
-                  const cat = appCategories.find(c => c.name === catName);
-                  if (cat) {
-                      openCategoryManagementModal(cat.id);
-                  } else {
-                      showToast("ক্যাটাগরি খুঁজে পাওয়া যায়নি", "error");
-                  }
-              }
-
-              async function syncUsersFromDatabaseSilently() {
-                  try {
-                      if (window.db) {
-                          const snap = await window.db.collection('bexo_users').get();
-                          const supabaseUsers = [];
-                          snap.forEach(doc => {
-                              const data = doc.data();
-                              if (data) supabaseUsers.push(data);
-                          });
-                          
-                          if (supabaseUsers.length > 0) {
-                              if (!Array.isArray(appUsers)) appUsers = [];
-                              
-                              supabaseUsers.forEach(fUser => {
-                                  if (!fUser || !fUser.profileId) return;
-                                  const existingIdx = appUsers.findIndex(u => u.profileId === fUser.profileId);
-                                  if (existingIdx > -1) {
-                                      appUsers[existingIdx] = { ...appUsers[existingIdx], ...fUser };
-                                  } else {
-                                      appUsers.push(fUser);
-                                  }
-                              });
-                              
-                              appUsers = appUsers.filter(u => u && (u.phone || u.email || u.profileId));
-                              localStorage.setItem('bexo_users', JSON.stringify(appUsers));
-                              
-                              if (typeof updateAdminStats === 'function') {
-                                  updateAdminStats();
-                              }
-                              
-                              // Re-render UI table if on open Users view
-                              const tbody = document.getElementById('adminUserTableBody');
-                              if (tbody) {
-                                  tbody.innerHTML = renderAdminUserRows(appUsers);
-                              }
-                          }
-                      }
-                  } catch (err) {
-                      console.error("Silent sync users error:", err);
-                  }
-              }
-
-              async function syncUsersFromDatabaseDirectly() {
-                  const syncBtn = document.getElementById('adminSyncUsersBtn');
-                  if (syncBtn) {
-                      syncBtn.disabled = true;
-                      syncBtn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> লোড হচ্ছে...';
-                   }
-                   
-                   try {
-                       if (window.db) {
-                           const snap = await window.db.collection('bexo_users').get();
-                           const supabaseUsers = [];
-                           snap.forEach(doc => {
-                               const data = doc.data();
-                               if (data) supabaseUsers.push(data);
-                           });
-                           
-                           if (supabaseUsers.length > 0) {
-                               if (!Array.isArray(appUsers)) appUsers = [];
-                               
-                               supabaseUsers.forEach(fUser => {
-                                   if (!fUser || !fUser.profileId) return;
-                                   const existingIdx = appUsers.findIndex(u => u.profileId === fUser.profileId || u.phone === fUser.phone);
-                                   if (existingIdx > -1) {
-                                       appUsers[existingIdx] = { ...appUsers[existingIdx], ...fUser };
-                                   } else {
-                                       appUsers.push(fUser);
-                                   }
-                               });
-                               
-                               appUsers = appUsers.filter(u => u && (u.phone || u.email || u.profileId));
-                               localStorage.setItem('bexo_users', JSON.stringify(appUsers));
-                               
-                               if (typeof updateAdminStats === 'function') {
-                                   updateAdminStats();
-                               }
-                               
-                               // Upload local-only users back to Supabase to ensure Supabase has all accounts
-                               appUsers.forEach(u => {
-                                   if (u && u.profileId && u.phone && u.password) {
-                                       const existsInSupabase = supabaseUsers.some(f => f.profileId === u.profileId);
-                                       if (!existsInSupabase) {
-                                           console.log(`[Manual Direct Sync] Uploading missing local user to Supabase: ${u.profileId}`);
-                                           window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
-                                               .catch(err => console.error("Direct sync upload user error:", err));
-                                        }
-                                   }
-                               });
-
-                               const tbody = document.getElementById('adminUserTableBody');
-                               if (tbody) {
-                                   tbody.innerHTML = renderAdminUserRows(appUsers);
-                               }
-                               showToast("ডাটাবেজ থেকে সকল ইউজার সফলভাবে লোড ও সিনক্রোনাইজ করা হয়েছে!", "success");
-                           } else {
-                               if (appUsers.length > 0) {
-                                   // Seed empty Supabase with existing local users
-                                   appUsers.forEach(u => {
-                                       window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
-                                           .catch(err => console.warn("Auto-seed user error:", err));
-                                   });
-                                   showToast("ডিভাইসের ইউজারসমূহ সফলভাবে অনলাইন ডাটাবেজে সিঙ্ক করা হয়েছে!", "success");
-                               } else {
-                                   showToast("ডাটাবেজে কোন ইউজার তথ্য পাওয়া যায়নি।", "info");
-                               }
-                           }
-                       } else {
-                           showToast("ফায়ারবেস ডাটাবেজ কানেক্টেড নেই!", "error");
-                       }
-                   } catch (err) {
-                       console.error("Direct sync users error:", err);
-                       showToast("ইউজার সিনক্রোনাইজেশনে সমস্যা হয়েছে!", "error");
-                   } finally {
-                       if (syncBtn) {
-                           syncBtn.disabled = false;
-                           syncBtn.innerHTML = '<i class="fas fa-sync-alt"></i> ডাটাবেজ সিঙ্ক';
-                       }
-                   }
-               }
 
               function updateAppUsersList(profile) {
-                  if (!profile || !profile.phone || !profile.password) {
-                      return;
-                  }
+                  if (!profile || !profile.profileId) return;
                   if (!Array.isArray(appUsers)) {
                       appUsers = [];
-                  }
-                  
-                  // Ensure profile has a valid profileId
-                  if (!profile.profileId) {
-                      profile.profileId = 'BX-' + Math.floor(100000 + Math.random() * 900000);
                   }
 
                   const idx = appUsers.findIndex(u => u.profileId && u.profileId === profile.profileId);
                   const userData = {
                       profileId: profile.profileId,
-                      avatar: profile.avatar || '',
-                      fullName: profile.fullName,
                       shopName: profile.shopName || '',
-                      sellerCode: profile.sellerCode,
-                      phone: profile.phone,
+                      fullName: profile.fullName || '',
+                      phone: profile.phone || '',
+                      address: profile.address || '',
+                      district: profile.district || '',
                       email: profile.email || '',
                       fbPage: profile.fbPage || '',
                       website: profile.website || '',
-                      district: profile.district || '',
-                      address: profile.address || '',
-                      password: profile.password || '',
-                      referredBy: profile.referredBy,
                       isPremium: profile.isPremium || false,
+                      hasWebsite: profile.hasWebsite || false,
                       isSubscribed: profile.isSubscribed || false,
                       currentPlan: profile.currentPlan || 'Free Plan',
-                      favorites: profile.favorites || [],
-                      cart: profile.cart || [],
-                      rechargeBalance: Number(profile.rechargeBalance) || 0,
-                      totalRecharge: Number(profile.totalRecharge) || 0,
-                      totalBillPay: Number(profile.totalBillPay) || 0,
-                      totalCommission: Number(profile.totalCommission) || 0,
+                      rechargeBalance: profile.rechargeBalance || 0,
+                      totalRecharge: profile.totalRecharge || 0,
+                      totalBillPay: profile.totalBillPay || 0,
+                      totalCommission: profile.totalCommission || 0,
                       rechargeTransactions: profile.rechargeTransactions || [],
-                      passiveEarnings: Number(profile.passiveEarnings) || 0,
-                      passiveTransactions: profile.passiveTransactions || [],
+                      sellerCode: profile.sellerCode || null,
+                      referredBy: profile.referredBy || null,
                       referrals: profile.referrals || { level1: [], level2: [], level3: [], level4: [] },
-                      deliveredOrdersCount: Number(profile.deliveredOrdersCount) || 0,
-                      hasPremiumCourse: profile.hasPremiumCourse || false,
-                      hasWebsite: profile.hasWebsite || false,
-                      lastActive: profile.lastActive || 'Never',
-                      joinDate: profile.joinDate || new Date().toLocaleDateString('bn-BD'),
-                      createdAt: profile.createdAt || Date.now(),
-                      notifications: profile.notifications || []
+                      deliveredOrdersCount: profile.deliveredOrdersCount || 0,
+                      passiveEarnings: profile.passiveEarnings || 0,
+                      passiveTransactions: profile.passiveTransactions || [],
+                      password: profile.password || (idx > -1 ? appUsers[idx].password : '')
                   };
 
                   if (idx > -1) {
                       appUsers[idx] = { ...appUsers[idx], ...userData };
-                   } else {
-                      appUsers.push(userData);
-                   }
-                   saveUsers(userData.profileId);
-                  if (window.db) {
-                      window.db.collection('bexo_users').doc(String(userData.profileId)).set(sanitizeForSupabase(userData))
-                          .catch(err => {
-                              console.warn("Supabase update user error:", err);
-                              if (typeof queueUserForSync === 'function') {
-                                  queueUserForSync(userData.profileId);
-                              }
-                          });
                   } else {
-                      if (typeof queueUserForSync === 'function') {
-                          queueUserForSync(userData.profileId);
-                      }
-                      if (typeof initializeSupabaseIfReady === 'function') {
-                          initializeSupabaseIfReady();
-                      }
+                      appUsers.push(userData);
                   }
+
+                  saveUsers(userData.profileId);
               }
 
-              const PASSIVE_COMMISSION_RATES = [
-                  { min: 8501, max: 10000, l1: 16, l2: 12, l3: 10, l4: 5 },
-                  { min: 6101, max: 8500, l1: 10, l2: 7, l3: 5, l4: 4 },
-                  { min: 4001, max: 6100, l1: 8, l2: 6, l3: 4, l4: 3 },
-                  { min: 2801, max: 4000, l1: 7, l2: 4, l3: 3, l4: 2 },
-                  { min: 1701, max: 2800, l1: 6, l2: 4, l3: 3, l4: 2 },
-                  { min: 801, max: 1700, l1: 6, l2: 4, l3: 2, l4: 2 },
-                  { min: 501, max: 800, l1: 6, l2: 3, l3: 2, l4: 2 },
-                  { min: 401, max: 500, l1: 5, l2: 2, l3: 2, l4: 2 },
-                  { min: 301, max: 400, l1: 4, l2: 2, l3: 2, l4: 2 },
-                  { min: 201, max: 300, l1: 3, l2: 2, l3: 2, l4: 2 },
-                  { min: 101, max: 200, l1: 2, l2: 2, l3: 2, l4: 2 },
-                  { min: 80, max: 100, l1: 1, l2: 1, l3: 1, l4: 1 }
-              ];
-
-              function getPassiveCommission(adminPrice, level) {
-                  const rate = PASSIVE_COMMISSION_RATES.find(r => adminPrice >= r.min && adminPrice <= r.max);
-                  if (!rate) return 0;
-                  return rate[`l${level}`] || 0;
-              }
-
-              const INITIAL_CATEGORIES = [];
-
-              let appOrders = safeParse('bexo_orders', []);
-              let appManagerRecords = safeParse('bexo_manager_records', []);
-              let appResellerPayouts = safeParse('bexo_reseller_payouts', []);
-
-              function saveManagerRecords() {
-                  localStorage.setItem('bexo_manager_records', JSON.stringify(appManagerRecords));
-              }
-              function saveResellerPayouts() {
-                  localStorage.setItem('bexo_reseller_payouts', JSON.stringify(appResellerPayouts));
-              }
-              
-              // Clean and sanitize loaded orders to repair any undefined/NaN or mismatched fields from different order creation flows
-              appOrders = appOrders.map(o => {
-                  if (!o) return o;
-                  const item = (o.items && o.items.length > 0) ? o.items[0] : null;
-                  
-                  // Clean customer name
-                  let customerName = o.customerName || (o.shipping && o.shipping.name) || o.customer;
-                  if (!customerName || customerName === 'undefined') {
-                      customerName = 'সম্মানিত কাস্টমার';
-                  }
-
-                  // Clean customer phone
-                  let customerPhone = o.customerPhone || (o.shipping && o.shipping.mobile);
-                  if (!customerPhone || customerPhone === 'undefined') {
-                      customerPhone = 'N/A';
-                  }
-
-                  // Clean customer address
-                  let customerAddress = o.customerAddress || (o.shipping && o.shipping.address);
-                  if (!customerAddress || customerAddress === 'undefined') {
-                      customerAddress = 'ঠিকানা প্রদান করা হয়নি';
-                  }
-
-                  // Determine quantity (qty)
-                  const qty = Number(item ? (item.qty || 1) : 1) || 1;
-
-                  // Determine base price (buying)
-                  let basePriceObj = 0;
-                  if (item) {
-                      basePriceObj = Number(item.basePrice || item.base || 0);
-                  }
-                  let totalBasePrice = Number(o.totalBasePrice);
-                  if (isNaN(totalBasePrice) || o.totalBasePrice === undefined || o.totalBasePrice === null) {
-                      totalBasePrice = basePriceObj * qty;
-                  }
-                  if (isNaN(totalBasePrice) || totalBasePrice <= 0) {
-                      const totalRev = Number(o.total || o.totalSellingPrice || 0);
-                      const totalProf = Number(o.totalProfit || o.profit || 0);
-                      totalBasePrice = Math.max(0, totalRev - totalProf);
-                  }
-
-                  // Determine selling price
-                  let sellingPriceObj = 0;
-                  if (item) {
-                      sellingPriceObj = Number(item.sellingPrice || item.selling || 0);
-                  }
-                  let totalSellingPrice = Number(o.totalSellingPrice || o.total || o.selling);
-                  if (isNaN(totalSellingPrice) || totalSellingPrice === undefined || totalSellingPrice === null || totalSellingPrice <= 0) {
-                      totalSellingPrice = sellingPriceObj * qty;
-                  }
-                  if (isNaN(totalSellingPrice) || totalSellingPrice <= 0) {
-                      totalSellingPrice = totalBasePrice + (Number(o.totalProfit) || Number(o.profit) || 0);
-                  }
-
-                  // Determine total profit
-                  let totalProfit = o.totalProfit !== undefined ? Number(o.totalProfit) : Number(o.profit);
-                  if (isNaN(totalProfit) || totalProfit === undefined || totalProfit === null) {
-                      totalProfit = Math.max(0, totalSellingPrice - totalBasePrice);
-                  }
-
-                  // Standardize the items inside the order
-                  const sanitizedItems = o.items ? o.items.map(it => ({
-                      productId: it.productId || 'UNKNOWN',
-                      title: it.title || 'প্রোডাক্ট',
-                      image: it.image || it.img || 'https://picsum.photos/seed/def/200/200',
-                      size: it.size || 'N/A',
-                      qty: Number(it.qty) || 1,
-                      sellingPrice: Number(it.sellingPrice || it.selling || 0) || (totalSellingPrice / qty),
-                      basePrice: Number(it.basePrice || it.base || 0) || (totalBasePrice / qty)
-                  })) : [{
-                      productId: 'UNKNOWN',
-                      title: o.product || 'প্রোডাক্ট',
-                      image: 'https://picsum.photos/seed/def/200/200',
-                      size: 'N/A',
-                      qty: qty,
-                      sellingPrice: totalSellingPrice / qty,
-                      basePrice: totalBasePrice / qty
-                  }];
-
-                  const oToken = o.secretToken || ('SEC-' + (Math.abs(Number(o.id) || Date.now()) % 900000 + 100000));
-                  return {
-                      ...o,
-                      customerName,
-                      customerPhone,
-                      customerAddress,
-                      totalBasePrice: totalBasePrice || 0,
-                      totalSellingPrice: totalSellingPrice || 0,
-                      totalProfit: totalProfit || 0,
-                      grandTotal: Number(o.grandTotal) || (totalSellingPrice + Number(o.deliveryCharge || 0)),
-                      items: sanitizedItems,
-                      secretToken: oToken
-                  };
-              });
-              saveOrders();
-
-              function saveOrders(specificOrderId = null) {
-                  localStorage.setItem('bexo_orders', JSON.stringify(appOrders));
-                  if (window.db) {
-                      if (specificOrderId) {
-                          const o = appOrders.find(order => String(order.id) === String(specificOrderId));
-                          if (o) {
-                              window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
-                                  .catch(err => console.warn("Supabase sync specific order error:", err));
+              async function syncUsersFromDatabaseSilently() {
+                  if (!window.getSupabase || !window.getSupabase()) return;
+                  try {
+                      const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
+                      const supabaseUsers = snap.data || [];
+                      
+                      if (supabaseUsers && supabaseUsers.length > 0) {
+                          if (!Array.isArray(appUsers)) {
+                              appUsers = [];
                           }
-                      } else {
-                          appOrders.forEach(o => {
-                              if (o && o.id) {
-                                  window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
-                                      .catch(err => console.warn("Supabase sync order error:", err));
+                          
+                          supabaseUsers.forEach(fUser => {
+                              if (!fUser || !fUser.phone || !fUser.password) return;
+                              
+                              const existingIdx = appUsers.findIndex(u => u.profileId === fUser.profileId);
+                              if (existingIdx > -1) {
+                                  appUsers[existingIdx] = { ...appUsers[existingIdx], ...fUser };
+                              } else {
+                                  appUsers.push(fUser);
                               }
                           });
+                          
+                          appUsers = appUsers.filter(u => u && (u.phone || u.email || u.profileId));
+                          localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                          if (typeof renderAdminUsers === 'function') {
+                              renderAdminUsers();
+                          }
+                          if (typeof updateAdminStats === 'function') {
+                              updateAdminStats();
+                          }
                       }
+                  } catch (e) {
+                      console.warn("Silent user sync skipped:", e);
                   }
               }
 
-              let appSettings = JSON.parse(localStorage.getItem('bexo_settings')) || {
-                  youtubeLink: '',
-                  premiumGroupLink: '',
-                  homeBannerUrl: '',
-                  bkashLogo: '',
-                  nagadLogo: '',
-                  mcashLogo: '',
-                  bkashNumber: '',
-                  nagadNumber: '',
-                  mcashNumber: '',
-                  showTopSellingHome: false,
-                  topSellingLimit: 0,
-                  dhakaCharge: 80,
-                  outsideDhakaCharge: 130
-              };
-              function saveSettings() {
-                  localStorage.setItem('bexo_settings', JSON.stringify(appSettings));
-                  if (window.db) {
-                      window.db.collection('bexo_settings').doc('global').set(sanitizeForSupabase(appSettings))
-                          .catch(err => console.warn("Supabase sync settings error:", err));
+              async function syncUsersFromDatabaseDirectly() {
+                  if (!window.getSupabase || !window.getSupabase()) {
+                      showToast("ডাটাবেজ সংযোগ সক্রিয় নেই", "warning");
+                      return;
                   }
-              }
-              function saveAppSettings() {
-                  saveSettings();
-              }
-
-              let appPremiumRequests = JSON.parse(localStorage.getItem('bexo_premium_requests')) || [];
-              function savePremiumRequests() {
-                  localStorage.setItem('bexo_premium_requests', JSON.stringify(appPremiumRequests));
-                  if (window.db) {
-                      appPremiumRequests.forEach(r => {
-                          if (r && r.id) {
-                              window.db.collection('bexo_premium_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
-                                  .catch(err => console.warn("Supabase sync premium error:", err));
-                          }
-                      });
-                  }
-              }
-
-              let appRechargeRequests = JSON.parse(localStorage.getItem('bexo_recharge_requests')) || [];
-              function saveRechargeRequests() {
-                  localStorage.setItem('bexo_recharge_requests', JSON.stringify(appRechargeRequests));
-                  if (window.db) {
-                      appRechargeRequests.forEach(r => {
-                          if (r && r.id) {
-                              window.db.collection('bexo_recharge_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
-                                  .catch(err => console.warn("Supabase sync recharge error:", err));
-                          }
-                      });
-                  }
-              }
-
-              let appBalanceRequests = JSON.parse(localStorage.getItem('bexo_balance_requests')) || [];
-              function saveBalanceRequests() {
-                  localStorage.setItem('bexo_balance_requests', JSON.stringify(appBalanceRequests));
-                  if (window.db) {
-                      appBalanceRequests.forEach(r => {
-                          if (r && r.id) {
-                              window.db.collection('bexo_balance_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
-                                  .catch(err => console.warn("Supabase sync balance error:", err));
-                          }
-                      });
-                  }
-              }
-
-              let appBillRequests = JSON.parse(localStorage.getItem('bexo_bill_requests')) || [];
-              function saveBillRequests() {
-                  localStorage.setItem('bexo_bill_requests', JSON.stringify(appBillRequests));
-                  if (window.db) {
-                      appBillRequests.forEach(r => {
-                          if (r && r.id) {
-                              window.db.collection('bexo_bill_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
-                                  .catch(err => console.warn("Supabase sync bill error:", err));
-                          }
-                      });
-                  }
-              }
-
-              function savePendingProfits() {
-                  localStorage.setItem('bexo_pending_profits', JSON.stringify(appPendingProfits));
-              }
-
-              let appCustomerReports = JSON.parse(localStorage.getItem('bexo_customer_reports')) || {};
-              function saveCustomerReports() {
-                  localStorage.setItem('bexo_customer_reports', JSON.stringify(appCustomerReports));
-                  if (window.db) {
-                      window.db.collection('bexo_customer_reports').doc('global').set(sanitizeForSupabase(appCustomerReports))
-                          .catch(err => console.error(err));
-                  }
-              }
-
-              let appCategories = JSON.parse(localStorage.getItem('bexo_categories')) || INITIAL_CATEGORIES;
-
-              function saveCategories() {
-                  localStorage.setItem('bexo_categories', JSON.stringify(appCategories));
-                  if (window.db) {
-                      appCategories.forEach(c => {
-                          if (c && c.id) {
-                              window.db.collection('bexo_categories').doc(String(c.id)).set(sanitizeForSupabase(c))
-                                  .catch(err => console.warn("Supabase sync category error:", err));
-                          }
-                      });
-                  }
-              }
-
-              let appTransactions = JSON.parse(localStorage.getItem('bexo_transactions')) || [];
-              if (appTransactions.length > 500) appTransactions = appTransactions.slice(0, 500); // Performance cap
-
-              function saveTransactions() {
-                  localStorage.setItem('bexo_transactions', JSON.stringify(appTransactions));
-                  updateHeaderBalance();
-                  if (window.db) {
-                      appTransactions.forEach(t => {
-                          if (t && t.id) {
-                              window.db.collection('bexo_transactions').doc(String(t.id)).set(sanitizeForSupabase(t))
-                                  .catch(err => console.warn("Supabase sync transaction error:", err));
-                          }
-                      });
-                  }
-              }
-
-              let appAccounts = JSON.parse(localStorage.getItem('bexo_accounts')) || [];
-
-              function saveAccounts() {
-                  localStorage.setItem('bexo_accounts', JSON.stringify(appAccounts));
-                  if (window.db) {
-                      appAccounts.forEach(a => {
-                          if (a && a.id) {
-                              window.db.collection('bexo_accounts').doc(String(a.id)).set(sanitizeForSupabase(a))
-                                  .catch(err => console.warn("Supabase sync accounts error:", err));
-                          }
-                      });
-                  }
-              }
-
-              let appProfilePayments = JSON.parse(localStorage.getItem('bexo_profile_payments')) || [];
-
-              function saveProfilePayments() {
-                  localStorage.setItem('bexo_profile_payments', JSON.stringify(appProfilePayments));
-                  if (window.db) {
-                      appProfilePayments.forEach(p => {
-                          if (p && p.id) {
-                              window.db.collection('bexo_profile_payments').doc(String(p.id)).set(sanitizeForSupabase(p))
-                                  .catch(err => console.warn("Supabase sync profile payments error:", err));
-                          }
-                      });
-                  }
-              }
-
-              
-              // Emergency Quota Cleanup - Shrinks bloated payloads on boot
-              setTimeout(() => {
+                  
                   try {
-                      if (typeof appOrders !== 'undefined' && appOrders.length > 0) saveOrders();
-                      if (typeof userProfile !== 'undefined' && userProfile && userProfile.profileId) saveProfile();
-                  } catch(e) { console.error("Boot cleanup failed:", e); }
-              }, 3000);
-
-              let appWithdrawals = JSON.parse(localStorage.getItem('bexo_withdrawals')) || [];
-
-              function saveWithdrawals() {
-                  localStorage.setItem('bexo_withdrawals', JSON.stringify(appWithdrawals));
-                  if (window.db) {
-                      appWithdrawals.forEach(w => {
-                          if (w && w.id) {
-                              window.db.collection('bexo_withdrawals').doc(String(w.id)).set(sanitizeForSupabase(w))
-                                  .catch(err => console.warn("Supabase sync withdrawal error:", err));
+                      showToast("ডাটাবেজ থেকে ইউজার তালিকা লোড হচ্ছে...", "info");
+                      const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
+                      const supabaseUsers = snap.data || [];
+                      
+                      if (supabaseUsers && supabaseUsers.length > 0) {
+                          if (!Array.isArray(appUsers)) {
+                              appUsers = [];
                           }
-                      });
-                  }
-              }
-
-              let appSupportTickets = JSON.parse(localStorage.getItem('bexo_support_tickets')) || [];
-
-              function saveSupportTickets() {
-                  localStorage.setItem('bexo_support_tickets', JSON.stringify(appSupportTickets));
-                  if (window.db) {
-                      appSupportTickets.forEach(t => {
-                          if (t && t.id) {
-                              window.db.collection('bexo_support_tickets').doc(String(t.id)).set(sanitizeForSupabase(t))
-                                  .catch(err => console.warn("Supabase sync support tickets error:", err));
+                          
+                          supabaseUsers.forEach(fUser => {
+                              if (!fUser || !fUser.phone || !fUser.password) return;
+                              
+                              const existingIdx = appUsers.findIndex(u => u.profileId === fUser.profileId || u.phone === fUser.phone);
+                              if (existingIdx > -1) {
+                                  appUsers[existingIdx] = { ...appUsers[existingIdx], ...fUser };
+                              } else {
+                                  appUsers.push(fUser);
+                              }
+                          });
+                          
+                          appUsers = appUsers.filter(u => u && (u.phone || u.email || u.profileId));
+                          localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                          if (typeof renderAdminUsers === 'function') {
+                              renderAdminUsers();
                           }
-                      });
+                          if (typeof updateAdminStats === 'function') {
+                              updateAdminStats();
+                          }
+                          showToast(`মোট ${appUsers.length} জন ইউজার সিঙ্ক সম্পন্ন হয়েছে!`, "success");
+                          
+                          appUsers.forEach(u => {
+                              if (u && u.profileId && u.phone && u.password) {
+                                  const exists = supabaseUsers.some(f => f.profileId === u.profileId);
+                                  if (!exists) {
+                                      window.supabase.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
+                                          .catch(err => console.warn("Background user upload error:", err));
+                                  }
+                              }
+                          });
+                      } else {
+                          showToast("ডাটাবেজে কোনো ইউজার পাওয়া যায়নি। লোকাল ইউজার আপলোড করা হচ্ছে...", "info");
+                          if (appUsers.length > 0) {
+                              appUsers.forEach(u => {
+                                  if (u && u.profileId) {
+                                      window.supabase.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
+                                          .catch(err => console.warn("Supabase initial seed error:", err));
+                                  }
+                              });
+                              showToast(`লোকাল ${appUsers.length} জন ইউজার ডাটাবেজে ব্যাকআপ করা হয়েছে!`, "success");
+                          }
+                      }
+                  } catch (err) {
+                      console.error("Direct sync error:", err);
+                      showToast("সিঙ্ক করতে সমস্যা হয়েছে: " + err.message, "error");
                   }
               }
 
               async function processPendingSyncs() {
-                  if (!window.db) return;
+                  if (!window.getSupabase || !window.getSupabase()) return;
                   try {
                       let pending = JSON.parse(localStorage.getItem('bexo_pending_user_syncs') || '[]');
                       if (pending.length === 0) return;
@@ -3883,7 +3553,7 @@
                           const u = appUsers.find(user => user.profileId === id);
                           if (u && u.phone && u.password) {
                               try {
-                                  await window.db.collection('bexo_users').doc(String(id)).set(sanitizeForSupabase(u));
+                                  await window.supabase.collection('bexo_users').doc(String(id)).set(sanitizeForSupabase(u));
                                   console.log(`[Supabase Sync Applet] Successfully synced pending user: ${id}`);
                               } catch (err) {
                                   console.error(`[Supabase Sync Applet] Failed to sync pending user ${id}:`, err);
@@ -3898,15 +3568,11 @@
               }
 
               async function executeStartupSettlementCleanSweep() {
-                  console.log("[Clean Sweep] Checking if any Reseller Settlement audits/transactions need automatic purging...");
                   try {
                       let localTx = JSON.parse(localStorage.getItem('bexo_transactions')) || [];
                       const settlements = localTx.filter(t => t.type === 'Reseller Settlement');
                       
                       if (settlements.length > 0) {
-                          console.log(`[Clean Sweep] Found ${settlements.length} settlement transaction logs. Deleting permanently...`);
-                          
-                          // Reset in memory and write to localStorage
                           if (typeof appTransactions !== 'undefined') {
                               appTransactions = appTransactions.filter(t => t.type !== 'Reseller Settlement');
                               localStorage.setItem('bexo_transactions', JSON.stringify(appTransactions));
@@ -3915,18 +3581,16 @@
                               localStorage.setItem('bexo_transactions', JSON.stringify(localTx));
                           }
                           
-                          // Delete from Supabase
-                          if (window.db) {
+                          if (window.getSupabase && window.getSupabase()) {
                               settlements.forEach(t => {
                                   if (t.id) {
-                                      window.db.collection('bexo_transactions').doc(String(t.id)).delete()
+                                      window.supabase.collection('bexo_transactions').doc(String(t.id)).delete()
                                           .catch(err => console.error(`[Clean Sweep] Error deleting database transaction doc ${t.id}:`, err));
                                   }
                               });
                           }
                       }
 
-                      // Clean settled orders markers
                       let localOrders = JSON.parse(localStorage.getItem('bexo_orders')) || [];
                       let resetOccurred = false;
                       localOrders.forEach(o => {
@@ -3936,8 +3600,8 @@
                               delete o.settledProfitValue;
                               resetOccurred = true;
 
-                              if (window.db) {
-                                  window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
+                              if (window.getSupabase && window.getSupabase()) {
+                                  window.supabase.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
                                       .catch(err => console.error(`[Clean Sweep] Failed resetting supabase order doc ${o.id}:`, err));
                               }
                           }
@@ -3956,89 +3620,334 @@
                           } else {
                               localStorage.setItem('bexo_orders', JSON.stringify(localOrders));
                           }
-                          console.log("[Clean Sweep] Order profit reset sweep completed successfully.");
                       }
                   } catch (err) {
                       console.error("[Clean Sweep] Error running dynamic background settlement purge:", err);
                   }
               }
 
-
-              let userProfile = JSON.parse(localStorage.getItem('bexo_profile'));
-              if (!userProfile) {
-                  userProfile = {
-                      ...DEFAULT_PROFILE,
-                      shopName: '',
-                      fullName: '',
-                      phone: '',
-                      address: '',
-                      district: '',
-                      password: ''
-                  };
-              }
-
-              // Safety: Migration for existing profiles missing new fields
-              const requiredArrays = ['cart', 'orders', 'favorites', 'rechargeTransactions', 'passiveTransactions'];
-              requiredArrays.forEach(arr => {
-                  if (!userProfile[arr]) userProfile[arr] = [];
-              });
-              if (!userProfile.referrals) {
-                  userProfile.referrals = { level1: [], level2: [], level3: [], level4: [] };
-              }
-              if (userProfile.deliveredOrdersCount === undefined) userProfile.deliveredOrdersCount = 0;
-              if (userProfile.passiveEarnings === undefined) userProfile.passiveEarnings = 0;
-              if (userProfile.rechargeBalance === undefined) userProfile.rechargeBalance = 0;
-
-              function ensureBexoPayFields() {
-                  const fields = {
-                      rechargeBalance: 0,
-                      totalRecharge: 0,
-                      totalBillPay: 0,
-                      totalCommission: 0,
-                      rechargeTransactions: []
-                  };
-                  Object.keys(fields).forEach(key => {
-                      if (userProfile[key] === undefined) {
-                          userProfile[key] = fields[key];
+              // --- Category Management Functions ---
+              function openCategoryManagementModal(catId = null, subId = null) {
+                  let modal = document.getElementById('categoryManagementModal');
+                  if (!modal) {
+                      modal = document.createElement('div');
+                      modal.id = 'categoryManagementModal';
+                      modal.className = 'fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm';
+                      document.body.appendChild(modal);
+                  }
+                  
+                  let title = 'ক্যাটাগরি ম্যানেজমেন্ট';
+                  let nameVal = '';
+                  let imgVal = '';
+                  let bannerVal = '';
+                  let orderVal = 0;
+                  let isFeaturedVal = false;
+                  
+                  if (catId && !subId) {
+                      const cat = appCategories.find(c => c.id == catId);
+                      if (cat) {
+                          title = 'ক্যাটাগরি এডিট';
+                          nameVal = cat.name || '';
+                          imgVal = cat.image || '';
+                          bannerVal = cat.banner || '';
+                          orderVal = cat.order !== undefined ? cat.order : 0;
+                          isFeaturedVal = cat.isFeatured || false;
                       }
-                  });
-                  saveProfile();
+                  } else if (catId && subId) {
+                      const cat = appCategories.find(c => c.id == catId);
+                      if (cat && cat.subcategories) {
+                          const sub = cat.subcategories.find(s => s.id == subId);
+                          if (sub) {
+                              title = 'সাব-ক্যাটাগরি এডিট';
+                              nameVal = sub.name || '';
+                              imgVal = sub.image || '';
+                              bannerVal = sub.banner || '';
+                              orderVal = sub.order !== undefined ? sub.order : 0;
+                          }
+                      }
+                  }
+
+                  modal.innerHTML = `
+                      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative animate-fade-in text-gray-800">
+                          <button onclick="document.getElementById('categoryManagementModal').remove()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold">&times;</button>
+                          <h3 class="text-xl font-bold mb-4 text-emerald-800 border-b pb-2 flex items-center gap-2">
+                              <i class="fa-solid fa-layer-group"></i> ${title}
+                          </h3>
+                          
+                          <div class="space-y-4 text-sm">
+                              <div>
+                                  <label class="block font-semibold mb-1 text-gray-700">নাম (Name):</label>
+                                  <input type="text" id="catMgmtName" value="${nameVal}" placeholder="ক্যাটাগরির নাম লিখুন" class="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                              </div>
+                              <div>
+                                  <label class="block font-semibold mb-1 text-gray-700">আইকন/ছবি URL (Image URL):</label>
+                                  <input type="text" id="catMgmtImg" value="${imgVal}" placeholder="https://example.com/image.jpg" class="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                              </div>
+                              <div>
+                                  <label class="block font-semibold mb-1 text-gray-700">ব্যানার URL (Banner URL - Optional):</label>
+                                  <input type="text" id="catMgmtBanner" value="${bannerVal}" placeholder="https://example.com/banner.jpg" class="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                              </div>
+                              <div class="grid grid-cols-2 gap-3">
+                                  <div>
+                                      <label class="block font-semibold mb-1 text-gray-700">সিরিয়াল / অর্ডার:</label>
+                                      <input type="number" id="catMgmtOrder" value="${orderVal}" class="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                                  </div>
+                                  ${!subId ? `
+                                  <div class="flex items-center pt-6">
+                                      <label class="flex items-center gap-2 font-semibold cursor-pointer">
+                                          <input type="checkbox" id="catMgmtFeatured" ${isFeaturedVal ? 'checked' : ''} class="w-4 h-4 text-emerald-600 rounded">
+                                          হোমে ফিচার করুন
+                                      </label>
+                                  </div>` : '<div></div>'}
+                              </div>
+                          </div>
+                          
+                          <div class="mt-6 flex justify-end gap-3 border-t pt-4">
+                              <button onclick="document.getElementById('categoryManagementModal').remove()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium">বাতিল</button>
+                              <button onclick="saveCategoryManagement('${catId || ''}', '${subId || ''}')" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-md flex items-center gap-1.5">
+                                  <i class="fa-solid fa-check"></i> সংরক্ষণ করুন
+                              </button>
+                          </div>
+                      </div>
+                  `;
+              }
+
+              function saveCategoryManagement(catId, subId) {
+                  const name = document.getElementById('catMgmtName').value.trim();
+                  const image = document.getElementById('catMgmtImg').value.trim();
+                  const banner = document.getElementById('catMgmtBanner').value.trim();
+                  const order = parseInt(document.getElementById('catMgmtOrder').value) || 0;
+                  const isFeatured = document.getElementById('catMgmtFeatured') ? document.getElementById('catMgmtFeatured').checked : false;
+                  
+                  if (!name) {
+                      showToast("নাম দেওয়া আবশ্যক", "error");
+                      return;
+                  }
+                  
+                  if (!catId) {
+                      const newId = 'cat_' + Date.now();
+                      appCategories.push({
+                          id: newId,
+                          name,
+                          image,
+                          banner,
+                          order,
+                          isFeatured,
+                          subcategories: []
+                      });
+                      showToast("নতুন ক্যাটাগরি যুক্ত হয়েছে", "success");
+                  } else if (catId && !subId) {
+                      const cat = appCategories.find(c => c.id == catId);
+                      if (cat) {
+                          cat.name = name;
+                          cat.image = image;
+                          cat.banner = banner;
+                          cat.order = order;
+                          cat.isFeatured = isFeatured;
+                          showToast("ক্যাটাগরি আপডেট সম্পন্ন", "success");
+                      }
+                  } else if (catId && subId) {
+                      const cat = appCategories.find(c => c.id == catId);
+                      if (cat && cat.subcategories) {
+                          const sub = cat.subcategories.find(s => s.id == subId);
+                          if (sub) {
+                              sub.name = name;
+                              sub.image = image;
+                              sub.banner = banner;
+                              sub.order = order;
+                              showToast("সাব-ক্যাটাগরি আপডেট সম্পন্ন", "success");
+                          }
+                      }
+                  }
+                  
+                  saveCategories();
+                  document.getElementById('categoryManagementModal').remove();
+                  if (typeof renderAdminCategories === 'function') {
+                      renderAdminCategories();
+                  }
+                  if (typeof renderCategoryNav === 'function') {
+                      renderCategoryNav();
+                  }
+              }
+
+              function openAddSubCategoryModal(catId) {
+                  let modal = document.getElementById('addSubCategoryModal');
+                  if (!modal) {
+                      modal = document.createElement('div');
+                      modal.id = 'addSubCategoryModal';
+                      modal.className = 'fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm';
+                      document.body.appendChild(modal);
+                  }
+                  
+                  modal.innerHTML = `
+                      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-fade-in text-gray-800">
+                          <button onclick="document.getElementById('addSubCategoryModal').remove()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold">&times;</button>
+                          <h3 class="text-xl font-bold mb-4 text-emerald-800 border-b pb-2 flex items-center gap-2">
+                              <i class="fa-solid fa-plus-circle"></i> সাব-ক্যাটাগরি যোগ করুন
+                          </h3>
+                          
+                          <div class="space-y-4 text-sm">
+                              <div>
+                                  <label class="block font-semibold mb-1 text-gray-700">সাব-ক্যাটাগরির নাম:</label>
+                                  <input type="text" id="newSubCatName" placeholder="উদাঃ শার্ট, প্যান্ট..." class="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                              </div>
+                              <div>
+                                  <label class="block font-semibold mb-1 text-gray-700">আইকন/ছবি URL (ঐচ্ছিক):</label>
+                                  <input type="text" id="newSubCatImg" placeholder="https://example.com/sub.jpg" class="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                              </div>
+                          </div>
+                          
+                          <div class="mt-6 flex justify-end gap-3 border-t pt-4">
+                              <button onclick="document.getElementById('addSubCategoryModal').remove()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium">বাতিল</button>
+                              <button onclick="saveNewSubCategory('${catId}')" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-md">যোগ করুন</button>
+                          </div>
+                      </div>
+                  `;
+              }
+
+              function saveNewSubCategory(catId) {
+                  const name = document.getElementById('newSubCatName').value.trim();
+                  const img = document.getElementById('newSubCatImg').value.trim();
+                  
+                  if (!name) {
+                      showToast("সাব-ক্যাটাগরির নাম দিন", "error");
+                      return;
+                  }
+                  
+                  const cat = appCategories.find(c => c.id == catId);
+                  if (cat) {
+                      if (!cat.subcategories) cat.subcategories = [];
+                      cat.subcategories.push({
+                          id: 'sub_' + Date.now(),
+                          name: name,
+                          image: img || '',
+                          order: cat.subcategories.length
+                      });
+                      saveCategories();
+                      showToast("সাব-ক্যাটাগরি যুক্ত করা হয়েছে", "success");
+                      document.getElementById('addSubCategoryModal').remove();
+                      if (typeof renderAdminCategories === 'function') {
+                          renderAdminCategories();
+                      }
+                      if (typeof renderCategoryNav === 'function') {
+                          renderCategoryNav();
+                      }
+                  }
+              }
+
+              function deleteObjectFromCategory(catId, subId = null) {
+                  if (!confirm("আপনি কি নিশ্চিত এটি ডিলিট করতে চান?")) return;
+                  
+                  if (catId && !subId) {
+                      appCategories = appCategories.filter(c => String(c.id) !== String(catId));
+                      if (window.getSupabase && window.getSupabase()) {
+                          window.supabase.collection('bexo_categories').doc(String(catId)).delete().catch(err => console.error(err));
+                      }
+                      showToast("ক্যাটাগরি ডিলিট করা হয়েছে", "info");
+                  } else if (catId && subId) {
+                      const cat = appCategories.find(c => String(c.id) === String(catId));
+                      if (cat && cat.subcategories) {
+                          cat.subcategories = cat.subcategories.filter(s => String(s.id) !== String(subId));
+                          showToast("সাব-ক্যাটাগরি ডিলিট করা হয়েছে", "info");
+                      }
+                  }
+                  saveCategories();
+                  if (typeof renderAdminCategories === 'function') {
+                      renderAdminCategories();
+                  }
+                  if (typeof renderCategoryNav === 'function') {
+                      renderCategoryNav();
+                  }
+              }
+
+              function openCategoryQuickEdit(catName) {
+                  if (!catName) return;
+                  const cat = appCategories.find(c => c.name === catName);
+                  if (cat) {
+                      openCategoryManagementModal(cat.id);
+                  } else {
+                      openCategoryManagementModal();
+                      setTimeout(() => {
+                          const nameInput = document.getElementById('catMgmtName');
+                          if (nameInput) nameInput.value = catName;
+                      }, 100);
+                  }
+              }
+
+              // --- Boot Initialization & Listeners ---
+              if (localStorage.getItem('bexo_app_version') !== APP_VERSION) {
+                  localStorage.removeItem('bexo_orders');
+                  localStorage.removeItem('bexo_transactions');
+                  localStorage.removeItem('bexo_recharge_requests');
+                  localStorage.removeItem('bexo_balance_requests');
+                  localStorage.setItem('bexo_app_version', APP_VERSION);
+                  console.log("Migration executed: Demo data purged.");
               }
 
               ensureBexoPayFields();
+              saveUsers();
+              saveOrders();
 
-              let appPosts = JSON.parse(localStorage.getItem('bexo_posts')) || [];
-appPosts.forEach(p => {
-    const s = (p.stockCount !== undefined && p.stockCount !== null) ? Number(p.stockCount) : ((p.stock !== undefined && p.stock !== null) ? Number(p.stock) : null);
-    if (s !== null && s > 0) {
-        p.isStockOut = false;
-        p.stockStatus = 'in_stock';
-        p.stockCount = s;
-        p.stock = s;
-    } else if (s !== null && s <= 0) {
-        p.isStockOut = true;
-        p.stockStatus = 'out_of_stock';
-        p.stockCount = 0;
-        p.stock = 0;
-    }
-});
-              
-              // ONE-TIME FIX for corrupted image arrays
-              let _needsSave = false;
-              appPosts.forEach(p => {
-                  if (p.images && p.images.length > 1 && typeof p.images[0] === 'string' && typeof p.images[1] === 'string') {
-                      if ((p.images[0] === 'h' && p.images[1] === 't') || (p.images[0] === 'd' && p.images[1] === 'a' && p.images[2] === 't' && p.images[3] === 'a')) {
-                          p.images = [p.images.join('')];
-                          _needsSave = true;
+              setTimeout(() => {
+                  try {
+                      if (typeof appOrders !== 'undefined' && appOrders.length > 0) saveOrders();
+                      if (typeof userProfile !== 'undefined' && userProfile && userProfile.profileId) saveProfile();
+                  } catch(e) { console.error("Boot cleanup failed:", e); }
+              }, 3000);
+
+              // Sticky Header / Sidebar Scroll Prevention
+              window.addEventListener('scroll', () => {
+                  const header = document.querySelector('header');
+                  if (header) {
+                      if (window.scrollY > 0) {
+                          header.classList.add('shadow-lg');
+                      } else {
+                          header.classList.remove('shadow-lg');
                       }
                   }
               });
-              if (_needsSave) localStorage.setItem('bexo_posts', JSON.stringify(appPosts));
 
-              let productCurrentPage = 1;
-              const productsPerPage = 18;
+              // Cross-tab and Focus Data Synchronization
+              window.addEventListener('storage', (e) => {
+                  if (['bexo_users', 'bexo_orders', 'bexo_recharge_requests', 'bexo_balance_requests', 'bexo_withdrawals'].includes(e.key)) {
+                      if (typeof syncGlobalStateWithLocalStorage === 'function') {
+                          syncGlobalStateWithLocalStorage();
+                      }
+                      if (typeof currentMenu === 'string' && currentMenu === 'admin') {
+                          const dashboardTimeFilter = document.getElementById('adminDashboardTimeFilterSelect');
+                          if (dashboardTimeFilter && typeof renderAdminDashboard === 'function') {
+                              renderAdminDashboard();
+                          }
+                          const userTable = document.getElementById('adminUserTableBody');
+                          if (userTable && typeof renderAdminUsers === 'function') {
+                              renderAdminUsers();
+                          }
+                      }
+                      if (typeof updateAdminStats === 'function') {
+                          updateAdminStats();
+                      }
+                  }
+              });
 
-              
+              window.addEventListener('focus', () => {
+                  if (typeof syncGlobalStateWithLocalStorage === 'function') {
+                      syncGlobalStateWithLocalStorage();
+                  }
+                  if (typeof currentMenu === 'string' && currentMenu === 'admin') {
+                      const dashboardTimeFilter = document.getElementById('adminDashboardTimeFilterSelect');
+                      if (dashboardTimeFilter && typeof renderAdminDashboard === 'function') {
+                          renderAdminDashboard();
+                      }
+                      const userTable = document.getElementById('adminUserTableBody');
+                      if (userTable && typeof renderAdminUsers === 'function') {
+                          renderAdminUsers();
+                      }
+                  }
+                  if (typeof updateAdminStats === 'function') {
+                      updateAdminStats();
+                  }
+              });
+
 window.isProductOutOfStock = function(p) {
     if (!p) return true;
     const numStock = (p.stockCount !== undefined && p.stockCount !== null) ? Number(p.stockCount) : ((p.stock !== undefined && p.stock !== null) ? Number(p.stock) : null);
@@ -4076,8 +3985,8 @@ window.deductProductStock = function(items) {
                 product.stockStatus = 'in_stock';
             }
             updated = true;
-            if (window.db) {
-                window.db.collection('bexo_posts').doc(String(product.id)).set(sanitizeForSupabase(product))
+            if (window.getSupabase && window.getSupabase()) {
+                window.supabase.collection('bexo_posts').doc(String(product.id)).set(sanitizeForSupabase(product))
                     .catch(err => console.warn("Supabase update stock error:", err));
             }
         }
@@ -4097,7 +4006,7 @@ function savePosts() {
               }
 
               // Initialize Supabase inside index.html for real-time cloud sync of users and products
-              window.db = null;
+              // Supabase direct client mode
               var isSupabaseInitInProgress = false;
               var supabaseInitAttempts = 0;
 
@@ -4236,151 +4145,51 @@ function savePosts() {
                       if (!window.getSupabase()) {
                       }
                       
-                      window.db = {
-                          runTransaction: async (updateFunction) => {
-                              const compatTransaction = {
-                                  get: async (docRefCompat) => {
-                                      return await docRefCompat.get();
-                                  },
-                                  set: (docRefCompat, data) => {
-                                      docRefCompat.set(data);
-                                      return compatTransaction;
-                                  },
-                                  update: (docRefCompat, data) => {
-                                      docRefCompat.update(data);
-                                      return compatTransaction;
-                                  },
-                                  delete: (docRefCompat) => {
-                                      docRefCompat.delete();
-                                      return compatTransaction;
+                      // Direct Supabase Helper Functions
+                      window.subscribeSupabaseCollection = function(tableName, onData, onError) {
+                          const client = window.getSupabase ? window.getSupabase() : null;
+                          if (!client) return () => {};
+                          const fetchAll = async () => {
+                              try {
+                                  const { data, error } = await client.from(tableName).select('*');
+                                  if (error) {
+                                      if (onError) onError(error);
+                                  } else {
+                                      onData(data || []);
                                   }
-                              };
-                              return await updateFunction(compatTransaction);
-                          },
-                          collection: (collectionName) => {
-                              const makeQuery = (constraints) => {
-                                  return {
-                                      doc: (docId) => {
-                                          return {
-                                              _rawDocRef: { collectionName, docId },
-                                              set: async (data) => {
-                                                  if (!window.supabase) return;
-                                                  try {
-                                                      const payload = { ...data };
-                                                      if (payload.id === undefined) payload.id = String(docId);
-                                                      await window.supabase.from(collectionName).upsert(payload);
-                                                  } catch (e) { console.warn("Supabase set error:", e); }
-                                              },
-                                              update: async (data) => {
-                                                  if (!window.supabase) return;
-                                                  try {
-                                                      await window.supabase.from(collectionName).update(data).eq('id', String(docId));
-                                                  } catch (e) { console.warn("Supabase update error:", e); }
-                                              },
-                                              delete: async () => {
-                                                  if (!window.supabase) return;
-                                                  try {
-                                                      await window.supabase.from(collectionName).delete().eq('id', String(docId));
-                                                  } catch (e) { console.warn("Supabase delete error:", e); }
-                                              },
-                                              get: async () => {
-                                                  if (!window.supabase) return { exists: false, data: () => null, id: docId };
-                                                  try {
-                                                      const { data, error } = await window.supabase.from(collectionName).select('*').eq('id', String(docId)).maybeSingle();
-                                                      if (error || !data) return { exists: false, data: () => null, id: docId };
-                                                      return { exists: true, data: () => data, id: docId };
-                                                  } catch (e) {
-                                                      return { exists: false, data: () => null, id: docId };
-                                                  }
-                                              },
-                                              onSnapshot: (onNext) => {
-                                                  if (!window.supabase) return () => {};
-                                                  let channel;
-                                                  window.supabase.from(collectionName).select('*').eq('id', String(docId)).maybeSingle().then(({data}) => {
-                                                      onNext({ exists: !!data, data: () => data, id: docId });
-                                                      
-                                                      channel = window.supabase.channel(`public:${collectionName}:id=eq.${docId}`)
-                                                      .on('postgres_changes', { event: '*', schema: 'public', table: collectionName, filter: `id=eq.${docId}` }, payload => {
-                                                          if (payload.eventType === 'DELETE') {
-                                                              onNext({ exists: false, data: () => null, id: docId });
-                                                          } else {
-                                                              onNext({ exists: true, data: () => payload.new, id: docId });
-                                                          }
-                                                      }).subscribe();
-                                                  });
-                                                  return () => { if(channel) window.supabase.removeChannel(channel); };
-                                              }
-                                          };
-                                      },
-                                      orderBy: (field, direction = "asc") => {
-                                          return makeQuery([...constraints, { type: 'orderBy', field, direction: direction.toLowerCase() }]);
-                                      },
-                                      limit: (num) => {
-                                          return makeQuery([...constraints, { type: 'limit', num }]);
-                                      },
-                                      onSnapshot: (onNext, onError) => {
-                                          if (!window.supabase) return () => {};
-                                          
-                                          let currentData = [];
-                                          const notify = () => {
-                                              const docs = currentData.map(d => ({ exists: true, data: () => d, id: d.id }));
-                                              onNext({
-                                                  forEach: (cb) => docs.forEach(cb),
-                                                  docs: docs,
-                                                  empty: docs.length === 0
-                                              });
-                                          };
+                              } catch(e) {
+                                  if (onError) onError(e);
+                              }
+                          };
+                          fetchAll();
+                          const channel = client.channel(`realtime_${tableName}_all_${Math.random()}`)
+                              .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, () => {
+                                  fetchAll();
+                              }).subscribe();
+                          return () => client.removeChannel(channel);
+                      };
 
-                                          const fetchAll = () => {
-                                              let query = window.supabase.from(collectionName).select('*');
-                                              constraints.forEach(c => {
-                                                  if (c.type === 'orderBy') query = query.order(c.field, { ascending: c.direction === 'asc' });
-                                                  if (c.type === 'limit') query = query.limit(c.num);
-                                              });
-                                              query.then(({data, error}) => {
-                                                  if (data) {
-                                                      currentData = data;
-                                                      notify();
-                                                  } else if (error && onError) {
-                                                      onError(error);
-                                                  }
-                                              });
-                                          };
-
-                                          fetchAll();
-
-                                          const channel = window.supabase.channel(`public:${collectionName}_all`)
-                                          .on('postgres_changes', { event: '*', schema: 'public', table: collectionName }, () => {
-                                              fetchAll();
-                                          }).subscribe();
-                                          
-                                          return () => window.supabase.removeChannel(channel);
-                                      },
-                                      get: async () => {
-                                          if (!window.supabase) {
-                                              return { forEach: () => {}, docs: [], empty: true };
-                                          }
-                                          let query = window.supabase.from(collectionName).select('*');
-                                          constraints.forEach(c => {
-                                              if (c.type === 'orderBy') query = query.order(c.field, { ascending: c.direction === 'asc' });
-                                              if (c.type === 'limit') query = query.limit(c.num);
-                                          });
-                                          const { data } = await query;
-                                          const docs = (data || []).map(d => ({
-                                              exists: true,
-                                              data: () => d,
-                                              id: d.id
-                                          }));
-                                          return {
-                                              forEach: (cb) => docs.forEach(cb),
-                                              docs: docs,
-                                              empty: docs.length === 0
-                                          };
-                                      }
-                                  };
-                              };
-                              return makeQuery([]);
-                          }
+                      window.subscribeSupabaseDoc = function(tableName, docId, onData) {
+                          const client = window.getSupabase ? window.getSupabase() : null;
+                          if (!client || !docId) return () => {};
+                          const fetchDoc = async () => {
+                              try {
+                                  const { data } = await client.from(tableName).select('*').eq('id', String(docId)).maybeSingle();
+                                  onData(data);
+                              } catch(e) {
+                                  onData(null);
+                              }
+                          };
+                          fetchDoc();
+                          const channel = client.channel(`realtime_${tableName}_${docId}_${Math.random()}`)
+                              .on('postgres_changes', { event: '*', schema: 'public', table: tableName, filter: `id=eq.${docId}` }, (payload) => {
+                                  if (payload.eventType === 'DELETE') {
+                                      onData(null);
+                                  } else {
+                                      onData(payload.new);
+                                  }
+                              }).subscribe();
+                          return () => client.removeChannel(channel);
                       };
                       
                       updateSupabaseConnectionBadges(true);
@@ -4408,10 +4217,10 @@ function savePosts() {
                   return false;
               }
               function setupSupabaseRealtimeListeners() {
-                  if (!window.db) return;
+                  if (!window.getSupabase || !window.getSupabase()) return;
                   
                   // Realtime posts/products sync
-                  window.db.collection('bexo_posts').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_posts', snap => {
                       if (!snap) return;
                       const supabasePosts = [];
                       snap.forEach(doc => {
@@ -4422,7 +4231,7 @@ function savePosts() {
                           ) {
                               data.images = [data.images.join('')];
                               // Auto-correct in db silently
-                              window.db.collection('bexo_posts').doc(String(doc.id)).update({ images: data.images }).catch(()=>{});
+                              window.supabase.collection('bexo_posts').doc(String(doc.id)).update({ images: data.images }).catch(()=>{});
                           }
                           // Normalize stock status for real-time consistency across all clients
                           const numStock = (data.stockCount !== undefined && data.stockCount !== null) ? Number(data.stockCount) : ((data.stock !== undefined && data.stock !== null) ? Number(data.stock) : 0);
@@ -4455,7 +4264,7 @@ function savePosts() {
                       } else if (appPosts.length > 0) {
                           // Seed empty Supabase with existing local products
                           appPosts.forEach(p => {
-                              window.db.collection('bexo_posts').doc(String(p.id)).set(sanitizeForSupabase(p))
+                              window.supabase.collection('bexo_posts').doc(String(p.id)).set(sanitizeForSupabase(p))
                                   .catch(err => console.warn("Auto-seed product error:", err));
                           });
                       }
@@ -4467,7 +4276,7 @@ function savePosts() {
                   });
 
                   // Realtime users list sync with fallback merging to prevent race condition data loss on offline/slow registrations
-                  window.db.collection('bexo_users').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_users', snap => {
                       if (!snap) return;
                       const supabaseUsers = [];
                       snap.forEach(doc => {
@@ -4540,7 +4349,7 @@ function savePosts() {
                                   const existsInSupabase = supabaseUsers.some(f => f.profileId === u.profileId);
                                   if (!existsInSupabase) {
                                       console.log(`[Supabase Sync] Uploading missing local user: ${u.profileId} (${u.fullName})`);
-                                      window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
+                                      window.supabase.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
                                           .catch(err => console.warn("Supabase auto sync-back user error:", err));
                                   }
                               }
@@ -4548,7 +4357,7 @@ function savePosts() {
                       } else if (appUsers.length > 0) {
                           // Seed empty Supabase with existing local users
                           appUsers.forEach(u => {
-                              window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
+                              window.supabase.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u))
                                   .catch(err => console.warn("Auto-seed user error:", err));
                           });
                       }
@@ -4560,7 +4369,7 @@ function savePosts() {
                   });
 
                   // Realtime orders sync
-                  window.db.collection('bexo_orders').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_orders', snap => {
                       if (!snap) return;
                       const supabaseOrders = [];
                       snap.forEach(doc => {
@@ -4573,7 +4382,7 @@ function savePosts() {
                           triggerViewRendering('orders');
                       } else if (appOrders.length > 0) {
                           appOrders.forEach(o => {
-                              window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
+                              window.supabase.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
                                   .catch(err => console.warn("Auto-seed orders error:", err));
                           });
                       }
@@ -4585,7 +4394,7 @@ function savePosts() {
                   });
 
                   // Realtime settings sync
-                  window.db.collection('bexo_settings').doc('global').onSnapshot(doc => {
+                  subscribeSupabaseDoc('bexo_settings', 'global', doc => {
                       if (doc && doc.exists) {
                           const data = doc.data();
                           if (data) {
@@ -4594,7 +4403,7 @@ function savePosts() {
                               triggerViewRendering('settings');
                           }
                       } else {
-                          window.db.collection('bexo_settings').doc('global').set(sanitizeForSupabase(appSettings))
+                          (window.getSupabase ? window.getSupabase().from('bexo_settings').upsert(sanitizeForSupabase(appSettings)) : Promise.resolve())
                               .catch(err => console.warn("Auto-seed settings error:", err));
                       }
                   }, err => {
@@ -4605,7 +4414,7 @@ function savePosts() {
                   });
 
                   // Realtime premium requests sync
-                  window.db.collection('bexo_premium_requests').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_premium_requests', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4618,7 +4427,7 @@ function savePosts() {
                           triggerViewRendering('premium');
                       } else if (appPremiumRequests.length > 0) {
                           appPremiumRequests.forEach(r => {
-                              window.db.collection('bexo_premium_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
+                              window.supabase.collection('bexo_premium_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
                                   .catch(err => console.warn("Auto-seed premium error:", err));
                           });
                       }
@@ -4628,7 +4437,7 @@ function savePosts() {
                   });
 
                   // Realtime recharge requests sync
-                  window.db.collection('bexo_recharge_requests').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_recharge_requests', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4641,7 +4450,7 @@ function savePosts() {
                           triggerViewRendering('recharges');
                       } else if (appRechargeRequests.length > 0) {
                           appRechargeRequests.forEach(r => {
-                              window.db.collection('bexo_recharge_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
+                              window.supabase.collection('bexo_recharge_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
                                   .catch(err => console.warn("Auto-seed recharge error:", err));
                           });
                       }
@@ -4651,7 +4460,7 @@ function savePosts() {
                   });
 
                   // Realtime balance requests sync
-                  window.db.collection('bexo_balance_requests').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_balance_requests', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4664,7 +4473,7 @@ function savePosts() {
                           triggerViewRendering('balances');
                       } else if (appBalanceRequests.length > 0) {
                           appBalanceRequests.forEach(r => {
-                              window.db.collection('bexo_balance_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
+                              window.supabase.collection('bexo_balance_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
                                   .catch(err => console.warn("Auto-seed balance error:", err));
                           });
                       }
@@ -4674,7 +4483,7 @@ function savePosts() {
                   });
 
                   // Realtime bill requests sync
-                  window.db.collection('bexo_bill_requests').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_bill_requests', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4687,7 +4496,7 @@ function savePosts() {
                           triggerViewRendering('bills');
                       } else if (appBillRequests.length > 0) {
                           appBillRequests.forEach(r => {
-                              window.db.collection('bexo_bill_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
+                              window.supabase.collection('bexo_bill_requests').doc(String(r.id)).set(sanitizeForSupabase(r))
                                   .catch(err => console.warn("Auto-seed bills error:", err));
                           });
                       }
@@ -4697,7 +4506,7 @@ function savePosts() {
                   });
 
                   // Realtime customer reports sync
-                  window.db.collection('bexo_customer_reports').doc('global').onSnapshot(doc => {
+                  subscribeSupabaseDoc('bexo_customer_reports', 'global', doc => {
                       if (doc && doc.exists) {
                           const data = doc.data();
                           if (data) {
@@ -4706,7 +4515,7 @@ function savePosts() {
                               triggerViewRendering('customer_reports');
                           }
                       } else {
-                          window.db.collection('bexo_customer_reports').doc('global').set(sanitizeForSupabase(appCustomerReports))
+                          (window.getSupabase ? window.getSupabase().from('bexo_customer_reports').upsert(sanitizeForSupabase(appCustomerReports)) : Promise.resolve())
                               .catch(err => console.error(err));
                       }
                   }, err => {
@@ -4715,7 +4524,7 @@ function savePosts() {
                   });
 
                   // Realtime categories sync
-                  window.db.collection('bexo_categories').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_categories', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4728,7 +4537,7 @@ function savePosts() {
                           triggerViewRendering('categories');
                       } else if (appCategories.length > 0) {
                           appCategories.forEach(c => {
-                              window.db.collection('bexo_categories').doc(String(c.id)).set(sanitizeForSupabase(c))
+                              window.supabase.collection('bexo_categories').doc(String(c.id)).set(sanitizeForSupabase(c))
                                   .catch(err => console.warn("Auto-seed categories error:", err));
                           });
                       }
@@ -4738,7 +4547,7 @@ function savePosts() {
                   });
 
                   // Realtime transactions sync
-                  window.db.collection('bexo_transactions').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_transactions', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4751,7 +4560,7 @@ function savePosts() {
                           triggerViewRendering('transactions');
                       } else if (appTransactions.length > 0) {
                           appTransactions.forEach(t => {
-                              window.db.collection('bexo_transactions').doc(String(t.id)).set(sanitizeForSupabase(t))
+                              window.supabase.collection('bexo_transactions').doc(String(t.id)).set(sanitizeForSupabase(t))
                                   .catch(err => console.warn("Supabase sync transaction error:", err));
                           });
                       }
@@ -4761,7 +4570,7 @@ function savePosts() {
                   });
 
                   // Realtime accounts sync
-                  window.db.collection('bexo_accounts').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_accounts', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4774,7 +4583,7 @@ function savePosts() {
                           triggerViewRendering('accounts');
                       } else if (appAccounts.length > 0) {
                           appAccounts.forEach(a => {
-                              window.db.collection('bexo_accounts').doc(String(a.id)).set(sanitizeForSupabase(a))
+                              window.supabase.collection('bexo_accounts').doc(String(a.id)).set(sanitizeForSupabase(a))
                                   .catch(err => console.warn("Supabase sync accounts error:", err));
                           });
                       }
@@ -4784,7 +4593,7 @@ function savePosts() {
                   });
 
                   // Realtime withdrawals sync
-                  window.db.collection('bexo_profile_payments').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_profile_payments', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4801,7 +4610,7 @@ function savePosts() {
                       handleSupabaseError(err, OperationType.LIST, "bexo_profile_payments");
                   });
 
-                  window.db.collection('bexo_withdrawals').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_withdrawals', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4814,7 +4623,7 @@ function savePosts() {
                           triggerViewRendering('withdrawals');
                       } else if (appWithdrawals.length > 0) {
                           appWithdrawals.forEach(w => {
-                              window.db.collection('bexo_withdrawals').doc(String(w.id)).set(sanitizeForSupabase(w))
+                              window.supabase.collection('bexo_withdrawals').doc(String(w.id)).set(sanitizeForSupabase(w))
                                   .catch(err => console.warn("Supabase sync withdrawal error:", err));
                           });
                       }
@@ -4824,7 +4633,7 @@ function savePosts() {
                   });
 
                   // Realtime support tickets sync
-                  window.db.collection('bexo_support_tickets').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_support_tickets', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4837,7 +4646,7 @@ function savePosts() {
                           triggerViewRendering('support');
                       } else if (appSupportTickets.length > 0) {
                           appSupportTickets.forEach(t => {
-                              window.db.collection('bexo_support_tickets').doc(String(t.id)).set(sanitizeForSupabase(t))
+                              window.supabase.collection('bexo_support_tickets').doc(String(t.id)).set(sanitizeForSupabase(t))
                                   .catch(err => console.warn("Supabase sync support tickets error:", err));
                           });
                       }
@@ -4847,7 +4656,7 @@ function savePosts() {
                   });
 
                   // Realtime manager records sync
-                  window.db.collection('bexo_manager_records').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_manager_records', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4860,7 +4669,7 @@ function savePosts() {
                           triggerViewRendering('manager');
                       } else if (appManagerRecords.length > 0) {
                           appManagerRecords.forEach(r => {
-                              window.db.collection('bexo_manager_records').doc(String(r.id)).set(sanitizeForSupabase(r))
+                              window.supabase.collection('bexo_manager_records').doc(String(r.id)).set(sanitizeForSupabase(r))
                                   .catch(err => console.warn("Supabase sync manager record error:", err));
                           });
                       }
@@ -4870,7 +4679,7 @@ function savePosts() {
                   });
 
                   // Realtime reseller payouts sync
-                  window.db.collection('bexo_reseller_payouts').onSnapshot(snap => {
+                  subscribeSupabaseCollection('bexo_reseller_payouts', snap => {
                       if (!snap) return;
                       const list = [];
                       snap.forEach(doc => {
@@ -4883,7 +4692,7 @@ function savePosts() {
                           triggerViewRendering('manager');
                       } else if (appResellerPayouts.length > 0) {
                           appResellerPayouts.forEach(p => {
-                              window.db.collection('bexo_reseller_payouts').doc(String(p.id)).set(sanitizeForSupabase(p))
+                              window.supabase.collection('bexo_reseller_payouts').doc(String(p.id)).set(sanitizeForSupabase(p))
                                   .catch(err => console.warn("Supabase sync reseller payouts error:", err));
                           });
                       }
@@ -5464,9 +5273,9 @@ function savePosts() {
                    let matchedUser = typeof findUserByEmailOrPhone === 'function' ? findUserByEmailOrPhone(cleanIdentifier) : null;
 
                    // If not found in memory, query cloud Supabase database
-                   if (!matchedUser && window.db) {
+                   if (!matchedUser && window.supabase) {
                        try {
-                           const snap = await window.db.collection('bexo_users').get();
+                           const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
                            snap.forEach(doc => {
                                const data = doc.data();
                                if (data) {
@@ -5776,9 +5585,9 @@ function savePosts() {
 
                                    let matchedUser = typeof findUserByEmailOrPhone === 'function' ? findUserByEmailOrPhone(identifier) : null;
 
-                                   if (!matchedUser && window.db) {
+                                   if (!matchedUser && window.supabase) {
                                        try {
-                                           const snap = await window.db.collection('bexo_users').get();
+                                           const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
                                            snap.forEach(doc => {
                                                const data = doc.data();
                                                if (data) {
@@ -6108,7 +5917,7 @@ function savePosts() {
                   attachEvents();
               }
 
-              function handleRegister() {
+              async function handleRegister() {
                   try {
                       const shopField = document.getElementById('regShop');
                       const nameField = document.getElementById('regName');
@@ -6437,9 +6246,9 @@ function savePosts() {
                           }
                           
                           if (!foundUser) {
-                              if (window.db) {
+                              if (window.getSupabase && window.getSupabase()) {
                                   try {
-                                      const snap = await window.db.collection('bexo_users').get();
+                                      const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
                                       snap.forEach(doc => {
                                           const data = doc.data();
                                           if (data && data.email && data.email.toLowerCase().trim() === loggedInUser.email.toLowerCase().trim()) {
@@ -7170,8 +6979,8 @@ function savePosts() {
 
                               appManagerRecords.push(record);
                               changed = true;
-                              if (window.db) {
-                                  window.db.collection('bexo_manager_records').doc(String(record.id)).set(sanitizeForSupabase(record))
+                              if (window.getSupabase && window.getSupabase()) {
+                                  window.supabase.collection('bexo_manager_records').doc(String(record.id)).set(sanitizeForSupabase(record))
                                       .catch(err => console.warn("Supabase sync error:", err));
                               }
                           }
@@ -7237,8 +7046,8 @@ function savePosts() {
 
                   saveManagerRecords();
 
-                  if (window.db) {
-                      window.db.collection('bexo_manager_records').doc(String(record.id)).set(sanitizeForSupabase(record))
+                  if (window.getSupabase && window.getSupabase()) {
+                      window.supabase.collection('bexo_manager_records').doc(String(record.id)).set(sanitizeForSupabase(record))
                           .catch(err => console.warn("Supabase sync error:", err));
                   }
 
@@ -7539,11 +7348,11 @@ function savePosts() {
                       saveManagerRecords();
                       saveResellerPayouts();
                       
-                      if (window.db) {
-                          window.db.collection('bexo_manager_records').doc(String(record.id)).set(sanitizeForSupabase(record))
+                      if (window.getSupabase && window.getSupabase()) {
+                          window.supabase.collection('bexo_manager_records').doc(String(record.id)).set(sanitizeForSupabase(record))
                               .catch(err => console.warn("Supabase sync error:", err));
                               
-                          window.db.collection('bexo_reseller_payouts').doc(String(payout.id)).set(sanitizeForSupabase(payout))
+                          window.supabase.collection('bexo_reseller_payouts').doc(String(payout.id)).set(sanitizeForSupabase(payout))
                               .catch(err => console.warn("Supabase sync error:", err));
                       }
                       
@@ -8837,8 +8646,8 @@ function savePosts() {
                   renderTable(backupLogs);
 
                   // Now query real-time database to show latest sync
-                  if (window.db) {
-                      window.db.collection('bexo_transactions').orderBy('timestamp', 'desc').limit(500).get().then(snapshot => {
+                  if (window.getSupabase && window.getSupabase()) {
+                      window.supabase.collection('bexo_transactions').orderBy('timestamp', 'desc').limit(500).get().then(snapshot => {
                           if (!snapshot.empty) {
                               const supabaseLogs = [];
                               snapshot.forEach(doc => {
@@ -14602,10 +14411,10 @@ function savePosts() {
                   if (updatedProfileIds.size > 0) {
                       Array.from(updatedProfileIds).forEach(pId => {
                           saveUsers(pId);
-                          if (window.db) {
+                          if (window.getSupabase && window.getSupabase()) {
                               const target = appUsers.find(u => String(u.profileId) === String(pId));
                               if (target) {
-                                  window.db.collection('bexo_users').doc(String(pId)).set(sanitizeForSupabase(target))
+                                  window.supabase.collection('bexo_users').doc(String(pId)).set(sanitizeForSupabase(target))
                                       .catch(err => console.warn("Supabase pass sync error:", err));
                               }
                           }
@@ -15023,7 +14832,7 @@ function savePosts() {
                                        <i class="fas fa-wifi text-slate-300 text-lg"></i>
                                    </div>
                                    <div>
-                                       ${window.db ? `
+                                       ${(window.getSupabase && window.getSupabase()) ? `
                                            <div class="flex items-center gap-2 text-emerald-600">
                                                <span class="w-3 h-3 bg-emerald-500 rounded-full "></span>
                                                <span class="text-lg font-black tracking-tight">Cloud Live</span>
@@ -15181,16 +14990,16 @@ function savePosts() {
 
                async function forceDatabaseDirectSyncDetailed() {
                    showToast("ডাটাবেজ ডিরেক্ট সিঙ্ক শুরু হয়েছে...", "info");
-                   if (!window.db) {
+                   if (!window.getSupabase || !window.getSupabase()) {
                        showToast("ডাটাবেজ লাইভ নেই! পুনরায় সংযোগের চেষ্টা চলছে...", "warning");
                        initializeSupabaseIfReady();
-                       if (!window.db) {
+                       if (!window.getSupabase || !window.getSupabase()) {
                            showToast("ডাটাবেজ সংযোগ ব্যর্থ হয়েছে! এরর লগটি চেক করুন।", "error");
                            return;
                        }
                    }
                    try {
-                       const snap = await window.db.collection('bexo_users').get();
+                       const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
                        const supabaseUsers = [];
                        snap.forEach(doc => {
                            const data = doc.data();
@@ -15228,7 +15037,7 @@ function savePosts() {
                }
 
                async function forceUploadLocalUsersDetailed() {
-                   if (!window.db) {
+                   if (!window.getSupabase || !window.getSupabase()) {
                        showToast("ডাটাবেজ কানেকশন অফলাইন!", "error");
                        return;
                    }
@@ -15237,7 +15046,7 @@ function savePosts() {
                        let uploadCount = 0;
                        for (const u of appUsers) {
                            if (u && u.profileId && u.phone && u.password) {
-                               await window.db.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u));
+                               await window.supabase.collection('bexo_users').doc(String(u.profileId)).set(sanitizeForSupabase(u));
                                uploadCount++;
                            }
                        }
@@ -15260,12 +15069,12 @@ function savePosts() {
                        appUsers = [];
                        localStorage.setItem('bexo_users', JSON.stringify([]));
                        
-                       if (!window.db) {
+                       if (!window.getSupabase || !window.getSupabase()) {
                            initializeSupabaseIfReady();
                        }
                        
-                       if (window.db) {
-                           const snap = await window.db.collection('bexo_users').get();
+                       if (window.getSupabase && window.getSupabase()) {
+                           const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
                            const supabaseUsers = [];
                            snap.forEach(doc => {
                                const data = doc.data();
@@ -15783,9 +15592,9 @@ function savePosts() {
                       if (typeof savePosts === 'function') savePosts();
                       
                       // Save to Supabase via frontend
-                      if (window.db) {
+                      if (window.getSupabase && window.getSupabase()) {
                           newPosts.forEach(postData => {
-                              window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForSupabase(postData))
+                              window.supabase.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForSupabase(postData))
                                   .catch(err => console.warn("Supabase save post error:", err));
                           });
                       }
@@ -16370,8 +16179,8 @@ function savePosts() {
                   const amountToAdd = Number(req.amount);
 
                   // 1. Direct Supabase user document update to guarantee reliability
-                  if (window.db && req.profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(req.profileId));
+                  if (window.supabase && req.profileId) {
+                      const userDocRef = window.supabase.collection('bexo_users').doc(String(req.profileId));
                       userDocRef.get().then(doc => {
                           if (doc.exists) {
                               const userData = doc.data();
@@ -16670,8 +16479,8 @@ function savePosts() {
                   saveBillRequests();
 
                   // 1. Direct Supabase user document update to guarantee reliability
-                  if (window.db && profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
+                  if (window.supabase && profileId) {
+                      const userDocRef = window.supabase.collection('bexo_users').doc(String(profileId));
                       userDocRef.get().then(doc => {
                           if (doc.exists) {
                               const userData = doc.data();
@@ -16762,8 +16571,8 @@ function savePosts() {
                   saveRechargeRequests();
 
                   // 1. Direct Supabase user document update to guarantee reliability
-                  if (window.db && profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
+                  if (window.supabase && profileId) {
+                      const userDocRef = window.supabase.collection('bexo_users').doc(String(profileId));
                       userDocRef.get().then(doc => {
                           if (doc.exists) {
                               const userData = doc.data();
@@ -16859,11 +16668,11 @@ function savePosts() {
                   saveWithdrawals();
 
                   // 1. Run standard Supabase database transaction for multi-document reliability
-                  if (window.db && req.profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(req.profileId));
-                      const withdrawDocRef = window.db.collection('bexo_withdrawals').doc(String(id));
+                  if (window.supabase && req.profileId) {
+                      const userDocRef = window.supabase.collection('bexo_users').doc(String(req.profileId));
+                      const withdrawDocRef = window.supabase.collection('bexo_withdrawals').doc(String(id));
 
-                      window.db.runTransaction(async (transaction) => {
+                      window.supabase.runTransaction(async (transaction) => {
                           const userDoc = await transaction.get(userDocRef);
                           const withdrawDoc = await transaction.get(withdrawDocRef);
 
@@ -16942,7 +16751,7 @@ function savePosts() {
                                   adminNote: adminNote,
                                   details: statusToSet === 'Cancelled' ? `উইথড্র রিকোয়েস্ট বাতিল এবং রিফান্ড (উইথড্র ID: ${id})` : `উইথড্র রিকোয়েস্ট সফলভাবে সম্পন্ন হয়েছে (উইথড্র ID: ${id})`
                               };
-                              const auditTxnRef = window.db.collection('bexo_transactions').doc(String(auditTxnId));
+                              const auditTxnRef = window.supabase.collection('bexo_transactions').doc(String(auditTxnId));
                               transaction.set(auditTxnRef, sanitizeForSupabase(auditTxn));
                           }
                       }).then(() => {
@@ -17072,8 +16881,8 @@ function savePosts() {
                   }
 
                   // Write directly to Supabase to update the target user Profile
-                  if (window.db && profileId) {
-                      const userDocRef = window.db.collection('bexo_users').doc(String(profileId));
+                  if (window.supabase && profileId) {
+                      const userDocRef = window.supabase.collection('bexo_users').doc(String(profileId));
                       userDocRef.get().then(doc => {
                           if (doc.exists) {
                               const userData = doc.data();
@@ -17118,8 +16927,8 @@ function savePosts() {
                       }
 
                       // Update directly in Supabase
-                      if (window.db) {
-                          const userDocRef = window.db.collection('bexo_users').doc(String(id));
+                      if (window.getSupabase && window.getSupabase()) {
+                          const userDocRef = window.supabase.collection('bexo_users').doc(String(id));
                           userDocRef.get().then(doc => {
                               if (doc.exists) {
                                   const userData = doc.data();
@@ -17551,9 +17360,9 @@ function savePosts() {
                   }
                   savePosts();
 
-                  if (window.db) {
+                  if (window.getSupabase && window.getSupabase()) {
                       newPosts.forEach(postData => {
-                          window.db.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForSupabase(postData))
+                          window.supabase.collection('bexo_posts').doc(String(postData.id)).set(sanitizeForSupabase(postData))
                               .catch(err => console.warn("Supabase save post error:", err));
                       });
                   }
@@ -17586,8 +17395,8 @@ function savePosts() {
                   if(!confirm("আপনি কি নিশ্চিতভাবে এই পোস্টটি ডিলিট করতে চান?")) return;
                   appPosts = appPosts.filter(p => String(p.id) !== String(id));
                   savePosts();
-                  if (window.db) {
-                      window.db.collection('bexo_posts').doc(String(id)).delete()
+                  if (window.getSupabase && window.getSupabase()) {
+                      window.supabase.collection('bexo_posts').doc(String(id)).delete()
                           .catch(err => console.warn("Supabase delete product error:", err));
                   }
                   renderAdminPostList();
@@ -17609,8 +17418,8 @@ function savePosts() {
                           p.stock = 0;
                       }
                       savePosts();
-                      if (window.db) {
-                          window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForSupabase(p))
+                      if (window.getSupabase && window.getSupabase()) {
+                          window.supabase.collection('bexo_posts').doc(String(id)).set(sanitizeForSupabase(p))
                               .catch(err => console.warn("Supabase update product error:", err));
                       }
                       renderAdminPostList();
@@ -17622,8 +17431,8 @@ function savePosts() {
                   if(p) {
                       p.isPublished = (p.isPublished === false) ? true : false;
                       savePosts();
-                      if (window.db) {
-                          window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForSupabase(p))
+                      if (window.getSupabase && window.getSupabase()) {
+                          window.supabase.collection('bexo_posts').doc(String(id)).set(sanitizeForSupabase(p))
                               .catch(err => console.warn("Supabase update product error:", err));
                       }
                       renderAdminPostList();
@@ -17967,8 +17776,8 @@ function changeStock(id) {
             p.stockStatus = 'out_of_stock';
         }
         savePosts();
-        if (window.db) {
-            window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForSupabase(p))
+        if (window.getSupabase && window.getSupabase()) {
+            window.supabase.collection('bexo_posts').doc(String(id)).set(sanitizeForSupabase(p))
                 .catch(err => console.warn("Supabase update stock error:", err));
         }
         renderAdminPostList();
@@ -17987,8 +17796,8 @@ function changePrice(id) {
                   if(newPrice !== null && !isNaN(newPrice)) {
                       p.price = parseInt(newPrice);
                       savePosts();
-                      if (window.db) {
-                          window.db.collection('bexo_posts').doc(String(id)).set(sanitizeForSupabase(p))
+                      if (window.getSupabase && window.getSupabase()) {
+                          window.supabase.collection('bexo_posts').doc(String(id)).set(sanitizeForSupabase(p))
                               .catch(err => console.warn("Supabase update price error:", err));
                       }
                       renderAdminPostList();
@@ -20074,14 +19883,14 @@ window.subscribeFullScreenLiveChat = function() {
     window.currentChatSession = { profileId, userName, phone, email, isGuest, ipAddress, possibleRegisteredUser, profilePic };
     
     // Subscribe to messages
-    if (!window.db) return;
+    if (!window.getSupabase || !window.getSupabase()) return;
     const collectionName = isGuest ? 'guest_chats' : 'live_chats';
     
     if (window.fullScreenLiveChatUnsubscribe) {
         window.fullScreenLiveChatUnsubscribe();
     }
     
-    window.fullScreenLiveChatUnsubscribe = window.db.collection(collectionName).doc(profileId).onSnapshot(doc => {
+    window.fullScreenLiveChatUnsubscribe = subscribeSupabaseDoc(collectionName, profileId, doc => {
         let lastMsgText = 'কোনো মেসেজ নেই';
         let lastMsgTime = '';
         let unreadUser = 0;
@@ -20186,14 +19995,14 @@ window.subscribeFullScreenLiveChat = function() {
 window.sendFullScreenLiveChatMessage = function() {
     const input = document.getElementById('fullScreenLiveChatMessageInput');
     const text = input.value.trim();
-    if (!text || !window.db || !window.currentChatSession) return;
+    if (!text || !window.supabase || !window.currentChatSession) return;
     
     input.value = '';
     input.style.height = 'auto'; // reset textarea height
     
     const userId = String(window.currentChatSession.profileId);
     const collectionName = window.currentChatSession.isGuest ? 'guest_chats' : 'live_chats';
-    const docRef = window.db.collection(collectionName).doc(userId);
+    const docRef = window.supabase.collection(collectionName).doc(userId);
     
     const newMsg = {
         text: text,
@@ -20201,7 +20010,7 @@ window.sendFullScreenLiveChatMessage = function() {
         timestamp: Date.now()
     };
     
-    window.db.runTransaction(transaction => {
+    window.supabase.runTransaction(transaction => {
         return transaction.get(docRef).then(doc => {
             if (!doc.exists) {
                 transaction.set(docRef, {
@@ -21481,8 +21290,8 @@ function updateUserTicketStatus(id, newStatus) {
                       targetUser.rechargeTransactions.unshift(transaction);
 
                       // Direct database synchronization to avoid silent out of sync
-                      if (window.db && targetUser.profileId) {
-                          const userDocRef = window.db.collection('bexo_users').doc(String(targetUser.profileId));
+                      if (window.supabase && targetUser.profileId) {
+                          const userDocRef = window.supabase.collection('bexo_users').doc(String(targetUser.profileId));
                           userDocRef.get().then(doc => {
                               if (doc.exists) {
                                   const userData = doc.data();
@@ -22065,11 +21874,11 @@ function updateUserTicketStatus(id, newStatus) {
                         let orderResetPromises = [];
 
                         // 1. Delete transactions from Supabase bexo_transactions
-                        if (window.db) {
+                        if (window.getSupabase && window.getSupabase()) {
                             settlements.forEach(t => {
                                 if (t.id) {
                                     deletePromises.push(
-                                        window.db.collection('bexo_transactions').doc(String(t.id)).delete()
+                                        window.supabase.collection('bexo_transactions').doc(String(t.id)).delete()
                                             .catch(err => console.error(`Error deleting doc ${t.id}:`, err))
                                     );
                                 }
@@ -22092,9 +21901,9 @@ function updateUserTicketStatus(id, newStatus) {
                                         message: 'সেটেলমেন্ট অডিট লগ ডিলিট করার কারণে প্রফিট নিষ্পত্তি রিসেট করা হয়েছে।'
                                     });
 
-                                    if (window.db) {
+                                    if (window.getSupabase && window.getSupabase()) {
                                         orderResetPromises.push(
-                                            window.db.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
+                                            window.supabase.collection('bexo_orders').doc(String(o.id)).set(sanitizeForSupabase(o))
                                                 .catch(err => console.error(`Error resetting order Doc ${o.id}:`, err))
                                         );
                                     }
@@ -22708,13 +22517,13 @@ function verifySuperAdminPin() {
 
                    // Execute ACID Transaction process
                    try {
-                       if (window.db) {
+                       if (window.getSupabase && window.getSupabase()) {
                            // Use relational atomicity transaction across Supabase if online!
-                           const userDocRef = window.db.collection('bexo_users').doc(String(resellerProfileId));
-                           const orderDocRef = window.db.collection('bexo_orders').doc(String(order.id));
-                           const txnDocRef = window.db.collection('bexo_transactions').doc(String(settlementTxnId));
+                           const userDocRef = window.supabase.collection('bexo_users').doc(String(resellerProfileId));
+                           const orderDocRef = window.supabase.collection('bexo_orders').doc(String(order.id));
+                           const txnDocRef = window.supabase.collection('bexo_transactions').doc(String(settlementTxnId));
 
-                           await window.db.runTransaction(async (transaction) => {
+                           await window.supabase.runTransaction(async (transaction) => {
                                // Read active order from inside transactional bounds
                                const orderDoc = await transaction.get(orderDocRef);
                                const orderData = orderDoc.data() || {};
@@ -22884,10 +22693,10 @@ async function loadLandingProducts() {
     try {
         let products = [];
         
-        // Attempt to fetch from window.db first if it's initialized
-        if (window.db && typeof window.db.collection === 'function') {
+        // Attempt to fetch from window.supabase first if it's initialized
+        if (window.supabase && typeof window.supabase.collection === 'function') {
             try {
-                const snapshot = await window.db.collection('bexo_posts').get();
+                const snapshot = await (window.getSupabase ? window.getSupabase().from('bexo_posts').select('*') : Promise.resolve({ data: [] }));
                 if (snapshot && !snapshot.empty) {
                     snapshot.forEach(doc => {
                         const data = doc.data();
@@ -23031,11 +22840,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Render immediately using local posts cache if available
     loadLandingProducts();
     
-    if (window.db !== null && typeof window.db !== 'undefined') {
+    if (window.supabase !== null && typeof window.supabase !== 'undefined') {
         loadLandingProducts();
     } else {
         const interval = setInterval(() => {
-            if (window.db !== null && typeof window.db !== 'undefined') {
+            if (window.supabase !== null && typeof window.supabase !== 'undefined') {
                 clearInterval(interval);
                 loadLandingProducts();
             }
@@ -23259,15 +23068,15 @@ window.openLiveChat = async function() {
         }
     } else {
         // Logged in! Merge guest chats if they exist
-        if (guestId && window.db) {
+        if (guestId && window.supabase) {
             try {
-                const guestRef = window.db.collection('guest_chats').doc(guestId);
+                const guestRef = window.supabase.collection('guest_chats').doc(guestId);
                 const guestDoc = await guestRef.get();
                 if (guestDoc.exists) {
                     const guestData = guestDoc.data();
                     if (guestData.messages && guestData.messages.length > 0) {
-                        const userRef = window.db.collection('live_chats').doc(profileId);
-                        await window.db.runTransaction(async t => {
+                        const userRef = window.supabase.collection('live_chats').doc(profileId);
+                        await window.supabase.runTransaction(async t => {
                             const userDoc = await t.get(userRef);
                             let userMsgs = userDoc.exists ? (userDoc.data().messages || []) : [];
                             const allMsgs = [...guestData.messages, ...userMsgs].sort((a,b) => a.timestamp - b.timestamp);
@@ -23364,18 +23173,18 @@ window.closeLiveChat = function() {
 };
 
 window.subscribeLiveChatUser = function() {
-    if (!window.db || !window.currentChatSession) return;
+    if (!window.supabase || !window.currentChatSession) return;
     
     const userId = String(window.currentChatSession.profileId);
     const collectionName = window.currentChatSession.isGuest ? 'guest_chats' : 'live_chats';
     
-    window.liveChatUnsubscribe = window.db.collection(collectionName).doc(userId).onSnapshot(doc => {
+    window.liveChatUnsubscribe = subscribeSupabaseDoc(collectionName, userId, doc => {
         const data = doc.data() || { messages: [] };
         renderLiveChatMessagesUser(data.messages || []);
         
         // Reset unreadUser
         if (data.unreadUser > 0) {
-            window.db.collection(collectionName).doc(userId).update({ unreadUser: 0 }).catch(e => console.error(e));
+            (window.getSupabase ? window.getSupabase().from(collectionName).update({ unreadUser: 0 }).eq('id', String(userId)) : Promise.resolve()).catch(e => console.error(e));
         }
     });
 };
@@ -23453,13 +23262,13 @@ window.sendLiveChatMessage = function() {
     console.log("sendLiveChatMessage called");
     const input = document.getElementById('liveChatMessageInput');
     const text = input.value.trim();
-    if (!text || !window.db || !window.currentChatSession) return;
+    if (!text || !window.supabase || !window.currentChatSession) return;
     
     input.value = '';
     
     const userId = String(window.currentChatSession.profileId);
     const collectionName = window.currentChatSession.isGuest ? 'guest_chats' : 'live_chats';
-    const docRef = window.db.collection(collectionName).doc(userId);
+    const docRef = window.supabase.collection(collectionName).doc(userId);
     
     const newMsg = {
         text: text,
@@ -23468,7 +23277,7 @@ window.sendLiveChatMessage = function() {
     };
     
     console.log("Starting transaction for:", userId);
-    window.db.runTransaction(transaction => {
+    window.supabase.runTransaction(transaction => {
         return transaction.get(docRef).then(doc => {
             if (!doc.exists) {
                 transaction.set(docRef, {
@@ -23571,7 +23380,7 @@ window.adminLiveChatDetailUnsubscribe = null;
 window.adminSubscribeLiveChatsList = function(collectionName) {
     if (window.adminLiveChatsUnsubscribe) window.adminLiveChatsUnsubscribe();
     
-    window.adminLiveChatsUnsubscribe = window.db.collection(collectionName).orderBy('lastMessageTime', 'desc').onSnapshot(snapshot => {
+    window.adminLiveChatsUnsubscribe = window.supabase.collection(collectionName).orderBy('lastMessageTime', 'desc').onSnapshot(snapshot => {
         const listArea = document.getElementById('adminLiveChatList');
         if (!listArea) return;
         
@@ -23647,7 +23456,7 @@ window.adminOpenLiveChatDetail = function(userId, userName, isGuest, ipAddress, 
     // Subscribe to details
     if (window.adminLiveChatDetailUnsubscribe) window.adminLiveChatDetailUnsubscribe();
     
-    window.adminLiveChatDetailUnsubscribe = window.db.collection(collectionName).doc(userId).onSnapshot(doc => {
+    window.adminLiveChatDetailUnsubscribe = subscribeSupabaseDoc(collectionName, userId, doc => {
         const messagesArea = document.getElementById('adminLiveChatMessages');
         if (!messagesArea) return;
         
@@ -23691,7 +23500,7 @@ window.adminOpenLiveChatDetail = function(userId, userName, isGuest, ipAddress, 
         
         // Reset unreadAdmin
         if (data.unreadAdmin > 0) {
-            window.db.collection(collectionName).doc(userId).update({ unreadAdmin: 0 }).catch(e => console.error(e));
+            (window.getSupabase ? window.getSupabase().from(collectionName).update({ unreadAdmin: 0 }).eq('id', String(userId)) : Promise.resolve()).catch(e => console.error(e));
         }
     });
 };
@@ -23701,13 +23510,13 @@ window.adminSendLiveChatMessage = function() {
     
     const input = document.getElementById('adminLiveChatMessageInput');
     const text = input.value.trim();
-    if (!text || !window.db) return;
+    if (!text || !window.supabase) return;
     
     input.value = '';
     
     const userId = window.adminCurrentLiveChatUser;
     const collectionName = window.adminCurrentLiveChatCollection;
-    const docRef = window.db.collection(collectionName).doc(userId);
+    const docRef = window.supabase.collection(collectionName).doc(userId);
     
     const newMsg = {
         text: text,
@@ -23715,7 +23524,7 @@ window.adminSendLiveChatMessage = function() {
         timestamp: Date.now()
     };
     
-    window.db.runTransaction(transaction => {
+    window.supabase.runTransaction(transaction => {
         return transaction.get(docRef).then(doc => {
             if (!doc.exists) return; // Should exist if admin is replying
             const data = doc.data();
