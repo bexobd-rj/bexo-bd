@@ -26,7 +26,8 @@ export function createSupabaseFacade(rawClient: any = null) {
     },
     from: (tableName: string) => {
       if (activeClient && typeof activeClient.from === 'function') {
-        return activeClient.from(tableName);
+        const q = activeClient.from(tableName);
+        return q;
       }
       const dummyBuilder: any = {
         select: () => dummyBuilder,
@@ -42,8 +43,8 @@ export function createSupabaseFacade(rawClient: any = null) {
         limit: () => dummyBuilder,
         single: async () => ({ data: null, error: null }),
         maybeSingle: async () => ({ data: null, error: null }),
-        then: (resolve: any) => resolve({ data: [], error: null }),
-        catch: () => dummyBuilder
+        then: (resolve: any, reject?: any) => Promise.resolve({ data: [], error: null }).then(resolve, reject),
+        catch: (reject: any) => Promise.resolve({ data: [], error: null }).catch(reject)
       };
       return dummyBuilder;
     },

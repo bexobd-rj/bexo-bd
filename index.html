@@ -890,8 +890,8 @@
                 limit: function() { return builder; },
                 single: function() { return Promise.resolve({ data: null, error: null }); },
                 maybeSingle: function() { return Promise.resolve({ data: null, error: null }); },
-                then: function(resolve) { return resolve({ data: [], error: null }); },
-                catch: function() { return builder; }
+                then: function(resolve, reject) { return Promise.resolve({ data: [], error: null }).then(resolve, reject); },
+                catch: function(reject) { return Promise.resolve({ data: [], error: null }).catch(reject); }
               };
               return builder;
             },
@@ -3380,7 +3380,7 @@
               function saveSettings() {
                   localStorage.setItem('bexo_settings', JSON.stringify(appSettings));
                   if (window.getSupabase && window.getSupabase()) {
-                      (window.getSupabase ? window.getSupabase().from('bexo_settings').upsert(sanitizeForSupabase(appSettings)) : Promise.resolve())
+                      window.supabase.collection('bexo_settings').doc('global').set(sanitizeForSupabase(appSettings))
                           .catch(err => console.warn("Supabase sync settings error:", err));
                   }
               }
@@ -3443,7 +3443,7 @@
               function saveCustomerReports() {
                   localStorage.setItem('bexo_customer_reports', JSON.stringify(appCustomerReports));
                   if (window.getSupabase && window.getSupabase()) {
-                      (window.getSupabase ? window.getSupabase().from('bexo_customer_reports').upsert(sanitizeForSupabase(appCustomerReports)) : Promise.resolve())
+                      window.supabase.collection('bexo_customer_reports').doc('global').set(sanitizeForSupabase(appCustomerReports))
                           .catch(err => console.error(err));
                   }
               }
@@ -4472,16 +4472,35 @@ function savePosts() {
                       window.subscribeSupabaseCollection = function(tableName, onData, onError) {
                           const client = window.getSupabase ? window.getSupabase() : null;
                           if (!client) return () => {};
+                          const wrapCollection = (arr) => {
+                              const list = Array.isArray(arr) ? arr : [];
+                              const docs = list.map(item => ({
+                                  ...item,
+                                  exists: !!item,
+                                  id: String(item.id || item.profileId || ''),
+                                  data: () => item
+                              }));
+                              return {
+                                  docs: docs,
+                                  empty: docs.length === 0,
+                                  forEach: (cb) => docs.forEach(cb),
+                                  map: (cb) => docs.map(cb),
+                                  filter: (cb) => docs.filter(cb),
+                                  length: docs.length,
+                                  data: list
+                              };
+                          };
                           const fetchAll = async () => {
                               try {
                                   const { data, error } = await client.from(tableName).select('*');
                                   if (error) {
                                       if (onError) onError(error);
                                   } else {
-                                      onData(data || []);
+                                      onData(wrapCollection(data));
                                   }
                               } catch(e) {
                                   if (onError) onError(e);
+                                  else onData(wrapCollection([]));
                               }
                           };
                           fetchAll();
@@ -4492,24 +4511,34 @@ function savePosts() {
                           return () => client.removeChannel(channel);
                       };
 
-                      window.subscribeSupabaseDoc = function(tableName, docId, onData) {
+                      window.subscribeSupabaseDoc = function(tableName, docId, onData, onError) {
                           const client = window.getSupabase ? window.getSupabase() : null;
                           if (!client || !docId) return () => {};
+                          const wrapDoc = (data) => ({
+                              ...(data || {}),
+                              exists: !!data,
+                              id: String(docId),
+                              data: () => data || null
+                          });
                           const fetchDoc = async () => {
                               try {
-                                  const { data } = await client.from(tableName).select('*').eq('id', String(docId)).maybeSingle();
-                                  onData(data);
+                                  const { data, error } = await client.from(tableName).select('*').eq('id', String(docId)).maybeSingle();
+                                  if (error && onError) {
+                                      onError(error);
+                                  } else {
+                                      onData(wrapDoc(data));
+                                  }
                               } catch(e) {
-                                  onData(null);
+                                  onData(wrapDoc(null));
                               }
                           };
                           fetchDoc();
                           const channel = client.channel(`realtime_${tableName}_${docId}_${Math.random()}`)
                               .on('postgres_changes', { event: '*', schema: 'public', table: tableName, filter: `id=eq.${docId}` }, (payload) => {
                                   if (payload.eventType === 'DELETE') {
-                                      onData(null);
+                                      onData(wrapDoc(null));
                                   } else {
-                                      onData(payload.new);
+                                      onData(wrapDoc(payload.new));
                                   }
                               }).subscribe();
                           return () => client.removeChannel(channel);
@@ -4726,7 +4755,7 @@ function savePosts() {
                               triggerViewRendering('settings');
                           }
                       } else {
-                          (window.getSupabase ? window.getSupabase().from('bexo_settings').upsert(sanitizeForSupabase(appSettings)) : Promise.resolve())
+                          window.supabase.collection('bexo_settings').doc('global').set(sanitizeForSupabase(appSettings))
                               .catch(err => console.warn("Auto-seed settings error:", err));
                       }
                   }, err => {
@@ -4838,7 +4867,7 @@ function savePosts() {
                               triggerViewRendering('customer_reports');
                           }
                       } else {
-                          (window.getSupabase ? window.getSupabase().from('bexo_customer_reports').upsert(sanitizeForSupabase(appCustomerReports)) : Promise.resolve())
+                          window.supabase.collection('bexo_customer_reports').doc('global').set(sanitizeForSupabase(appCustomerReports))
                               .catch(err => console.error(err));
                       }
                   }, err => {
@@ -5598,9 +5627,11 @@ function savePosts() {
                    // If not found in memory, query cloud Supabase database
                    if (!matchedUser && window.supabase) {
                        try {
-                           const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
-                           snap.forEach(doc => {
-                               const data = doc.data();
+                           const snap = await (window.supabase && typeof window.supabase.collection === 'function' ? window.supabase.collection('bexo_users').get() : (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] })));
+                           const docs = snap.docs || (snap.forEach ? snap : (snap.data || []));
+                           if (typeof docs.forEach === 'function') {
+                               docs.forEach(doc => {
+                                   const data = typeof doc.data === 'function' ? doc.data() : doc;
                                if (data) {
                                    const uEmail = String(data.email || '').trim().toLowerCase();
                                    const uPhone = typeof normalizePhone === 'function' ? normalizePhone(data.phone) : String(data.phone || '').trim();
@@ -5613,6 +5644,7 @@ function savePosts() {
                                    }
                                }
                            });
+                           }
 
                            if (matchedUser) {
                                const idx = appUsers.findIndex(u => u.profileId === matchedUser.profileId);
@@ -23019,14 +23051,18 @@ async function loadLandingProducts() {
         // Attempt to fetch from window.supabase first if it's initialized
         if (window.supabase && typeof window.supabase.collection === 'function') {
             try {
-                const snapshot = await (window.getSupabase ? window.getSupabase().from('bexo_posts').select('*') : Promise.resolve({ data: [] }));
-                if (snapshot && !snapshot.empty) {
+                const snapshot = await window.supabase.collection('bexo_posts').get();
+                if (snapshot && typeof snapshot.forEach === 'function') {
                     snapshot.forEach(doc => {
-                        const data = doc.data();
+                        const data = typeof doc.data === 'function' ? doc.data() : doc;
                         if (data) {
                             products.push(data);
                         }
                     });
+                } else if (snapshot && Array.isArray(snapshot.data)) {
+                    products = [...snapshot.data];
+                } else if (Array.isArray(snapshot)) {
+                    products = [...snapshot];
                 }
             } catch (err) {
                 console.error("Failed to fetch landing products from supabase directly:", err);
@@ -23507,7 +23543,7 @@ window.subscribeLiveChatUser = function() {
         
         // Reset unreadUser
         if (data.unreadUser > 0) {
-            (window.getSupabase ? window.getSupabase().from(collectionName).update({ unreadUser: 0 }).eq('id', String(userId)) : Promise.resolve()).catch(e => console.error(e));
+            window.supabase.collection(collectionName).doc(String(userId)).update({ unreadUser: 0 }).catch(e => console.error(e));
         }
     });
 };
@@ -23823,7 +23859,7 @@ window.adminOpenLiveChatDetail = function(userId, userName, isGuest, ipAddress, 
         
         // Reset unreadAdmin
         if (data.unreadAdmin > 0) {
-            (window.getSupabase ? window.getSupabase().from(collectionName).update({ unreadAdmin: 0 }).eq('id', String(userId)) : Promise.resolve()).catch(e => console.error(e));
+            window.supabase.collection(collectionName).doc(String(userId)).update({ unreadAdmin: 0 }).catch(e => console.error(e));
         }
     });
 };
