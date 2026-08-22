@@ -3766,10 +3766,20 @@
               }
 
               async function syncUsersFromDatabaseSilently() {
-                  if (!window.getSupabase || !window.getSupabase()) return;
+                  if (!window.supabase) return;
                   try {
-                      const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
-                      const supabaseUsers = snap.data || [];
+                      const snap = await window.supabase.collection('bexo_users').get();
+                      const supabaseUsers = [];
+                      if (snap && typeof snap.forEach === 'function') {
+                          snap.forEach(doc => {
+                              const data = typeof doc.data === 'function' ? doc.data() : doc;
+                              if (data) supabaseUsers.push(data);
+                          });
+                      } else if (snap && Array.isArray(snap.data)) {
+                          supabaseUsers.push(...snap.data);
+                      } else if (Array.isArray(snap)) {
+                          supabaseUsers.push(...snap);
+                      }
                       
                       if (supabaseUsers && supabaseUsers.length > 0) {
                           if (!Array.isArray(appUsers)) {
@@ -3802,15 +3812,25 @@
               }
 
               async function syncUsersFromDatabaseDirectly() {
-                  if (!window.getSupabase || !window.getSupabase()) {
+                  if (!window.supabase) {
                       showToast("ডাটাবেজ সংযোগ সক্রিয় নেই", "warning");
                       return;
                   }
                   
                   try {
                       showToast("ডাটাবেজ থেকে ইউজার তালিকা লোড হচ্ছে...", "info");
-                      const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
-                      const supabaseUsers = snap.data || [];
+                      const snap = await window.supabase.collection('bexo_users').get();
+                      const supabaseUsers = [];
+                      if (snap && typeof snap.forEach === 'function') {
+                          snap.forEach(doc => {
+                              const data = typeof doc.data === 'function' ? doc.data() : doc;
+                              if (data) supabaseUsers.push(data);
+                          });
+                      } else if (snap && Array.isArray(snap.data)) {
+                          supabaseUsers.push(...snap.data);
+                      } else if (Array.isArray(snap)) {
+                          supabaseUsers.push(...snap);
+                      }
                       
                       if (supabaseUsers && supabaseUsers.length > 0) {
                           if (!Array.isArray(appUsers)) {
@@ -5627,7 +5647,7 @@ function savePosts() {
                    // If not found in memory, query cloud Supabase database
                    if (!matchedUser && window.supabase) {
                        try {
-                           const snap = await (window.supabase && typeof window.supabase.collection === 'function' ? window.supabase.collection('bexo_users').get() : (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] })));
+                           const snap = await window.supabase.collection('bexo_users').get();
                            const docs = snap.docs || (snap.forEach ? snap : (snap.data || []));
                            if (typeof docs.forEach === 'function') {
                                docs.forEach(doc => {
@@ -5942,9 +5962,19 @@ function savePosts() {
 
                                    if (!matchedUser && window.supabase) {
                                        try {
-                                           const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
-                                           snap.forEach(doc => {
-                                               const data = doc.data();
+                                           const snap = await window.supabase.collection('bexo_users').get();
+                                           const supabaseUsers = [];
+                                           if (snap && typeof snap.forEach === 'function') {
+                                               snap.forEach(doc => {
+                                                   const data = typeof doc.data === 'function' ? doc.data() : doc;
+                                                   if (data) supabaseUsers.push(data);
+                                               });
+                                           } else if (snap && Array.isArray(snap.data)) {
+                                               supabaseUsers.push(...snap.data);
+                                           } else if (Array.isArray(snap)) {
+                                               supabaseUsers.push(...snap);
+                                           }
+                                           supabaseUsers.forEach(data => {
                                                if (data) {
                                                    const uEmail = String(data.email || '').trim().toLowerCase();
                                                    const uPhone = typeof normalizePhone === 'function' ? normalizePhone(data.phone) : String(data.phone || '').trim();
@@ -6601,20 +6631,30 @@ function savePosts() {
                           }
                           
                           if (!foundUser) {
-                              if (window.getSupabase && window.getSupabase()) {
-                                  try {
-                                      const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
-                                      snap.forEach(doc => {
-                                          const data = doc.data();
-                                          if (data && data.email && data.email.toLowerCase().trim() === loggedInUser.email.toLowerCase().trim()) {
-                                              foundUser = data;
-                                          }
-                                      });
-                                  } catch(e) {
-                                      console.warn("Supabase check failed:", e);
-                                  }
-                              }
-                          }
+                               if (window.supabase) {
+                                   try {
+                                       const snap = await window.supabase.collection('bexo_users').get();
+                                       const supabaseUsers = [];
+                                       if (snap && typeof snap.forEach === 'function') {
+                                           snap.forEach(doc => {
+                                               const data = typeof doc.data === 'function' ? doc.data() : doc;
+                                               if (data) supabaseUsers.push(data);
+                                           });
+                                       } else if (snap && Array.isArray(snap.data)) {
+                                           supabaseUsers.push(...snap.data);
+                                       } else if (Array.isArray(snap)) {
+                                           supabaseUsers.push(...snap);
+                                       }
+                                       supabaseUsers.forEach(data => {
+                                           if (data && data.email && data.email.toLowerCase().trim() === loggedInUser.email.toLowerCase().trim()) {
+                                               foundUser = data;
+                                           }
+                                       });
+                                   } catch(e) {
+                                       console.warn("Supabase check failed:", e);
+                                   }
+                               }
+                           }
                           
                           if (!foundUser) {
                               // Sign up: Create a new profile
@@ -15354,12 +15394,18 @@ function savePosts() {
                        }
                    }
                    try {
-                       const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
-                       const supabaseUsers = [];
-                       snap.forEach(doc => {
-                           const data = doc.data();
-                           if (data) supabaseUsers.push(data);
-                       });
+                        const snap = await window.supabase.collection('bexo_users').get();
+                        const supabaseUsers = [];
+                        if (snap && typeof snap.forEach === 'function') {
+                            snap.forEach(doc => {
+                                const data = typeof doc.data === 'function' ? doc.data() : doc;
+                                if (data) supabaseUsers.push(data);
+                            });
+                        } else if (snap && Array.isArray(snap.data)) {
+                            supabaseUsers.push(...snap.data);
+                        } else if (Array.isArray(snap)) {
+                            supabaseUsers.push(...snap);
+                        }
                        
                        let addedCount = 0;
                        let updatedCount = 0;
@@ -15428,13 +15474,19 @@ function savePosts() {
                            initializeSupabaseIfReady();
                        }
                        
-                       if (window.getSupabase && window.getSupabase()) {
-                           const snap = await (window.getSupabase ? window.getSupabase().from('bexo_users').select('*') : Promise.resolve({ data: [] }));
-                           const supabaseUsers = [];
-                           snap.forEach(doc => {
-                               const data = doc.data();
-                               if (data) supabaseUsers.push(data);
-                           });
+                       if (window.supabase) {
+                            const snap = await window.supabase.collection('bexo_users').get();
+                            const supabaseUsers = [];
+                            if (snap && typeof snap.forEach === 'function') {
+                                snap.forEach(doc => {
+                                    const data = typeof doc.data === 'function' ? doc.data() : doc;
+                                    if (data) supabaseUsers.push(data);
+                                });
+                            } else if (snap && Array.isArray(snap.data)) {
+                                supabaseUsers.push(...snap.data);
+                            } else if (Array.isArray(snap)) {
+                                supabaseUsers.push(...snap);
+                            }
                            
                            supabaseUsers.forEach(f => {
                                if (f && f.phone && f.password) {
