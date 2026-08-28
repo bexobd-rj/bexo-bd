@@ -16,7 +16,9 @@ async function startServer() {
 
   // Mount the serverless functions as express routes for local testing
   app.all("/api/test-connection", async (req, res) => await testConnection(req, res));
+  app.all("/api/test-api-connection", async (req, res) => await testConnection(req, res));
   app.all("/api/import-products", async (req, res) => await importProducts(req, res));
+  app.all("/api/fetch-external-products", async (req, res) => await importProducts(req, res));
   app.all("/api/publish-products", async (req, res) => await publishProducts(req, res));
   app.all("/api/save-settings", async (req, res) => await saveSettings(req, res));
 

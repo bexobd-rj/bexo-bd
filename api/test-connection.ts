@@ -26,18 +26,20 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { baseUrl, authType, apiKey, secretKey } = req.body || {};
-    if (!baseUrl) {
+    const { baseUrl, websiteUrl, authType, apiKey, secretKey, apiSecret } = req.body || {};
+    const finalBaseUrl = baseUrl || websiteUrl;
+    const finalSecretKey = secretKey || apiSecret;
+    if (!finalBaseUrl) {
       return res.status(400).json({ success: false, error: "Base URL is required" });
     }
     
     // 2. SSRF Protection: Validate Base URL
-    const urlValidation = isSafeUrl(baseUrl);
+    const urlValidation = isSafeUrl(finalBaseUrl);
     if (!urlValidation.safe) {
       return res.status(400).json({ success: false, error: `Blocked unsafe URL: ${urlValidation.error}` });
     }
 
-    let fullUrl = baseUrl.replace(/\/+$/, "");
+    let fullUrl = finalBaseUrl.replace(/\/+$/, "");
     
     const headers: Record<string, string> = {
       "Accept": "application/json",
@@ -48,8 +50,8 @@ export default async function handler(req: any, res: any) {
       headers["Authorization"] = `Bearer ${apiKey}`;
     } else if (authType === "api_key_header" && apiKey) {
       headers["X-API-Key"] = apiKey;
-    } else if (authType === "basic_auth" && (apiKey || secretKey)) {
-      const token = Buffer.from(`${apiKey || ''}:${secretKey || ''}`).toString('base64');
+    } else if (authType === "basic_auth" && (apiKey || finalSecretKey)) {
+      const token = Buffer.from(`${apiKey || ''}:${finalSecretKey || ''}`).toString('base64');
       headers["Authorization"] = `Basic ${token}`;
     }
     
