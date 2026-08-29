@@ -298,7 +298,11 @@
                           
                           if (typeof updateHeaderUI === 'function') updateHeaderUI();
                           if (typeof updateHeaderBalance === 'function') updateHeaderBalance();
-                          if (typeof renderHome === 'function') renderHome();
+                          if (typeof currentMenu === 'string' && currentMenu === 'profile' && typeof renderProfile === 'function') {
+                              renderProfile();
+                          } else if (typeof renderHome === 'function') {
+                              renderHome();
+                          }
                           
                           console.log("[Supabase Sync] Profile successfully synced and stored.");
                       }
@@ -9102,6 +9106,16 @@ function verifyRegOtp(email) {
 
               function switchMenu(menuKey) {
                   currentMenu = menuKey;
+                  if (menuKey === 'profile') {
+                      const client = window.getSupabase ? window.getSupabase() : null;
+                      if (client && client.auth) {
+                          client.auth.getSession().then(({ data: { session } }) => {
+                              if (session && session.user && typeof syncProfileFromCloud === 'function') {
+                                  syncProfileFromCloud(session.user);
+                              }
+                          }).catch(() => {});
+                      }
+                  }
                   // UI visual feedback
                   const items = document.querySelectorAll('.sidebar-item');
                   items.forEach(el => el.classList.remove('active'));
