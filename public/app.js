@@ -1736,9 +1736,20 @@ function savePosts() {
               window.showSupabaseConnectionInfo = function() {
                   const client = window.getSupabase();
                   const isConfigured = !!client;
-                  const message = isConfigured 
-                      ? "✅ Supabase ক্লাউড ডাটাবেজের সাথে সফলভাবে সংযুক্ত রয়েছে। আপনার ডাটা ক্লাউডে সুরক্ষিত ও সিঙ্ক হচ্ছে।"
-                      : "ℹ️ বর্তমানে অ্যাপটি লোকাল মেমরি মোডে (Local Active) চলছে।\n\nSupabase ক্লাউডে সরাসরি কানেক্ট করতে চাইলে:\n১. প্রজেক্টের .env ফাইলে VITE_SUPABASE_URL এবং VITE_SUPABASE_ANON_KEY যোগ করুন,\n২. অথবা এডমিন প্যানেলের 'API & Database Config' সেকশনে Supabase ক্রেডেনশিয়াল সেট করুন।\n\nবর্তমানে আপনার লোকাল ডাটা পুরোপুরি সুরক্ষিত রয়েছে।";
+                  
+                  // Check if there are actual sync errors
+                  const errorLogs = window.supabaseErrors || [];
+                  const hasErrors = errorLogs.length > 0;
+
+                  let message = "";
+                  if (isConfigured && !hasErrors) {
+                      message = "✅ Supabase ক্লাউড ডাটাবেজের সাথে সফলভাবে সংযুক্ত রয়েছে। আপনার ডাটা ক্লাউডে সুরক্ষিত ও সিঙ্ক হচ্ছে।";
+                  } else if (isConfigured && hasErrors) {
+                      message = "⚠️ Supabase সংযুক্ত আছে, কিন্তু ডাটা সিঙ্ক হতে সমস্যা হচ্ছে।\n\nকারণ হতে পারে:\n১. ডাটাবেজে টেবিলগুলো (bexo_users, bexo_posts ইত্যাদি) তৈরি করা হয়নি।\n২. Row Level Security (RLS) পলিসি অন করা আছে যা ডাটা পড়তে বাধা দিচ্ছে।\n\nশেষ এরর:\n" + (errorLogs[errorLogs.length - 1]?.error || "অজানা এরর");
+                  } else {
+                      message = "ℹ️ বর্তমানে অ্যাপটি লোকাল মেমরি মোডে (Local Active) চলছে।\n\nSupabase ক্লাউডে সরাসরি কানেক্ট করতে চাইলে:\n১. প্রজেক্টের .env ফাইলে VITE_SUPABASE_URL এবং VITE_SUPABASE_ANON_KEY যোগ করুন,\n২. অথবা এডমিন প্যানেলের 'API & Database Config' সেকশনে Supabase ক্রেডেনশিয়াল সেট করুন।";
+                  }
+                  
                   alert(message);
               };
 
@@ -2992,12 +3003,14 @@ function verifyRegOtp(email) {
                    }
 
                     let matchedUser = null;
-                    if (!window.supabase && typeof findUserByEmailOrPhone === 'function') {
+                    
+                    // Always try to find in local memory first as a fallback guarantee
+                    if (typeof findUserByEmailOrPhone === 'function') {
                         matchedUser = findUserByEmailOrPhone(cleanIdentifier);
                     }
 
-                   // If not found in memory, query cloud Supabase database securely via server-side scoped lookup
-                   if (!matchedUser && window.supabase) {
+                    // If connected to cloud, try to get authoritative cloud data
+                    if (window.supabase) {
                        try {
                            matchedUser = await getUserByEmailPhoneOrProfileId(cleanIdentifier);
                            if (matchedUser) {
@@ -3017,21 +3030,33 @@ function verifyRegOtp(email) {
 
                    if (sb && sb.auth) {
                        const creds = { password: cleanPass };
-                       if (isEmail) creds.email = cleanIdentifier;
-                       else creds.phone = cleanIdentifier;
-
+                       if (isEmail) {
+                           creds.email = cleanIdentifier;
+                       } else {
+                           // If logging in with phone, Supabase auth might fail because phone is not verified.
+                           // Use the email from matchedUser if available.
+                           if (matchedUser && matchedUser.email) {
+                               creds.email = matchedUser.email.toLowerCase();
+                           } else {
+                               creds.phone = cleanIdentifier;
+                           }
+                       }
+                       
                        try {
                            const { data, error } = await sb.auth.signInWithPassword(creds);
-                           if (!error && data) {
+                           if (!error && data && data.session) {
                                authSuccess = true;
+                           } else {
+                               // Fallback: If auth fails, try to login with magic link/otp? No, it's a password login.
+                               window._lastAuthError = error?.message; console.warn('Supabase auth login failed:', error?.message);
                            }
                        } catch (e) {
-                           console.warn('Supabase auth login exception:', e);
+                           window._lastAuthError = e?.message || e; console.warn('Supabase auth login exception:', e);
                        }
                    }
 
                     let localPassMatch = false;
-                    if (!window.supabase && matchedUser && matchedUser.password) {
+                    if (matchedUser && matchedUser.password) {
                         const uPassClean = String(matchedUser.password).trim().replace(/[০-৯]/g, d => bMap[d] || d);
                         if (uPassClean === cleanPass) {
                             localPassMatch = true;
@@ -3148,10 +3173,14 @@ function verifyRegOtp(email) {
                    if (matchedUser && !localPassMatch) {
                        showToast('লগইন ব্যর্থ: পাসওয়ার্ড ভুল প্রদান করেছেন!', 'error');
                    } else {
-                       showToast('লগইন ব্যর্থ: Invalid login credentials', 'error');
+                       if (window._lastAuthError) {
+                           showToast('লগইন ব্যর্থ: ' + window._lastAuthError, 'error');
+                       } else {
+                           showToast('লগইন ব্যর্থ: অ্যাকাউন্ট পাওয়া যায়নি বা পাসওয়ার্ড ভুল', 'error');
+                       }
                    }
                }
-               window.handleLogin = handleLogin;
+               window.handleLogin = function(e) { window._lastAuthError = null; handleLogin(e); };
 
               function togglePasswordVisibility(inputId, btn) {
                   const input = document.getElementById(inputId);
@@ -3797,6 +3826,7 @@ function verifyRegOtp(email) {
                           address: addr,
                           referredBy: referredBy,
                           profileId: profileUid,
+                          password: pass,
                           enc_password: btoa(unescape(encodeURIComponent(pass))),
                           joinDate: new Date().toLocaleDateString('bn-BD'),
                           createdAt: Date.now()
