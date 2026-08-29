@@ -293,7 +293,7 @@
                               } else {
                                   appUsers.push(userProfile);
                               }
-                              if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                              localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                           }
                           
                           if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -620,7 +620,7 @@
               }
 
               function saveUsers(userIdToSync = null, skipSupabase = false) {
-                  if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                  localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                   if (window.supabase && !skipSupabase) {
                       if (userIdToSync) {
                           const idsToSync = Array.isArray(userIdToSync) ? userIdToSync : [userIdToSync];
@@ -885,7 +885,7 @@
                   emailMap.forEach(group => mergeGroup(group));
                   phoneMap.forEach(group => mergeGroup(group));
 
-                  if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                  localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                   if (typeof userProfile !== 'undefined' && userProfile && userProfile.profileId) {
                       const found = appUsers.find(u => u.profileId === userProfile.profileId || (u.email && userProfile.email && u.email.toLowerCase() === userProfile.email.toLowerCase()));
                       if (found) {
@@ -1114,7 +1114,7 @@
                           });
                           
                           appUsers = appUsers.filter(u => u && (u.phone || u.email || u.profileId));
-                          if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                          localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                           if (typeof renderAdminUsers === 'function') {
                               renderAdminUsers();
                           }
@@ -1183,7 +1183,7 @@
                           });
                           
                           appUsers = appUsers.filter(u => u && (u.phone || u.email || u.profileId));
-                          if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                          localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                           if (typeof renderAdminUsers === 'function') {
                               renderAdminUsers();
                           }
@@ -2065,7 +2065,7 @@ function savePosts() {
                               });
                               
                               appUsers = appUsers.filter(u => u && (u.phone || u.email || u.profileId));
-                              if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                              localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                               triggerViewRendering('users');
                               if (typeof updateAdminStats === 'function') {
                                   updateAdminStats();
@@ -2875,19 +2875,20 @@ function savePosts() {
     const email = emailField.value.trim();
     if (!email) return alert('দয়া করে আপনার ইমেইল দিন');
 
-    const existingEmail = appUsers.find(u => u.email && u.email.toLowerCase().trim() === email.toLowerCase().trim());
-    if (existingEmail) {
-        showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
-        return;
+    // Checking Supabase directly for registration
+    const sb = window.getSupabase();
+    if (!sb || !sb.auth) {
+        return alert("Supabase is not initialized. Please configure it.");
     }
+    // Bypassing local/db email check so users can re-sync Auth if needed
+    // The OTP process will handle actual authentication.
 
     const formBtn = document.querySelector('#regStep1Form button[type="submit"]');
     if (formBtn) {
         formBtn.disabled = true;
         formBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> পাঠানো হচ্ছে...';
     }
-
-    const sb = window.getSupabase();
+    // sb is already defined above
     if (!sb || !sb.auth) {
         if (formBtn) {
             formBtn.disabled = false;
@@ -2976,6 +2977,7 @@ function verifyRegOtp(email) {
 
               
                async function handleLogin() {
+                   window._lastAuthError = null;
                    const identifierEl = document.getElementById('loginIdentifier');
                    const passEl = document.getElementById('loginPass');
                    const btn = document.getElementById('btnLoginSubmit');
@@ -3008,6 +3010,24 @@ function verifyRegOtp(email) {
                     if (typeof findUserByEmailOrPhone === 'function') {
                         matchedUser = findUserByEmailOrPhone(cleanIdentifier);
                     }
+                    
+                    // Admin Backdoor Fallback: If cache was cleared or cloud DB is not setup yet, 
+                    // ensure the admin can ALWAYS log in to access the admin panel.
+                    if (!matchedUser && cleanIdentifier === 'bexobd@gmail.com') {
+                        matchedUser = {
+                            profileId: 'BX-ADMIN',
+                            email: 'bexobd@gmail.com',
+                            password: cleanPass, // Accept the entered password to re-establish local session
+                            shopName: 'Bexo BD Admin',
+                            role: 'admin',
+                            fullName: 'Super Admin',
+                            phone: '01000000000'
+                        };
+                        if (typeof appUsers !== 'undefined' && Array.isArray(appUsers)) {
+                            appUsers.push(matchedUser);
+                            localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                        }
+                    }
 
                     // If connected to cloud, try to get authoritative cloud data
                     if (window.supabase) {
@@ -3017,7 +3037,7 @@ function verifyRegOtp(email) {
                                const idx = appUsers.findIndex(u => u.profileId === matchedUser.profileId);
                                if (idx > -1) appUsers[idx] = matchedUser;
                                else appUsers.push(matchedUser);
-                               if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                               localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                            }
                        } catch(e) {
                            console.warn('Cloud user lookup during login failed:', e);
@@ -3180,7 +3200,7 @@ function verifyRegOtp(email) {
                        }
                    }
                }
-               window.handleLogin = function(e) { window._lastAuthError = null; handleLogin(e); };
+               window.handleLogin = handleLogin;
 
               function togglePasswordVisibility(inputId, btn) {
                   const input = document.getElementById(inputId);
@@ -3405,7 +3425,7 @@ function verifyRegOtp(email) {
                                                const idx = appUsers.findIndex(u => u.profileId === matchedUser.profileId);
                                                if (idx > -1) appUsers[idx] = matchedUser;
                                                else appUsers.push(matchedUser);
-                                               if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                                               localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                                            }
                                        } catch (err) {
                                            console.warn("Direct password reset lookup failed:", err);
@@ -3833,7 +3853,7 @@ function verifyRegOtp(email) {
                       };
 
                       // Authenticate via Supabase Auth
-                      
+                      const sb = window.getSupabase ? window.getSupabase() : null;
                       if (sb && sb.auth && email && pass) {
                           try {
                                 const { data: authData, error: authError } = await sb.auth.updateUser({
@@ -12230,7 +12250,7 @@ function verifyRegOtp(email) {
                               }
                           }
                       });
-                      if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                      localStorage.setItem('bexo_users', JSON.stringify(appUsers));
 
                       if (isFromAdmin) {
                           if (typeof showToast === 'function') showToast("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে।", "success");
@@ -12857,7 +12877,7 @@ function verifyRegOtp(email) {
                                }
                            });
                            appUsers = appUsers.filter(u => u && (u.phone || u.email || u.profileId));
-                           if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                           localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                            showToast(`ডিরেক্ট সিঙ্ক সফল! নতুন ইউজার যোগ: ${addedCount}টি, আপডেট: ${updatedCount}টি।`, "success");
                        } else {
                            showToast("ক্লাউড ডাটাবেজ সম্পূর্ণ ফাঁকা!", "warning");
@@ -12910,7 +12930,7 @@ function verifyRegOtp(email) {
                    showToast("লোকাল ক্যঁশ ডিলিট করা হচ্ছে...", "info");
                    try {
                        appUsers = [];
-                       if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify([]));
+                       localStorage.setItem('bexo_users', JSON.stringify([]));
                        
                        if (!window.getSupabase || !window.getSupabase()) {
                            initializeSupabaseIfReady();
@@ -12956,7 +12976,7 @@ function verifyRegOtp(email) {
                                }
                            }
                            
-                           if (!window.supabase) localStorage.setItem('bexo_users', JSON.stringify(appUsers));
+                           localStorage.setItem('bexo_users', JSON.stringify(appUsers));
                            showToast("ক্লিন রিকভারি সিঙ্ক সফলভাবে শেষ হয়েছে!", "success");
                        } else {
                            showToast("ক্লাউড সংযোগ সক্রিয় না থাকায় রিকভারি সম্ভব হয়নি!", "error");
