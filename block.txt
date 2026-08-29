@@ -1,0 +1,27 @@
+
+                      // Authenticate via Supabase Auth
+                      const sb = window.getSupabase ? window.getSupabase() : null;
+                      if (sb && sb.auth && email && pass) {
+                          try {
+                                  email: email,
+                                  options: {
+                                      data: {
+                                          fullName: name,
+                                          shopName: shop,
+                                          phone: phone,
+                                          address: addr,
+                                          referredBy: referredBy,
+                                          profileId: profileUid
+                                  }
+                              });
+                              if (authError) {
+                                  console.warn("Supabase Auth signUp note:", authError.message);
+                              }
+                              if (authData && authData.user) {
+                                  newProfile.id = authData.user.id;
+                              }
+                          } catch (authErr) {
+                              console.warn("Supabase Auth signUp error:", authErr);
+                          }
+                      }
+
