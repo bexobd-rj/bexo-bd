@@ -1949,6 +1949,7 @@ function savePosts() {
                       return true;
                   } catch (e) {
                       console.warn("Supabase SDK init failed inside index.html:", e);
+                      console.error("Init failed: " + e.message + " | Stack: " + e.stack);
                       isSupabaseInitInProgress = false;
                       updateSupabaseConnectionBadges(false);
                       
@@ -2544,6 +2545,7 @@ function savePosts() {
 
               // copyToClipboard is defined once later in the file
 
+              initializeSupabaseIfReady();
               // Passive Heartbeat for last active tracking
               setInterval(() => {
                   if (typeof initializeSupabaseIfReady === 'function') {
@@ -2957,11 +2959,7 @@ function verifyRegOtp(email) {
 
                   const sb = window.getSupabase();
                   if (!sb || !sb.auth) return alert("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel environment variables.");
-                  sb.auth.verifyOtp({
-                          email: email,
-                          token: otp,
-                          type: 'email'
-                      }).then(res => {
+                  sb.auth.verifyOtp({ email: email, token: otp, type: 'magiclink' }).then(res => {
                       if (res.error) {
                           alert("Invalid OTP: " + res.error.message);
                           btn.innerHTML = 'ভেরিফাই করুন <i class="fas fa-check-circle"></i>';
@@ -2969,6 +2967,10 @@ function verifyRegOtp(email) {
                       } else {
                           completeEmailVerification(email);
                       }
+                  }).catch(err => {
+                      alert('Error verifying OTP: ' + err.message);
+                      btn.innerHTML = 'ভেরিফাই করুন <i class="fas fa-check-circle"></i>';
+                      btn.disabled = false;
                   });
               }
 
