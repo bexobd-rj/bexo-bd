@@ -2016,7 +2016,7 @@ function savePosts() {
                   }, err => {
                       console.warn("Supabase posts snapshot subscription error:", err);
                       logSupabaseError("bexo_posts onSnapshot", err);
-                      updateSupabaseConnectionBadges(false, "Posts Sync Error: " + err.message);
+                      // updateSupabaseConnectionBadges(false, "Posts Sync Error: " + err.message);
                       handleSupabaseError(err, OperationType.LIST, "bexo_posts");
                   });
 
@@ -2078,12 +2078,12 @@ function savePosts() {
                       }, err => {
                           console.warn("Supabase users snapshot subscription error:", err);
                           logSupabaseError("bexo_users onSnapshot", err);
-                          updateSupabaseConnectionBadges(false, "Users Sync Error: " + err.message);
+                          // updateSupabaseConnectionBadges(false, "Users Sync Error: " + err.message);
                           handleSupabaseError(err, OperationType.LIST, "bexo_users");
                       });
                   } else if (userProfile && userProfile.profileId) {
                       // Non-admins subscribe to only their OWN profile document securely
-                      subscribeSupabaseDoc('bexo_users', userProfile.profileId, snap => {
+                      subscribeSupabaseDoc('bexo_users', userProfile.id, snap => {
                           if (snap && snap.exists) {
                               const data = snap.data();
                               if (data) {
@@ -2122,7 +2122,7 @@ function savePosts() {
                   }, err => {
                       console.warn("Supabase orders subscription error:", err);
                       logSupabaseError("bexo_orders onSnapshot", err);
-                      updateSupabaseConnectionBadges(false, "Orders Sync Error: " + err.message);
+                      // updateSupabaseConnectionBadges(false, "Orders Sync Error: " + err.message);
                       handleSupabaseError(err, OperationType.LIST, "bexo_orders");
                   });
 
@@ -2142,7 +2142,7 @@ function savePosts() {
                   }, err => {
                       console.warn("Supabase settings subscription error:", err);
                       logSupabaseError("bexo_settings onSnapshot", err);
-                      updateSupabaseConnectionBadges(false, "Settings Sync Error: " + err.message);
+                      // updateSupabaseConnectionBadges(false, "Settings Sync Error: " + err.message);
                       handleSupabaseError(err, OperationType.GET, "bexo_settings/global");
                   });
 
@@ -3746,237 +3746,137 @@ function verifyRegOtp(email) {
               }
 
               async function handleRegister() {
-                  try {
-                      const shopField = document.getElementById('regShop');
-                      const nameField = document.getElementById('regName');
-                      const phoneField = document.getElementById('regPhone');
-                      const emailField = document.getElementById('regEmail');
-                      const addrField = document.getElementById('regAddress');
-                      const passField = document.getElementById('regPass');
-                      const confirmField = document.getElementById('regConfirmPass');
-                      const refCodeField = document.getElementById('regReferral');
-                      const termsField = document.getElementById('terms');
+    try {
+        const shopField = document.getElementById('regShop');
+        const nameField = document.getElementById('regName');
+        const phoneField = document.getElementById('regPhone');
+        const emailField = document.getElementById('regEmail');
+        const addrField = document.getElementById('regAddress');
+        const passField = document.getElementById('regPass');
+        const confirmField = document.getElementById('regConfirmPass');
+        const refCodeField = document.getElementById('regReferral');
+        const termsField = document.getElementById('terms');
 
-                      if (!shopField || !nameField || !phoneField || !passField || !termsField) {
-                          throw new Error("Required registration fields missing in DOM");
-                      }
+        if (!shopField || !nameField || !phoneField || !passField || !termsField) {
+            throw new Error("Required registration fields missing in DOM");
+        }
 
-                      const shop = shopField.value.trim();
-                      const name = nameField.value.trim();
-                      
-                      // Convert and normalize phone and password numbers
-                      let phone = phoneField.value.trim();
-                      let pass = passField.value;
-                      let confirm = confirmField ? confirmField.value : '';
-                      const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
-                      phone = phone.replace(/[০-৯]/g, d => bMap[d] || d);
-                      pass = pass.replace(/[০-৯]/g, d => bMap[d] || d);
-                      confirm = confirm.replace(/[০-৯]/g, d => bMap[d] || d);
-                      
-                      // Standardize phone number using normalizePhone to 11 digits
-                      phone = normalizePhone(phone);
+        const shop = shopField.value.trim();
+        const name = nameField.value.trim();
+        
+        let phone = phoneField.value.trim();
+        let pass = passField.value;
+        let confirm = confirmField ? confirmField.value : '';
+        const bMap = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+        phone = phone.replace(/[০-৯]/g, d => bMap[d] || d);
+        pass = pass.replace(/[০-৯]/g, d => bMap[d] || d);
+        confirm = confirm.replace(/[০-৯]/g, d => bMap[d] || d);
+        phone = typeof normalizePhone === 'function' ? normalizePhone(phone) : phone;
 
-                      const email = emailField ? emailField.value.trim() : '';
-                      const addr = addrField ? addrField.value.trim() : '';
-                      const refCode = refCodeField ? refCodeField.value.trim() : '';
-                      const terms = termsField.checked;
+        const email = emailField ? emailField.value.trim() : '';
+        const addr = addrField ? addrField.value.trim() : '';
+        const refCode = refCodeField ? refCodeField.value.trim() : '';
+        const terms = termsField.checked;
 
-                      if (!terms) {
-                          showToast("শর্তাবলীতে রাজি হতে হবে!", "error");
-                          return;
-                      }
+        if (!terms) return showToast("শর্তাবলীতে রাজি হতে হবে!", "error");
+        if(!shop || !name || !phone || !addr || !pass || !email) return showToast("সবগুলো তথ্য সঠিকভাবে পূরণ করুন এবং অবশ্যই ইমেইল প্রদান করুন!", "error");
+        if (phone.length !== 11 || !phone.startsWith('01')) return showToast("অনুগ্রহ করে একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)!", "error");
+        if(pass !== confirm) return showToast("পাসওয়ার্ড ম্যাচ করেনি!", "error");
+        if(pass.length < 6) return showToast("পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে!", "error");
 
-                      if(!shop || !name || !phone || !addr || !pass || !email) {
-                          showToast("সবগুলো তথ্য সঠিকভাবে পূরণ করুন এবং অবশ্যই ইমেইল প্রদান করুন!", "error");
-                          return;
-                      }
+        const sb = window.getSupabase ? window.getSupabase() : null;
+        if (!sb || !sb.auth) return showToast("সুপারবেজ ডাটাবেজ সংযুক্ত নয়।", "error");
 
-                      if (phone.length !== 11 || !phone.startsWith('01')) {
-                          showToast("অনুগ্রহ করে একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)!", "error");
-                          return;
-                      }
+        const btn = document.querySelector('#registerForm button[type="submit"]');
+        if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> অপেক্ষা করুন...'; btn.disabled = true; }
 
-                      if(pass !== confirm) {
-                          showToast("পাসওয়ার্ড ম্যাচ করেনি!", "error");
-                          return;
-                      }
+        // Passive Income: Referral Logic
+        let referredBy = null;
+        if (refCode) {
+            if (typeof findReferrerByCode === 'function') {
+                const referrer = findReferrerByCode(refCode);
+                if (referrer) referredBy = referrer.profileId;
+                else {
+                    if (btn) { btn.innerHTML = 'অ্যাকাউন্ট তৈরি করুন'; btn.disabled = false; }
+                    return showToast("ভুল রেফারেল কোড!", "error");
+                }
+            }
+        }
 
-                      if(pass.length < 6) {
-                          showToast("পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে!", "error");
-                          return;
-                      }
+        const profileUid = 'BX-' + Math.floor(100000 + Math.random() * 900000);
 
-                      // Check Supabase directly for existing account via server-side query
-                      if (window.supabase) {
-                          try {
-                              const phoneUser = await getUserByEmailPhoneOrProfileId(phone);
-                              if (phoneUser) {
-                                  showToast("এই ফোন নম্বর দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
-                                  return;
-                              }
+        // ALWAYS signUp for registration
+        const { data: authData, error: authError } = await sb.auth.signUp({
+            email: email,
+            password: pass,
+            options: {
+                data: {
+                    fullName: name,
+                    shopName: shop,
+                    phone: phone,
+                    address: addr,
+                    referredBy: referredBy,
+                    profileId: profileUid
+                }
+            }
+        });
 
-                              const emailUser = await getUserByEmailPhoneOrProfileId(email);
-                              if (emailUser) {
-                                  showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
-                                  return;
-                              }
-                          } catch (err) {
-                              console.warn("Direct Supabase user check failed, fallback to local:", err);
-                          }
-                      }
+        if (authError) {
+            console.warn("Supabase Auth signUp error:", authError.message);
+            if (btn) { btn.innerHTML = 'অ্যাকাউন্ট তৈরি করুন'; btn.disabled = false; }
+            if (authError.message.includes("User already registered")) {
+                showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
+            } else {
+                showToast("রেজিস্ট্রেশন ব্যর্থ: " + authError.message, "error");
+            }
+            return;
+        }
 
-                      // Passive Income: Referral Logic
-                      let referredBy = null;
-                      if (refCode) {
-                          const referrer = findReferrerByCode(refCode);
-                          if (referrer) {
-                              referredBy = referrer.profileId;
-                          } else {
-                              showToast("ভুল রেফারেল কোড! দয়া করে সঠিক কোড দিন অথবা ঘরটি খালি রাখুন।", "error");
-                              return;
-                          }
-                      }
-
-                      const oldProfileId = userProfile ? userProfile.profileId : null;
-
-                      // Create Profile (Staged/Prepared)
-                      const profileUid = 'BX-' + Math.floor(100000 + Math.random() * 900000);
-                      const newProfile = {
-                          ...DEFAULT_PROFILE,
-                          shopName: shop,
-                          fullName: name,
-                          phone: phone,
-                          email: email,
-                          address: addr,
-                          referredBy: referredBy,
-                          profileId: profileUid,
-                          password: pass,
-                          enc_password: btoa(unescape(encodeURIComponent(pass))),
-                          joinDate: new Date().toLocaleDateString('bn-BD'),
-                          createdAt: Date.now()
-                      };
-
-                      // Authenticate via Supabase Auth
-                      const sb = window.getSupabase ? window.getSupabase() : null;
-                      if (sb && sb.auth && email && pass) {
-                          try {
-                                const { data: authData, error: authError } = await sb.auth.updateUser({
-                                    password: pass,
-                                    data: {
-                                        fullName: name,
-                                        shopName: shop,
-                                        phone: phone,
-                                        address: addr,
-                                        referredBy: referredBy,
-                                        profileId: profileUid
-                                    }
-                                });
-                              if (authError) {
-                                  console.warn("Supabase Auth signUp note:", authError.message);
-                              }
-                              if (authData && authData.user) {
-                                  newProfile.id = authData.user.id;
-                              }
-                          } catch (authErr) {
-                              console.warn("Supabase Auth signUp error:", authErr);
-                          }
-                      }
-
-                      // Define actual creation and database integration function
-                      const completeRegistration = (profile) => {
-                          // Migrate guest session resources to new registered profileId
-                          if (oldProfileId && oldProfileId !== profile.profileId) {
-                              // 1. Migrate appAccounts (Bank / wallet accounts)
-                              let migratedAccCount = 0;
-                              appAccounts.forEach(acc => {
-                                  if (acc.profileId === oldProfileId) {
-                                      acc.profileId = profile.profileId;
-                                      migratedAccCount++;
-                                  }
-                              });
-                              if (migratedAccCount > 0) saveAccounts();
-
-                              // 2. Migrate balance requests
-                              let migratedBalCount = 0;
-                              appBalanceRequests.forEach(req => {
-                                  if (req.profileId === oldProfileId) {
-                                      req.profileId = profile.profileId;
-                                      migratedBalCount++;
-                                  }
-                              });
-                              if (migratedBalCount > 0) saveBalanceRequests();
-
-                              // 3. Migrate withdrawals
-                              let migratedWdrCount = 0;
-                              appWithdrawals.forEach(w => {
-                                  if (w.profileId === oldProfileId) {
-                                      w.profileId = profile.profileId;
-                                      migratedWdrCount++;
-                                  }
-                              });
-                              if (migratedWdrCount > 0) saveWithdrawals();
-
-                              // 4. Migrate orders
-                              let migratedOrdCount = 0;
-                              appOrders.forEach(o => {
-                                  if (o.profileId === oldProfileId) {
-                                      o.profileId = profile.profileId;
-                                      migratedOrdCount++;
-                                  }
-                              });
-                              if (migratedOrdCount > 0) saveOrders();
-                          }
-
-                          // REFERRAL COMMISSION Logic
-                          if (referredBy) {
-                              const refs = JSON.parse(localStorage.getItem('bexo_referrals')) || [];
-                              refs.push({
-                                  referredBy: refCode,
-                                  name: shop,
-                                  commission: 50,
-                                  date: new Date().toLocaleString()
-                              });
-                              localStorage.setItem('bexo_referrals', JSON.stringify(refs));
-                              showToast("রেফারেল বোনাস ৫০ টাকা সফলভাবে যোগ হয়েছে।", "success");
-                          }
-
-                          // Update Global and Local State
-                          userProfile = profile;
-                          saveProfile();
-                          updateAppUsersList(userProfile);
-
-                          // Set login fields for visuals (optional but good for consistency)
-                          const loginPhone = document.getElementById('loginPhone');
-                          const loginPass = document.getElementById('loginPass');
-                          if(loginPhone) loginPhone.value = phone;
-                          if(loginPass) loginPass.value = pass;
-
-                          showToast("অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে তৈরি এবং ভেরিফাই হয়েছে।", "success");
-
-                          // Direct Login UI Switch
-                          const auth = document.getElementById('authSection');
-                          const dash = document.getElementById('dashboardSection');
-
-                          if(auth && dash) {
-                              auth.classList.add('hidden');
-                              dash.classList.remove('hidden');
-                              dash.classList.add('fade-in');
-                              var landing = document.getElementById('landingSection');
-                              if(landing) landing.classList.add('hidden');
-                              renderHome();
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }
-                      };
-
-                      // Trigger dual verification flow
-                      // Skip verification and complete registration immediately
-                      completeRegistration(newProfile);
-
-                  } catch (error) {
-                      console.error("Registration Error:", error);
-                      showToast("অ্যাকাউন্ট তৈরিতে সমস্যা হয়েছে! আবার চেষ্টা করুন।", "error");
-                  }
-              }
+        if (authData && authData.user) {
+            // Successfully signed up!
+            const newProfile = {
+                id: authData.user.id,
+                profileId: profileUid,
+                shopName: shop,
+                fullName: name,
+                phone: phone,
+                email: email,
+                address: addr,
+                referredBy: referredBy,
+                password: pass,
+                joinDate: new Date().toLocaleDateString('bn-BD'),
+                createdAt: Date.now()
+            };
+            
+            userProfile = typeof normalizeProfile === 'function' ? normalizeProfile(newProfile) : newProfile;
+            localStorage.setItem('bexo_profile_' + authData.user.id, JSON.stringify(userProfile));
+            localStorage.setItem('bexo_profile', JSON.stringify(userProfile));
+            localStorage.setItem('bexo_active_uid', authData.user.id);
+            if (typeof saveProfile === 'function') saveProfile();
+            if (typeof updateAppUsersList === 'function') updateAppUsersList(userProfile);
+            
+            showToast("অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে।", "success");
+            
+            // UI Transition
+            if (btn) { btn.innerHTML = 'অ্যাকাউন্ট তৈরি করুন'; btn.disabled = false; }
+            const authSection = document.getElementById('authSection');
+            const dashboardSection = document.getElementById('dashboardSection');
+            if (authSection && dashboardSection) {
+                authSection.classList.add('hidden');
+                dashboardSection.classList.remove('hidden');
+                dashboardSection.classList.add('fade-in');
+                const landing = document.getElementById('landingSection');
+                if (landing) landing.classList.add('hidden');
+                window.location.reload();
+            }
+        }
+    } catch (error) {
+        console.error("Registration Error:", error);
+        showToast("অ্যাকাউন্ট তৈরিতে সমস্যা হয়েছে! আবার চেষ্টা করুন।", "error");
+        const btn = document.querySelector('#registerForm button[type="submit"]');
+        if (btn) { btn.innerHTML = 'অ্যাকাউন্ট তৈরি করুন'; btn.disabled = false; }
+    }
+}
 
               function showGoogleFallbackModal(callback) {
                   let modal = document.getElementById('google-fallback-modal');
@@ -9965,7 +9865,9 @@ function verifyRegOtp(email) {
                           updateHeaderBalance();
 
                           const transaction = {
-                              id: 'BP' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+    id: 'BP' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+    userId: userProfile.id || localStorage.getItem('bexo_active_uid'),
+    profileId: userProfile.profileId,
                               type: 'Bill Pay',
                               billType: type,
                               billName: name,
@@ -16210,8 +16112,9 @@ function changePrice(id) {
                   const orderNo = '2026' + Math.floor(Math.random() * 100000000);
 
                   const newOrder = {
-                      id: orderId,
-                      orderNo: orderNo,
+    id: orderId,
+    orderNo: orderNo,
+    userId: userProfile.id || localStorage.getItem('bexo_active_uid'),
                       profileId: userProfile.profileId,
                       resellerShopName: userProfile.shopName || 'Bexo BD Official',
                       resellerAddress: userProfile.address || 'Dhaka, Bangladesh',
@@ -19173,8 +19076,10 @@ function updateUserTicketStatus(id, newStatus) {
                       if(!targetUser.rechargeTransactions) targetUser.rechargeTransactions = [];
                       
                       const transaction = {
-                          id: Date.now(),
-                          type: 'Income',
+    id: Date.now(),
+    userId: targetUser.id || localStorage.getItem('bexo_active_uid'),
+    profileId: targetUser.profileId,
+    type: 'Income',
                           details: `অর্ডার প্রফিট (ID: #${order.orderNo || order.id})${customNote ? ' - ' + customNote : ''}`,
                           amount: profit,
                           balance: newBalance,
