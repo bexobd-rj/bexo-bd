@@ -1,0 +1,23 @@
+-- Add missing columns to bexo_users so all profile data can sync correctly
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS avatar text;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "fbPage" text;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS website text;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS district text;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "isPremium" boolean DEFAULT false;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "hasWebsite" boolean DEFAULT false;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "isSubscribed" boolean DEFAULT false;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "currentPlan" text DEFAULT 'Free Plan';
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "rechargeBalance" numeric DEFAULT 0;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "totalRecharge" numeric DEFAULT 0;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "totalBillPay" numeric DEFAULT 0;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "totalCommission" numeric DEFAULT 0;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "sellerCode" text;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "deliveredOrdersCount" integer DEFAULT 0;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "passiveEarnings" numeric DEFAULT 0;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS referrals jsonb DEFAULT '{"level1":[],"level2":[],"level3":[],"level4":[]}'::jsonb;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "rechargeTransactions" jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "passiveTransactions" jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS cart jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS orders jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS favorites jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.bexo_users ADD COLUMN IF NOT EXISTS "joinDate" text;

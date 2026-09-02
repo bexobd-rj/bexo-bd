@@ -668,6 +668,15 @@
                       set: function(data) {
                         if (self.rawClient) {
                           var payload = Object.assign({}, data);
+                          if (collectionName === 'bexo_users' && strId.startsWith('BX-')) {
+                              if (payload.id === strId) delete payload.id;
+                              if (payload.id === undefined && data.id) payload.id = data.id;
+                              // Try to update first
+                              return self.rawClient.from(collectionName).update(payload).eq('profileId', strId).then(function(res) {
+                                  if (res.error) return { data: data, error: res.error };
+                                  return { data: data, error: null };
+                              });
+                          }
                           if (payload.id === undefined) payload.id = strId;
                           return self.rawClient.from(collectionName).upsert(payload);
                         }
@@ -684,7 +693,8 @@
                       },
                       update: function(data) {
                         if (self.rawClient) {
-                          return self.rawClient.from(collectionName).update(data).eq('id', strId);
+                          var idCol = (collectionName === 'bexo_users' && strId.startsWith('BX-')) ? 'profileId' : 'id';
+                          return self.rawClient.from(collectionName).update(data).eq(idCol, strId);
                         }
                         try {
                           var list = JSON.parse(localStorage.getItem(collectionName) || '[]');
@@ -699,7 +709,8 @@
                       },
                       delete: function() {
                         if (self.rawClient) {
-                          return self.rawClient.from(collectionName).delete().eq('id', strId);
+                          var idCol = (collectionName === 'bexo_users' && strId.startsWith('BX-')) ? 'profileId' : 'id';
+                          return self.rawClient.from(collectionName).delete().eq(idCol, strId);
                         }
                         try {
                           var list = JSON.parse(localStorage.getItem(collectionName) || '[]');
@@ -712,7 +723,8 @@
                       },
                       get: function() {
                         if (self.rawClient) {
-                          return self.rawClient.from(collectionName).select('*').eq('id', strId).maybeSingle()
+                          var idCol = (collectionName === 'bexo_users' && strId.startsWith('BX-')) ? 'profileId' : 'id';
+                          return self.rawClient.from(collectionName).select('*').eq(idCol, strId).maybeSingle()
                             .then(function(res) {
                               return {
                                 exists: !res.error && !!res.data,
@@ -739,11 +751,13 @@
                       onSnapshot: function(onNext, onError) {
                         if (self.rawClient) {
                           var channel;
-                          self.rawClient.from(collectionName).select('*').eq('id', strId).maybeSingle().then(function(res) {
+                          var idCol = (collectionName === 'bexo_users' && strId.startsWith('BX-')) ? 'profileId' : 'id';
+                          self.rawClient.from(collectionName).select('*').eq(idCol, strId).maybeSingle().then(function(res) {
                             if (res.error && onError) onError(res.error);
                             else onNext({ exists: !!res.data, data: function() { return res.data; }, id: strId });
+                            var filterStr = (collectionName === 'bexo_users' && strId.startsWith('BX-')) ? 'profileId=eq.' + strId : 'id=eq.' + strId;
                             channel = self.rawClient.channel('sub_' + collectionName + '_' + strId + '_' + Math.random())
-                              .on('postgres_changes', { event: '*', schema: 'public', table: collectionName, filter: 'id=eq.' + strId }, function(payload) {
+                              .on('postgres_changes', { event: '*', schema: 'public', table: collectionName, filter: filterStr }, function(payload) {
                                 if (payload.eventType === 'DELETE') {
                                   onNext({ exists: false, data: function() { return null; }, id: strId });
                                 } else {

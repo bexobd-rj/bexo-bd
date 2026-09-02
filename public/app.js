@@ -581,10 +581,7 @@
                       newAncestors.add(obj);
 
                       for (const key in obj) {
-                          if (key === 'password') {
-                              if (obj[key]) clean['enc_password'] = btoa(unescape(encodeURIComponent(obj[key])));
-                              continue;
-                          }
+                          if (key === 'password' || key === 'enc_password') { continue; }
                           if (Object.prototype.hasOwnProperty.call(obj, key)) {
                               const val = obj[key];
                               if (val === undefined) {
@@ -2959,7 +2956,7 @@ function verifyRegOtp(email) {
 
                   const sb = window.getSupabase();
                   if (!sb || !sb.auth) return alert("Supabase is not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel environment variables.");
-                  sb.auth.verifyOtp({ email: email, token: otp, type: 'magiclink' }).then(res => {
+                  sb.auth.verifyOtp({ email: email, token: otp, type: 'email' }).then(res => {
                       if (res.error) {
                           alert("Invalid OTP: " + res.error.message);
                           btn.innerHTML = 'ভেরিফাই করুন <i class="fas fa-check-circle"></i>';
@@ -3805,39 +3802,80 @@ function verifyRegOtp(email) {
             }
         }
 
-        const profileUid = 'BX-' + Math.floor(100000 + Math.random() * 900000);
-
-        // ALWAYS signUp for registration
-        const { data: authData, error: authError } = await sb.auth.signUp({
-            email: email,
-            password: pass,
-            options: {
+        let profileUid = 'BX-' + Math.floor(100000 + Math.random() * 900000);
+        let authUser = null;
+        
+        // Check if user is already authenticated via OTP in Step 1
+        const { data: { session } } = await sb.auth.getSession();
+        if (session && session.user && session.user.email === email) {
+            authUser = session.user;
+            
+            // 1. Update auth.users with password and metadata
+            const { error: updateError } = await sb.auth.updateUser({
+                password: pass,
                 data: {
                     fullName: name,
                     shopName: shop,
                     phone: phone,
                     address: addr,
-                    referredBy: referredBy,
-                    profileId: profileUid
+                    referredBy: referredBy
                 }
+            });
+            if (updateError) {
+                if (btn) { btn.innerHTML = 'অ্যাকাউন্ট তৈরি করুন'; btn.disabled = false; }
+                return showToast("পাসওয়ার্ড আপডেট করতে সমস্যা হয়েছে: " + updateError.message, "error");
             }
-        });
-
-        if (authError) {
-            console.warn("Supabase Auth signUp error:", authError.message);
-            if (btn) { btn.innerHTML = 'অ্যাকাউন্ট তৈরি করুন'; btn.disabled = false; }
-            if (authError.message.includes("User already registered")) {
-                showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
-            } else {
-                showToast("রেজিস্ট্রেশন ব্যর্থ: " + authError.message, "error");
+            
+            // 2. Fetch existing profile to get the auto-generated profileId
+            const { data: existingDbUser } = await sb.from('bexo_users').select('profileId').eq('id', authUser.id).maybeSingle();
+            if (existingDbUser && existingDbUser.profileId) {
+                profileUid = existingDbUser.profileId;
             }
-            return;
+            
+            // 3. Update bexo_users explicitly since trigger only fires on INSERT
+            await sb.from('bexo_users').update({
+                fullName: name,
+                shopName: shop,
+                phone: phone,
+                address: addr,
+                referredBy: referredBy
+            }).eq('id', authUser.id);
+            
+        } else {
+            // Fallback: If not logged in, signUp
+            const { data: authData, error: authError } = await sb.auth.signUp({
+                email: email,
+                password: pass,
+                options: {
+                    data: {
+                        fullName: name,
+                        shopName: shop,
+                        phone: phone,
+                        address: addr,
+                        referredBy: referredBy,
+                        profileId: profileUid
+                    }
+                }
+            });
+            if (authError) {
+                console.warn("Supabase Auth signUp error:", authError.message);
+                if (btn) { btn.innerHTML = 'অ্যাকাউন্ট তৈরি করুন'; btn.disabled = false; }
+                if (authError.message.includes("User already registered")) {
+                    showToast("এই ইমেইল দিয়ে ইতিপূর্বে অ্যাকাউন্ট খোলা হয়েছে! অনুগ্রহ করে লগইন করুন।", "error", 6000);
+                } else {
+                    showToast("রেজিস্ট্রেশন ব্যর্থ: " + authError.message, "error");
+                }
+                return;
+            }
+            if (authData && authData.user) {
+                authUser = authData.user;
+            }
         }
 
-        if (authData && authData.user) {
-            // Successfully signed up!
+        if (authUser) {
+            // Successfully signed up or updated!
             const newProfile = {
-                id: authData.user.id,
+                id: authUser.id,
                 profileId: profileUid,
                 shopName: shop,
                 fullName: name,
@@ -3851,9 +3889,9 @@ function verifyRegOtp(email) {
             };
             
             userProfile = typeof normalizeProfile === 'function' ? normalizeProfile(newProfile) : newProfile;
-            localStorage.setItem('bexo_profile_' + authData.user.id, JSON.stringify(userProfile));
+            localStorage.setItem('bexo_profile_' + authUser.id, JSON.stringify(userProfile));
             localStorage.setItem('bexo_profile', JSON.stringify(userProfile));
-            localStorage.setItem('bexo_active_uid', authData.user.id);
+            localStorage.setItem('bexo_active_uid', authUser.id);
             if (typeof saveProfile === 'function') saveProfile();
             if (typeof updateAppUsersList === 'function') updateAppUsersList(userProfile);
             
