@@ -3832,14 +3832,19 @@ function verifyRegOtp(email) {
                 profileUid = existingDbUser.profileId;
             }
             
-            // 3. Update bexo_users explicitly since trigger only fires on INSERT
-            await sb.from('bexo_users').update({
+            // 3. Upsert bexo_users explicitly to handle both new and existing users
+            const { error: upsertErr } = await sb.from('bexo_users').upsert({
+                id: authUser.id,
+                profileId: profileUid,
+                email: email,
                 fullName: name,
                 shopName: shop,
                 phone: phone,
                 address: addr,
-                referredBy: referredBy
-            }).eq('id', authUser.id);
+                referredBy: referredBy,
+                role: (email === 'bexobd@gmail.com') ? 'admin' : 'user'
+            }, { onConflict: 'id' });
+            if (upsertErr) console.warn("Upsert error in register:", upsertErr);
             
         } else {
             // Fallback: If not logged in, signUp

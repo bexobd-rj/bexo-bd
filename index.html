@@ -671,9 +671,17 @@
                           if (collectionName === 'bexo_users' && strId.startsWith('BX-')) {
                               if (payload.id === strId) delete payload.id;
                               if (payload.id === undefined && data.id) payload.id = data.id;
-                              // Try to update first
-                              return self.rawClient.from(collectionName).update(payload).eq('profileId', strId).then(function(res) {
+                              // Try to update first. If 0 rows updated, we must UPSERT by id.
+                              return self.rawClient.from(collectionName).update(payload).eq('profileId', strId).select('id').then(function(res) {
                                   if (res.error) return { data: data, error: res.error };
+                                  if (res.data && res.data.length > 0) return { data: data, error: null };
+                                  // 0 rows updated means missing row. We must upsert.
+                                  // To upsert, we need the UUID 'id' which might be in payload.id
+                                  if (payload.id) {
+                                      return self.rawClient.from(collectionName).upsert(payload, { onConflict: 'id' }).then(function(r) {
+                                          return { data: data, error: r.error };
+                                      });
+                                  }
                                   return { data: data, error: null };
                               });
                           }
@@ -755,6 +763,7 @@
                           self.rawClient.from(collectionName).select('*').eq(idCol, strId).maybeSingle().then(function(res) {
                             if (res.error && onError) onError(res.error);
                             else onNext({ exists: !!res.data, data: function() { return res.data; }, id: strId });
+                          }).catch(function(err) { if(onError) onError(err); });
                             var filterStr = (collectionName === 'bexo_users' && strId.startsWith('BX-')) ? 'profileId=eq.' + strId : 'id=eq.' + strId;
                             channel = self.rawClient.channel('sub_' + collectionName + '_' + strId + '_' + Math.random())
                               .on('postgres_changes', { event: '*', schema: 'public', table: collectionName, filter: filterStr }, function(payload) {
@@ -764,9 +773,6 @@
                                   onNext({ exists: true, data: function() { return payload.new; }, id: strId });
                                 }
                               }).subscribe();
-                          }).catch(function(err) {
-                            if (onError) onError(err);
-                          });
                           return function() { if (channel && self.rawClient.removeChannel) self.rawClient.removeChannel(channel); };
                         }
                         setTimeout(function() {
